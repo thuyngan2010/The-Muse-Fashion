@@ -1,0 +1,57 @@
+services:
+  api-migrate:
+    image: ${API_IMAGE:-fashion-commerce-api:local}
+    restart: "no"
+    env_file:
+      - ${API_ENV_FILE:-apps/api/.env}
+    environment:
+      NODE_ENV: production
+    entrypoint: ["node", "apps/api/dist/scripts/migrate.js"]
+
+  api:
+    image: ${API_IMAGE:-fashion-commerce-api:local}
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    restart: unless-stopped
+    init: true
+    env_file:
+      - ${API_ENV_FILE:-apps/api/.env}
+    environment:
+      NODE_ENV: production
+      HOST: 0.0.0.0
+      PORT: 3000
+      TRUST_PROXY: "true"
+      SWAGGER_ENABLED: ${SWAGGER_ENABLED:-false}
+    depends_on:
+      api-migrate:
+        condition: service_completed_successfully
+    expose:
+      - "3000"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/api/v1/health/ready').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      start_period: 20s
+      retries: 3
+
+  web:
+    image: ${WEB_IMAGE:-fashion-commerce-web:local}
+    build:
+      context: .
+      dockerfile: Dockerfile.web
+    restart: unless-stopped
+    environment:
+      PUBLIC_API_BASE_URL: ${PUBLIC_API_BASE_URL:-/api/v1}
+      API_UPSTREAM: http://api:3000
+    depends_on:
+      api:
+        condition: service_healthy
+    ports:
+      - "${WEB_BIND_ADDRESS:-127.0.0.1}:${WEB_PORT:-8080}:8080"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/healthz"]
+      interval: 30s
+      timeout: 5s
+      start_period: 10s
+      retries: 3

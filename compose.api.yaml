@@ -1,0 +1,12 @@
+# Standalone backend server; reuses the API and migration contracts.
+services:
+  api-migrate:
+    extends:
+      file: compose.deploy.yaml
+      service: api-migrate
+  api:
+    extends:
+      file: compose.deploy.yaml
+      service: api
+    ports:
+      - "${API_BIND_ADDRESS:-127.0.0.1}:${API_PORT:-3000}:3000"

@@ -1,0 +1,31 @@
+# syntax=docker/dockerfile:1.7
+FROM node:24-bookworm-slim AS build
+WORKDIR /app
+
+COPY package.json package-lock.json .npmrc ./
+COPY apps/api/package.json apps/api/package.json
+COPY packages/contracts/package.json packages/contracts/package.json
+RUN --mount=type=cache,target=/root/.npm npm ci --no-audit --fetch-timeout=60000 --fetch-retries=2
+
+COPY apps/api apps/api
+COPY packages/contracts packages/contracts
+RUN npm run build:api
+RUN npm prune --omit=dev
+
+FROM node:24-bookworm-slim AS runtime
+ENV NODE_ENV=production HOST=0.0.0.0 PORT=3000
+WORKDIR /app
+RUN groupadd --system --gid 10001 nodeapp && useradd --system --uid 10001 --gid nodeapp --home-dir /nonexistent --shell /usr/sbin/nologin nodeapp
+
+COPY --from=build --chown=nodeapp:nodeapp /app/package.json /app/package-lock.json ./
+COPY --from=build --chown=nodeapp:nodeapp /app/node_modules ./node_modules
+COPY --from=build --chown=nodeapp:nodeapp /app/apps/api/package.json ./apps/api/package.json
+COPY --from=build --chown=nodeapp:nodeapp /app/apps/api/dist ./apps/api/dist
+COPY --from=build --chown=nodeapp:nodeapp /app/apps/api/src/migrations/*.ts ./apps/api/src/migrations/
+COPY --from=build --chown=nodeapp:nodeapp /app/packages/contracts/package.json ./packages/contracts/package.json
+COPY --from=build --chown=nodeapp:nodeapp /app/packages/contracts/dist ./packages/contracts/dist
+
+USER nodeapp
+EXPOSE 3000
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 CMD ["node", "-e", "fetch('http://127.0.0.1:3000/api/v1/health/ready').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+CMD ["node", "apps/api/dist/main.js"]
