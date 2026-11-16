@@ -1,0 +1,37 @@
+{
+  "passed": 5,
+  "findings": [
+    {
+      "id": "A01",
+      "renameStatus": 200,
+      "cancellationStatus": 409,
+      "message": "Voucher usage cannot be released",
+      "retainedOrderState": "PENDING_PAYMENT",
+      "retainedReservedStock": 1
+    },
+    {
+      "id": "A02",
+      "httpStatus": 201,
+      "previousPermissionRemoved": true,
+      "remainingPermissions": [
+        "order.read"
+      ]
+    },
+    {
+      "id": "A06",
+      "endpoint": "/admin/orders?page=1&limit=1",
+      "requestedLimit": 1,
+      "returnedItems": 4
+    },
+    {
+      "id": "A08",
+      "endpoint": "/admin/users?page=1&limit=100",
+      "httpStatus": 400
+    },
+    {
+      "id": "A04",
+      "httpStatus": 400,
+      "missingField": "evidenceObjectKey"
+    }
+  ]
+}

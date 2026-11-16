@@ -1,0 +1,188 @@
+{
+  "isolatedTestDatabase": "fc_audit_commerce_mvsdqm28_f2d313",
+  "results": [
+    {
+      "label": "create_valid_100_percent_voucher",
+      "status": 201,
+      "body": {
+        "id": "6ae22ebcb87a7de1ae0d0c37",
+        "code": "AUDITFREE100",
+        "type": "PERCENT",
+        "value": 100,
+        "maxDiscount": null,
+        "minimumSubtotal": 0,
+        "validFrom": "2026-10-28T17:18:56.000Z",
+        "validTo": "2026-10-28T17:29:56.000Z",
+        "usageLimit": 10,
+        "usedCount": 0,
+        "status": "ACTIVE"
+      }
+    },
+    {
+      "label": "zero_total_quote",
+      "status": 201,
+      "body": {
+        "id": "c6e8c6a1-739a-43ec-98e9-308658e67184",
+        "subtotal": 1000000,
+        "shippingFee": 0,
+        "voucherDiscount": 1000000,
+        "payableTotal": 0,
+        "expiresAt": "2026-10-28T17:29:56.798Z"
+      }
+    },
+    {
+      "label": "zero_total_order",
+      "status": 201,
+      "body": {
+        "id": "6ae22ebcb87a7de1ae0d0c3e",
+        "code": "FCMVSDQPR3C6B2B0242777",
+        "state": "PENDING_PAYMENT",
+        "money": {
+          "subtotal": 1000000,
+          "shippingFee": 0,
+          "voucherDiscount": 1000000,
+          "payableTotal": 0
+        },
+        "paymentDueAt": "2026-10-28T17:49:56.895Z",
+        "createdAt": "2026-10-28T17:19:56.896Z"
+      }
+    },
+    {
+      "label": "zero_total_payment_attempt",
+      "status": 201,
+      "body": {
+        "id": "6ae22ebcb87a7de1ae0d0c43",
+        "orderId": "6ae22ebcb87a7de1ae0d0c3e",
+        "provider": "SEPAY",
+        "state": "PENDING",
+        "amount": 0,
+        "currency": "VND",
+        "reconciliationCode": "FCTSM5FMGG",
+        "expiresAt": "2026-10-28T17:49:56.895Z",
+        "paidAt": null,
+        "bank": {
+          "bin": "970422",
+          "accountNumberMasked": "******6789",
+          "accountName": "FASHION COMMERCE"
+        },
+        "qrImageUrl": "https://vietqr.app/img?acc=0123456789&bank=970422&amount=0&des=FCTSM5FMGG&template=compact&holder=FASHION+COMMERCE",
+        "hasOpenReview": false,
+        "reviewOutcome": null
+      }
+    },
+    {
+      "label": "zero_transfer_webhook",
+      "status": 400,
+      "body": {
+        "statusCode": 400,
+        "code": "VALIDATION_FAILED",
+        "message": "Invalid SePay webhook payload",
+        "requestId": "c6e145da-bc73-4680-a6fb-a743e2619b69"
+      }
+    },
+    {
+      "label": "zero_total_admin_confirm",
+      "status": 422,
+      "body": {
+        "statusCode": 422,
+        "code": "BUSINESS_RULE_FAILED",
+        "message": "Order cannot be confirmed without a succeeded payment",
+        "requestId": "3bcda6ec-43c5-4703-8daa-8691e8a949cc"
+      }
+    },
+    {
+      "label": "zero_order_db_state",
+      "order": {
+        "_id": "6ae22ebcb87a7de1ae0d0c3e",
+        "code": "FCMVSDQPR3C6B2B0242777",
+        "customerId": "6ae22ebba7c3c2f838fec889",
+        "items": [
+          {
+            "lineId": "6ae22ebcb87a7de1ae0d0c3d",
+            "productId": "6ae22ebca7c3c2f838fec88c",
+            "variantId": "6ae22ebca7c3c2f838fec88d",
+            "sku": "8051f329-cc28-4de5-9c6e-35c2b2d015d4",
+            "productName": "Audit product",
+            "unitPrice": 1000000,
+            "quantity": 1,
+            "discount": 0,
+            "lineTotal": 1000000
+          }
+        ],
+        "money": {
+          "subtotal": 1000000,
+          "shippingFee": 0,
+          "voucherDiscount": 1000000,
+          "payableTotal": 0
+        },
+        "shippingSnapshot": {
+          "addressId": "6ae22ebca7c3c2f838fec88b",
+          "receiver": "Audit Customer",
+          "phone": "0901234567",
+          "location": {
+            "line1": "1 Test",
+            "ward": "1",
+            "district": "1",
+            "province": "HCM"
+          },
+          "note": null,
+          "shippingMethod": "STANDARD"
+        },
+        "state": "PENDING_PAYMENT",
+        "paymentDueAt": "2026-10-28T17:49:56.895Z",
+        "idempotencyKey": "3fdcd216-8c71-47f9-b6f7-d4cdb1c025aa",
+        "requestHash": "7aacaec56fe9249970c52639de0048290e184045edf0a7fed54f23809157d16d",
+        "voucherCode": "AUDITFREE100",
+        "version": 1,
+        "paymentAttemptRevision": 1,
+        "createdAt": "2026-10-28T17:19:56.896Z",
+        "updatedAt": "2026-10-28T17:19:56.896Z",
+        "__v": 0
+      },
+      "reservedStock": 1
+    },
+    {
+      "label": "shipment_failed",
+      "status": 200,
+      "body": {
+        "orderId": "6ae22ebda7c3c2f838fec88f",
+        "carrier": "Test Carrier",
+        "trackingCode": "TRACKAUDIT",
+        "status": "FAILED",
+        "events": [
+          {
+            "status": "FAILED",
+            "note": "Recipient temporarily unavailable",
+            "at": "2026-10-28T17:19:57.058Z",
+            "actorId": "6ae22ebba7c3c2f838fec88a"
+          }
+        ]
+      }
+    },
+    {
+      "label": "shipment_retry_after_failed",
+      "status": 422,
+      "body": {
+        "statusCode": 422,
+        "code": "BUSINESS_RULE_FAILED",
+        "message": "Shipment status cannot move backwards or leave a terminal state",
+        "requestId": "a8330831-83e0-4fdf-8efa-e2b49ec8c84a"
+      }
+    },
+    {
+      "label": "shipment_cancel_after_failed",
+      "status": 422,
+      "body": {
+        "statusCode": 422,
+        "code": "BUSINESS_RULE_FAILED",
+        "message": "Order cannot be cancelled in its current state",
+        "requestId": "c974ed0d-6719-4152-bfd6-d3fc3f0eb12e"
+      }
+    },
+    {
+      "label": "failed_shipment_db_state",
+      "orderState": "SHIPPING",
+      "shipmentStatus": "FAILED"
+    }
+  ]
+}

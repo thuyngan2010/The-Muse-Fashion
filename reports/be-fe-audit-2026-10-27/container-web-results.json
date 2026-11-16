@@ -1,0 +1,11 @@
+{
+  "runtimeRemoteApiConfig": "passed",
+  "runtimeConfigNoStore": "passed",
+  "spaFallback": "passed",
+  "A19": {
+    "smallUploadBytes": 1024,
+    "smallUploadStatus": 502,
+    "largeUploadBytes": 2097152,
+    "largeUploadStatus": 413
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "scope": "isolated local MongoDB; synthetic commerce fixtures",
+  "verifiedAt": "2026-10-27T16:46:15.700Z",
+  "collections": {
+    "users": 1,
+    "orders": 5,
+    "payments": 5
+  },
+  "businessDataHashMatches": true,
+  "sourceSha256": "21a7e1f695f516d616a151f519e7c422cdf850be0034c4341b7e43303a523228",
+  "restoredSha256": "21a7e1f695f516d616a151f519e7c422cdf850be0034c4341b7e43303a523228",
+  "migrationVersions": 3,
+  "restoreAndMigrationVerifyMs": 4949,
+  "observedLostFixtureDocuments": 0,
+  "productionRpoRtoAccepted": false
+}

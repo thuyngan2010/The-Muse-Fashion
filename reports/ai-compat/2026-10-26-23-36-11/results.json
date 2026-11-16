@@ -1,0 +1,2605 @@
+{
+  "startedAt": "2026-10-26 23:36:11",
+  "timezone": "Asia/Saigon",
+  "endpoint": "http://localhost:3669/v1",
+  "model": "gpt-6-thinking",
+  "scope": "Chat Completions, SSE, function tools, validation/authentication, model discovery; one Responses API probe.",
+  "exclusions": "Not an OpenAI certification. No audio, image generation/editing, embeddings, uploads, stored-completion CRUD, rate-limit stress, billing, or exhaustive parameter-combination testing. Optional capability rejection is distinct from malformed output. Accepted sampler/reasoning parameters do not prove their implementation. BEHAVIOR_FAIL denotes observed prompt-following failures, not a malformed JSON response or proof that the gateway drops roles. FAIL includes strict HTTP-status differences from OpenAI as well as silently ignored feature settings.",
+  "reference": "https://developers.openai.com/api/reference/resources/chat/subresources/completions/methods/create",
+  "counts": {
+    "PASS": 18,
+    "FAIL": 29,
+    "BEHAVIOR_FAIL": 3,
+    "UNSUPPORTED": 0,
+    "ERROR": 2
+  },
+  "durationMs": 121836,
+  "results": [
+    {
+      "name": "01 basic JSON and response envelope",
+      "state": "PASS",
+      "request": {
+        "model": "gpt-6-thinking",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Reply with exactly OK."
+          }
+        ],
+        "max_completion_tokens": 1024,
+        "stream": false
+      },
+      "httpStatus": 200,
+      "contentType": "application/json",
+      "errors": [],
+      "evidence": {
+        "id": "chatcmpl-7d0fbe44475e49feba9738d127c0fdbc",
+        "object": "chat.completion",
+        "model": "gpt-6-thinking",
+        "created": 1793032578,
+        "choices": [
+          {
+            "index": 0,
+            "finish_reason": "stop",
+            "message": {
+              "role": "assistant",
+              "content": "OK"
+            }
+          }
+        ],
+        "usage": {
+          "prompt_tokens": 12,
+          "completion_tokens": 1,
+          "total_tokens": 13,
+          "prompt_tokens_details": {
+            "text_tokens": 12,
+            "image_tokens": 0,
+            "cached_tokens": 0
+          },
+          "completion_tokens_details": {
+            "text_tokens": 1,
+            "image_tokens": 0,
+            "reasoning_tokens": 0
+          }
+        }
+      },
+      "elapsedMs": 7763,
+      "category": "capability"
+    },
+    {
+      "name": "02 multi-turn conversation",
+      "state": "PASS",
+      "request": {
+        "model": "gpt-6-thinking",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Remember the code LIME42."
+          },
+          {
+            "role": "assistant",
+            "content": "Remembered."
+          },
+          {
+            "role": "user",
+            "content": "Reply only with the code I supplied."
+          }
+        ],
+        "max_completion_tokens": 1024,
+        "stream": false
+      },
+      "httpStatus": 200,
+      "contentType": "application/json",
+      "errors": [],
+      "evidence": {
+        "id": "chatcmpl-a3df7ee10cd74580987dfb4ff51680c5",
+        "object": "chat.completion",
+        "model": "gpt-6-thinking",
+        "created": 1793032579,
+        "choices": [
+          {
+            "index": 0,
+            "finish_reason": "stop",
+            "message": {
+              "role": "assistant",
+              "content": "LIME42"
+            }
+          }
+        ],
+        "usage": {
+          "prompt_tokens": 33,
+          "completion_tokens": 3,
+          "total_tokens": 36,
+          "prompt_tokens_details": {
+            "text_tokens": 33,
+            "image_tokens": 0,
+            "cached_tokens": 0
+          },
+          "completion_tokens_details": {
+            "text_tokens": 3,
+            "image_tokens": 0,
+            "reasoning_tokens": 0
+          }
+        }
+      },
+      "elapsedMs": 7971,
+      "category": "prompt-following"
+    },
+    {
+      "name": "03 system instruction priority",
+      "state": "BEHAVIOR_FAIL",
+      "request": {
+        "model": "gpt-6-thinking",
+        "messages": [
+          {
+            "role": "system",
+            "content": "Reply with exactly SYSTEM_OK."
+          },
+          {
+            "role": "user",
+            "content": "Reply with exactly OK."
+          }
+        ],
+        "max_completion_tokens": 1024,
+        "stream": false
+      },
+      "httpStatus": 200,
+      "contentType": "application/json",
+      "errors": [
+        "Expected \"SYSTEM_OK\", got \"OK\""
+      ],
+      "evidence": {
+        "id": "chatcmpl-7c194073cb4c48b9af94b78fe51dd054",
+        "object": "chat.completion",
+        "model": "gpt-6-thinking",
+        "created": 1793032585,
+        "choices": [
+          {
+            "index": 0,
+            "finish_reason": "stop",
+            "message": {
+              "role": "assistant",
+              "content": "OK"
+            }
+          }
+        ],
+        "usage": {
+          "prompt_tokens": 22,
+          "completion_tokens": 1,
+          "total_tokens": 23,
+          "prompt_tokens_details": {
+            "text_tokens": 22,
+            "image_tokens": 0,
+            "cached_tokens": 0
+          },
+          "completion_tokens_details": {
+            "text_tokens": 1,
+            "image_tokens": 0,
+            "reasoning_tokens": 0
+          }
+        }
+      },
+      "elapsedMs": 6989,
+      "category": "prompt-following"
+    },
+    {
+      "name": "04 developer role",
+      "state": "BEHAVIOR_FAIL",
+      "request": {
+        "model": "gpt-6-thinking",
+        "messages": [
+          {
+            "role": "developer",
+            "content": "Reply with exactly DEV_OK."
+          },
+          {
+            "role": "user",
+            "content": "Reply with exactly OK."
+          }
+        ],
+        "max_completion_tokens": 1024,
+        "stream": false
+      },
+      "httpStatus": 200,
+      "contentType": "application/json",
+      "errors": [
+        "Expected \"DEV_OK\", got \"OK\""
+      ],
+      "evidence": {
+        "id": "chatcmpl-72568c8a82fc4d8d801307dad82b6392",
+        "object": "chat.completion",
+        "model": "gpt-6-thinking",
+        "created": 1793032585,
+        "choices": [
+          {
+            "index": 0,
+            "finish_reason": "stop",
+            "message": {
+              "role": "assistant",
+              "content": "OK"
+            }
+          }
+        ],
+        "usage": {
+          "prompt_tokens": 22,
+          "completion_tokens": 1,
+          "total_tokens": 23,
+          "prompt_tokens_details": {
+            "text_tokens": 22,
+            "image_tokens": 0,
+            "cached_tokens": 0
+          },
+          "completion_tokens_details": {
+            "text_tokens": 1,
+            "image_tokens": 0,
+            "reasoning_tokens": 0
+          }
+        }
+      },
+      "elapsedMs": 5854,
+      "category": "prompt-following"
+    },
+    {
+      "name": "05 array text content parts",
+      "state": "PASS",
+      "request": {
+        "model": "gpt-6-thinking",
+        "messages": [
+          {
+            "role": "user",
+            "content": [
+              {
+                "type": "text",
+                "text": "Reply with exactly PARTS_OK."
+              }
+            ]
+          }
+        ],
+        "max_completion_tokens": 1024,
+        "stream": false
+      },
+      "httpStatus": 200,
+      "contentType": "application/json",
+      "errors": [],
+      "evidence": {
+        "id": "chatcmpl-df797c9f0fc34dc080d2d86084fcf3f6",
+        "object": "chat.completion",
+        "model": "gpt-6-thinking",
+        "created": 1793032590,
+        "choices": [
+          {
+            "index": 0,
+            "finish_reason": "stop",
+            "message": {
+              "role": "assistant",
+              "content": "PARTS_OK"
+            }
+          }
+        ],
+        "usage": {
+          "prompt_tokens": 14,
+          "completion_tokens": 3,
+          "total_tokens": 17,
+          "prompt_tokens_details": {
+            "text_tokens": 14,
+            "image_tokens": 0,
+            "cached_tokens": 0
+          },
+          "completion_tokens_details": {
+            "text_tokens": 3,
+            "image_tokens": 0,
+            "reasoning_tokens": 0
+          }
+        }
+      },
+      "elapsedMs": 5208,
+      "category": "capability"
+    },
+    {
+      "name": "06 Vietnamese Unicode",
+      "state": "PASS",
+      "request": {
+        "model": "gpt-6-thinking",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Chỉ trả lời chính xác: Xin chào Việt Nam 🌿"
+          }
+        ],
+        "max_completion_tokens": 1024,
+        "stream": false
+      },
+      "httpStatus": 200,
+      "contentType": "application/json",
+      "errors": [],
+      "evidence": {
+        "id": "chatcmpl-0ec0b48cf0344757ba24414a152a18ae",
+        "object": "chat.completion",
+        "model": "gpt-6-thinking",
+        "created": 1793032592,
+        "choices": [
+          {
+            "index": 0,
+            "finish_reason": "stop",
+            "message": {
+              "role": "assistant",
+              "content": "Xin chào Việt Nam 🌿"
+            }
+          }
+        ],
+        "usage": {
+          "prompt_tokens": 21,
+          "completion_tokens": 7,
+          "total_tokens": 28,
+          "prompt_tokens_details": {
+            "text_tokens": 21,
+            "image_tokens": 0,
+            "cached_tokens": 0
+          },
+          "completion_tokens_details": {
+            "text_tokens": 7,
+            "image_tokens": 0,
+            "reasoning_tokens": 0
+          }
+        }
+      },
+      "elapsedMs": 6061,
+      "category": "prompt-following"
+    },
+    {
+      "name": "07 exact-text instruction with quotes/newlines",
+      "state": "BEHAVIOR_FAIL",
+      "request": {
+        "model": "gpt-6-thinking",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Repeat exactly the text between <text> and </text>, without fences: <text>A \"quote\"\nB \\ slash</text>"
+          }
+        ],
+        "max_completion_tokens": 1024,
+        "stream": false
+      },
+      "httpStatus": 200,
+      "contentType": "application/json",
+      "errors": [
+        "Expected \"A \\\"quote\\\"\\nB \\\\ slash\", got \"<text>A \\\"quote\\\"\\nB \\\\ slash</text>\""
+      ],
+      "evidence": {
+        "id": "chatcmpl-221f7f86792543a292cdf14025c4f1e5",
+        "object": "chat.completion",
+        "model": "gpt-6-thinking",
+        "created": 1793032597,
+        "choices": [
+          {
+            "index": 0,
+            "finish_reason": "stop",
+            "message": {
+              "role": "assistant",
+              "content": "<text>A \"quote\"\nB \\ slash</text>"
+            }
+          }
+        ],
+        "usage": {
+          "prompt_tokens": 34,
+          "completion_tokens": 12,
+          "total_tokens": 46,
+          "prompt_tokens_details": {
+            "text_tokens": 34,
+            "image_tokens": 0,
+            "cached_tokens": 0
+          },
+          "completion_tokens_details": {
+            "text_tokens": 12,
+            "image_tokens": 0,
+            "reasoning_tokens": 0
+          }
+        }
+      },
+      "elapsedMs": 7632,
+      "category": "prompt-following",
+      "note": "Prompt-following check, not proof of a JSON wire-escaping defect."
+    },
+    {
+      "name": "08 multiple choices n=2",
+      "state": "FAIL",
+      "request": {
+        "model": "gpt-6-thinking",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Reply with exactly OK."
+          }
+        ],
+        "max_completion_tokens": 1024,
+        "stream": false,
+        "n": 2
+      },
+      "httpStatus": 200,
+      "contentType": "application/json",
+      "errors": [
+        "n=2 did not return two distinct choices"
+      ],
+      "evidence": {
+        "id": "chatcmpl-7d0fbe44475e49feba9738d127c0fdbc",
+        "object": "chat.completion",
+        "model": "gpt-6-thinking",
+        "created": 1793032578,
+        "choices": [
+          {
+            "index": 0,
+            "finish_reason": "stop",
+            "message": {
+              "role": "assistant",
+              "content": "OK"
+            }
+          }
+        ],
+        "usage": {
+          "prompt_tokens": 12,
+          "completion_tokens": 1,
+          "total_tokens": 13,
+          "prompt_tokens_details": {
+            "text_tokens": 12,
+            "image_tokens": 0,
+            "cached_tokens": 0
+          },
+          "completion_tokens_details": {
+            "text_tokens": 1,
+            "image_tokens": 0,
+            "reasoning_tokens": 0
+          }
+        }
+      },
+      "elapsedMs": 9,
+      "category": "capability"
+    },
+    {
+      "name": "09 temperature=0 acceptance",
+      "state": "PASS",
+      "note": "Acceptance only; sampling semantics cannot be proven by one sample.",
+      "request": {
+        "model": "gpt-6-thinking",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Reply with exactly OK."
+          }
+        ],
+        "max_completion_tokens": 1024,
+        "stream": false,
+        "temperature": 0
+      },
+      "httpStatus": 200,
+      "contentType": "application/json",
+      "errors": [],
+      "evidence": {
+        "id": "chatcmpl-9e4408ba8c3d40789d3586a7803a295d",
+        "object": "chat.completion",
+        "model": "gpt-6-thinking",
+        "created": 1793032597,
+        "choices": [
+          {
+            "index": 0,
+            "finish_reason": "stop",
+            "message": {
+              "role": "assistant",
+              "content": "OK"
+            }
+          }
+        ],
+        "usage": {
+          "prompt_tokens": 12,
+          "completion_tokens": 1,
+          "total_tokens": 13,
+          "prompt_tokens_details": {
+            "text_tokens": 12,
+            "image_tokens": 0,
+            "cached_tokens": 0
+          },
+          "completion_tokens_details": {
+            "text_tokens": 1,
+            "image_tokens": 0,
+            "reasoning_tokens": 0
+          }
+        }
+      },
+      "elapsedMs": 5415,
+      "category": "capability"
+    },
+    {
+      "name": "10 top_p acceptance",
+      "state": "PASS",
+      "note": "Acceptance only; not a statistical sampler test.",
+      "request": {
+        "model": "gpt-6-thinking",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Reply with exactly OK."
+          }
+        ],
+        "max_completion_tokens": 1024,
+        "stream": false,
+        "top_p": 0.5
+      },
+      "httpStatus": 200,
+      "contentType": "application/json",
+      "errors": [],
+      "evidence": {
+        "id": "chatcmpl-35955fcc00164e4782f479f5b7a400a3",
+        "object": "chat.completion",
+        "model": "gpt-6-thinking",
+        "created": 1793032603,
+        "choices": [
+          {
+            "index": 0,
+            "finish_reason": "stop",
+            "message": {
+              "role": "assistant",
+              "content": "OK"
+            }
+          }
+        ],
+        "usage": {
+          "prompt_tokens": 12,
+          "completion_tokens": 1,
+          "total_tokens": 13,
+          "prompt_tokens_details": {
+            "text_tokens": 12,
+            "image_tokens": 0,
+            "cached_tokens": 0
+          },
+          "completion_tokens_details": {
+            "text_tokens": 1,
+            "image_tokens": 0,
+            "reasoning_tokens": 0
+          }
+        }
+      },
+      "elapsedMs": 5760,
+      "category": "capability"
+    },
+    {
+      "name": "11 frequency and presence penalties",
+      "state": "PASS",
+      "note": "Acceptance only.",
+      "request": {
+        "model": "gpt-6-thinking",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Reply with exactly OK."
+          }
+        ],
+        "max_completion_tokens": 1024,
+        "stream": false,
+        "frequency_penalty": 0.5,
+        "presence_penalty": 0.5
+      },
+      "httpStatus": 200,
+      "contentType": "application/json",
+      "errors": [],
+      "evidence": {
+        "id": "chatcmpl-95b49e031d9748ce9b9e2b7223476eae",
+        "object": "chat.completion",
+        "model": "gpt-6-thinking",
+        "created": 1793032602,
+        "choices": [
+          {
+            "index": 0,
+            "finish_reason": "stop",
+            "message": {
+              "role": "assistant",
+              "content": "OK"
+            }
+          }
+        ],
+        "usage": {
+          "prompt_tokens": 12,
+          "completion_tokens": 1,
+          "total_tokens": 13,
+          "prompt_tokens_details": {
+            "text_tokens": 12,
+            "image_tokens": 0,
+            "cached_tokens": 0
+          },
+          "completion_tokens_details": {
+            "text_tokens": 1,
+            "image_tokens": 0,
+            "reasoning_tokens": 0
+          }
+        }
+      },
+      "elapsedMs": 5116,
+      "category": "capability"
+    },
+    {
+      "name": "12 max_completion_tokens=1 enforced",
+      "state": "FAIL",
+      "request": {
+        "model": "gpt-6-thinking",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Count from 1 to 30, separated by spaces. Output every number."
+          }
+        ],
+        "max_completion_tokens": 1,
+        "stream": false
+      },
+      "httpStatus": 200,
+      "contentType": "application/json",
+      "errors": [
+        "truncated completion must finish with length",
+        "completion token cap was exceeded"
+      ],
+      "evidence": {
+        "id": "chatcmpl-0f3b42eaf3e44560b4b92401eb66b8ff",
+        "object": "chat.completion",
+        "model": "gpt-6-thinking",
+        "created": 1793032609,
+        "choices": [
+          {
+            "index": 0,
+            "finish_reason": "stop",
+            "message": {
+              "role": "assistant",
+              "content": "1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30"
+            }
+          }
+        ],
+        "usage": {
+          "prompt_tokens": 23,
+          "completion_tokens": 59,
+          "total_tokens": 82,
+          "prompt_tokens_details": {
+            "text_tokens": 23,
+            "image_tokens": 0,
+            "cached_tokens": 0
+          },
+          "completion_tokens_details": {
+            "text_tokens": 59,
+            "image_tokens": 0,
+            "reasoning_tokens": 0
+          }
+        }
+      },
+      "elapsedMs": 6882,
+      "category": "capability"
+    },
+    {
+      "name": "13 legacy max_tokens=1 enforced",
+      "state": "FAIL",
+      "request": {
+        "model": "gpt-6-thinking",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Count from 1 to 30, separated by spaces. Output every number."
+          }
+        ],
+        "stream": false,
+        "max_tokens": 1
+      },
+      "httpStatus": 200,
+      "contentType": "application/json",
+      "errors": [
+        "truncated completion must finish with length",
+        "completion token cap was exceeded"
+      ],
+      "evidence": {
+        "id": "chatcmpl-398263be91374f28b37b8e47e7fdfdf2",
+        "object": "chat.completion",
+        "model": "gpt-6-thinking",
+        "created": 1793032609,
+        "choices": [
+          {
+            "index": 0,
+            "finish_reason": "stop",
+            "message": {
+              "role": "assistant",
+              "content": "1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30"
+            }
+          }
+        ],
+        "usage": {
+          "prompt_tokens": 23,
+          "completion_tokens": 59,
+          "total_tokens": 82,
+          "prompt_tokens_details": {
+            "text_tokens": 23,
+            "image_tokens": 0,
+            "cached_tokens": 0
+          },
+          "completion_tokens_details": {
+            "text_tokens": 59,
+            "image_tokens": 0,
+            "reasoning_tokens": 0
+          }
+        }
+      },
+      "elapsedMs": 6571,
+      "category": "capability"
+    },
+    {
+      "name": "14 stop sequence enforced",
+      "state": "FAIL",
+      "request": {
+        "model": "gpt-6-thinking",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Reply exactly ALPHA<END>BETA with no other text."
+          }
+        ],
+        "max_completion_tokens": 1024,
+        "stream": false,
+        "stop": [
+          "<END>"
+        ]
+      },
+      "httpStatus": 200,
+      "contentType": "application/json",
+      "errors": [
+        "Expected \"ALPHA\", got \"ALPHA<escape><END></escape>BETA\""
+      ],
+      "evidence": {
+        "id": "chatcmpl-97486e747b9b4096bac898b18445500d",
+        "object": "chat.completion",
+        "model": "gpt-6-thinking",
+        "created": 1793032615,
+        "choices": [
+          {
+            "index": 0,
+            "finish_reason": "stop",
+            "message": {
+              "role": "assistant",
+              "content": "ALPHA<escape><END></escape>BETA"
+            }
+          }
+        ],
+        "usage": {
+          "prompt_tokens": 20,
+          "completion_tokens": 10,
+          "total_tokens": 30,
+          "prompt_tokens_details": {
+            "text_tokens": 20,
+            "image_tokens": 0,
+            "cached_tokens": 0
+          },
+          "completion_tokens_details": {
+            "text_tokens": 10,
+            "image_tokens": 0,
+            "reasoning_tokens": 0
+          }
+        }
+      },
+      "elapsedMs": 5637,
+      "category": "capability"
+    },
+    {
+      "name": "15 JSON object output",
+      "state": "FAIL",
+      "request": {
+        "model": "gpt-6-thinking",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Return a JSON object with ok=true and count=3. No markdown."
+          }
+        ],
+        "max_completion_tokens": 1024,
+        "stream": false,
+        "response_format": {
+          "type": "json_object"
+        }
+      },
+      "httpStatus": 200,
+      "contentType": "application/json",
+      "errors": [
+        "content is not a JSON object"
+      ],
+      "evidence": {
+        "id": "chatcmpl-dcd39f03c04a4519b0d0350f9305d91e",
+        "object": "chat.completion",
+        "model": "gpt-6-thinking",
+        "created": 1793032616,
+        "choices": [
+          {
+            "index": 0,
+            "finish_reason": "stop",
+            "message": {
+              "role": "assistant",
+              "content": "<escape>{\"ok\":true,\"count\":3}</escape>"
+            }
+          }
+        ],
+        "usage": {
+          "prompt_tokens": 22,
+          "completion_tokens": 13,
+          "total_tokens": 35,
+          "prompt_tokens_details": {
+            "text_tokens": 22,
+            "image_tokens": 0,
+            "cached_tokens": 0
+          },
+          "completion_tokens_details": {
+            "text_tokens": 13,
+            "image_tokens": 0,
+            "reasoning_tokens": 0
+          }
+        }
+      },
+      "elapsedMs": 7107,
+      "category": "capability"
+    },
+    {
+      "name": "16 strict JSON schema against conflicting prompt",
+      "state": "FAIL",
+      "request": {
+        "model": "gpt-6-thinking",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Reply in plain prose: NOT_JSON. Add an extra field named extra if you return JSON."
+          }
+        ],
+        "max_completion_tokens": 1024,
+        "stream": false,
+        "response_format": {
+          "type": "json_schema",
+          "json_schema": {
+            "name": "compat_result",
+            "strict": true,
+            "schema": {
+              "type": "object",
+              "properties": {
+                "answer": {
+                  "type": "string",
+                  "enum": [
+                    "OK"
+                  ]
+                },
+                "count": {
+                  "type": "integer",
+                  "enum": [
+                    1
+                  ]
+                }
+              },
+              "required": [
+                "answer",
+                "count"
+              ],
+              "additionalProperties": false
+            }
+          }
+        }
+      },
+      "httpStatus": 200,
+      "contentType": "application/json",
+      "errors": [
+        "strict schema ignored: output is not JSON"
+      ],
+      "evidence": {
+        "id": "chatcmpl-e02af47fe1a44e3b8e8143ad07b06b16",
+        "object": "chat.completion",
+        "model": "gpt-6-thinking",
+        "created": 1793032623,
+        "choices": [
+          {
+            "index": 0,
+            "finish_reason": "stop",
+            "message": {
+              "role": "assistant",
+              "content": "NOT_JSON"
+            }
+          }
+        ],
+        "usage": {
+          "prompt_tokens": 26,
+          "completion_tokens": 2,
+          "total_tokens": 28,
+          "prompt_tokens_details": {
+            "text_tokens": 26,
+            "image_tokens": 0,
+            "cached_tokens": 0
+          },
+          "completion_tokens_details": {
+            "text_tokens": 2,
+            "image_tokens": 0,
+            "reasoning_tokens": 0
+          }
+        }
+      },
+      "elapsedMs": 8039,
+      "category": "capability"
+    },
+    {
+      "name": "17 forced named function tool",
+      "state": "FAIL",
+      "request": {
+        "model": "gpt-6-thinking",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Call get_weather for Paris. Do not answer from memory."
+          }
+        ],
+        "max_completion_tokens": 1024,
+        "stream": false,
+        "tools": [
+          {
+            "type": "function",
+            "function": {
+              "name": "get_weather",
+              "description": "Get the temperature for a city.",
+              "strict": true,
+              "parameters": {
+                "type": "object",
+                "properties": {
+                  "city": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "city"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        ],
+        "tool_choice": {
+          "type": "function",
+          "function": {
+            "name": "get_weather"
+          }
+        }
+      },
+      "httpStatus": 200,
+      "contentType": "application/json",
+      "errors": [
+        "no tool_calls returned"
+      ],
+      "evidence": {
+        "id": "chatcmpl-09a1d31f4a1c466da386b7d9d1a73713",
+        "object": "chat.completion",
+        "model": "gpt-6-thinking",
+        "created": 1793032624,
+        "choices": [
+          {
+            "index": 0,
+            "finish_reason": "stop",
+            "message": {
+              "role": "assistant",
+              "content": "I can’t execute `get_weather` directly in this backend, so I can’t verify live weather conditions in Paris without accessing the weather source.\n\nYou can check the current conditions and forecast for Paris, France here: [Weather in Paris — live forecast](https://www.google.com/search?q=Paris+France+current+weather)."
+            }
+          }
+        ],
+        "usage": {
+          "prompt_tokens": 74,
+          "completion_tokens": 67,
+          "total_tokens": 141,
+          "prompt_tokens_details": {
+            "text_tokens": 74,
+            "image_tokens": 0,
+            "cached_tokens": 0
+          },
+          "completion_tokens_details": {
+            "text_tokens": 67,
+            "image_tokens": 0,
+            "reasoning_tokens": 0
+          }
+        }
+      },
+      "elapsedMs": 7855,
+      "category": "capability"
+    },
+    {
+      "name": "18 required function tool",
+      "state": "FAIL",
+      "request": {
+        "model": "gpt-6-thinking",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Call get_weather for Paris. Do not answer from memory."
+          }
+        ],
+        "max_completion_tokens": 1024,
+        "stream": false,
+        "tools": [
+          {
+            "type": "function",
+            "function": {
+              "name": "get_weather",
+              "description": "Get the temperature for a city.",
+              "strict": true,
+              "parameters": {
+                "type": "object",
+                "properties": {
+                  "city": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "city"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        ],
+        "tool_choice": "required"
+      },
+      "httpStatus": 200,
+      "contentType": "application/json",
+      "errors": [
+        "no tool_calls returned"
+      ],
+      "evidence": {
+        "id": "chatcmpl-a290ef506d40486fa5215bb24f7ff151",
+        "object": "chat.completion",
+        "model": "gpt-6-thinking",
+        "created": 1793032631,
+        "choices": [
+          {
+            "index": 0,
+            "finish_reason": "stop",
+            "message": {
+              "role": "assistant",
+              "content": "I can’t call `get_weather` because tool execution is unavailable through this backend. I haven’t retrieved live weather data for Paris, so I won’t guess or answer from memory."
+            }
+          }
+        ],
+        "usage": {
+          "prompt_tokens": 74,
+          "completion_tokens": 37,
+          "total_tokens": 111,
+          "prompt_tokens_details": {
+            "text_tokens": 74,
+            "image_tokens": 0,
+            "cached_tokens": 0
+          },
+          "completion_tokens_details": {
+            "text_tokens": 37,
+            "image_tokens": 0,
+            "reasoning_tokens": 0
+          }
+        }
+      },
+      "elapsedMs": 7622,
+      "category": "capability"
+    },
+    {
+      "name": "19 tool_choice none",
+      "state": "PASS",
+      "request": {
+        "model": "gpt-6-thinking",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Reply with exactly OK."
+          }
+        ],
+        "max_completion_tokens": 1024,
+        "stream": false,
+        "tools": [
+          {
+            "type": "function",
+            "function": {
+              "name": "get_weather",
+              "description": "Get the temperature for a city.",
+              "strict": true,
+              "parameters": {
+                "type": "object",
+                "properties": {
+                  "city": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "city"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        ],
+        "tool_choice": "none"
+      },
+      "httpStatus": 200,
+      "contentType": "application/json",
+      "errors": [],
+      "evidence": {
+        "id": "chatcmpl-d69b72115e6e4eacbb133dd68755f9c5",
+        "object": "chat.completion",
+        "model": "gpt-6-thinking",
+        "created": 1793032630,
+        "choices": [
+          {
+            "index": 0,
+            "finish_reason": "stop",
+            "message": {
+              "role": "assistant",
+              "content": "OK"
+            }
+          }
+        ],
+        "usage": {
+          "prompt_tokens": 67,
+          "completion_tokens": 1,
+          "total_tokens": 68,
+          "prompt_tokens_details": {
+            "text_tokens": 67,
+            "image_tokens": 0,
+            "cached_tokens": 0
+          },
+          "completion_tokens_details": {
+            "text_tokens": 1,
+            "image_tokens": 0,
+            "reasoning_tokens": 0
+          }
+        }
+      },
+      "elapsedMs": 5190,
+      "category": "capability"
+    },
+    {
+      "name": "20 function tool result round trip",
+      "state": "FAIL",
+      "request": {
+        "model": "gpt-6-thinking",
+        "messages": [
+          {
+            "role": "user",
+            "content": "What is the temperature in Paris? Reply only with the numeric temperature returned by the tool."
+          },
+          {
+            "role": "assistant",
+            "content": null,
+            "tool_calls": [
+              {
+                "id": "call_compat_paris",
+                "type": "function",
+                "function": {
+                  "name": "get_weather",
+                  "arguments": "{\"city\":\"Paris\"}"
+                }
+              }
+            ]
+          },
+          {
+            "role": "tool",
+            "tool_call_id": "call_compat_paris",
+            "content": "{\"temperature\":21}"
+          }
+        ],
+        "max_completion_tokens": 1024,
+        "stream": false,
+        "tools": [
+          {
+            "type": "function",
+            "function": {
+              "name": "get_weather",
+              "description": "Get the temperature for a city.",
+              "strict": true,
+              "parameters": {
+                "type": "object",
+                "properties": {
+                  "city": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "city"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        ]
+      },
+      "httpStatus": 200,
+      "contentType": "application/json",
+      "errors": [
+        "Expected \"21\", got \"\""
+      ],
+      "evidence": {
+        "id": "chatcmpl-4afae481525740269aa8225ff46c56ae",
+        "object": "chat.completion",
+        "model": "gpt-6-thinking",
+        "created": 1793032634,
+        "choices": [
+          {
+            "index": 0,
+            "finish_reason": "stop",
+            "message": {
+              "role": "assistant",
+              "content": ""
+            }
+          }
+        ],
+        "usage": {
+          "prompt_tokens": 93,
+          "completion_tokens": 0,
+          "total_tokens": 93,
+          "prompt_tokens_details": {
+            "text_tokens": 93,
+            "image_tokens": 0,
+            "cached_tokens": 0
+          },
+          "completion_tokens_details": {
+            "text_tokens": 0,
+            "image_tokens": 0,
+            "reasoning_tokens": 0
+          }
+        }
+      },
+      "elapsedMs": 4706,
+      "category": "capability"
+    },
+    {
+      "name": "21 parallel tool calls",
+      "state": "FAIL",
+      "note": "Parallel calls are permitted, not guaranteed; count is reported separately.",
+      "request": {
+        "model": "gpt-6-thinking",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Call get_weather for BOTH Paris and Tokyo. Make two calls in this response."
+          }
+        ],
+        "max_completion_tokens": 1024,
+        "stream": false,
+        "tools": [
+          {
+            "type": "function",
+            "function": {
+              "name": "get_weather",
+              "description": "Get the temperature for a city.",
+              "strict": true,
+              "parameters": {
+                "type": "object",
+                "properties": {
+                  "city": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "city"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        ],
+        "tool_choice": "required",
+        "parallel_tool_calls": true
+      },
+      "httpStatus": 200,
+      "contentType": "application/json",
+      "errors": [
+        "no tool_calls returned"
+      ],
+      "evidence": {
+        "id": "chatcmpl-44937010e89c4dc690b9c0980a6b232d",
+        "object": "chat.completion",
+        "model": "gpt-6-thinking",
+        "created": 1793032641,
+        "choices": [
+          {
+            "index": 0,
+            "finish_reason": "stop",
+            "message": {
+              "role": "assistant",
+              "content": "I can’t execute `get_weather` tool calls through this backend, so I can’t make the two requested calls directly.\n\nThe two requested calls would be:\n\n1. `get_weather(\"Paris\")`\n2. `get_weather(\"Tokyo\")`\n\nI haven’t executed either call or retrieved live weather data."
+            }
+          }
+        ],
+        "usage": {
+          "prompt_tokens": 78,
+          "completion_tokens": 62,
+          "total_tokens": 140,
+          "prompt_tokens_details": {
+            "text_tokens": 78,
+            "image_tokens": 0,
+            "cached_tokens": 0
+          },
+          "completion_tokens_details": {
+            "text_tokens": 62,
+            "image_tokens": 0,
+            "reasoning_tokens": 0
+          }
+        },
+        "parallelCallCount": 0
+      },
+      "elapsedMs": 10456,
+      "category": "capability"
+    },
+    {
+      "name": "22 reasoning_effort low acceptance",
+      "state": "ERROR",
+      "note": "Acceptance only; cannot verify internal reasoning behavior.",
+      "request": {
+        "model": "gpt-6-thinking",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Reply with exactly OK."
+          }
+        ],
+        "max_completion_tokens": 1024,
+        "stream": false,
+        "reasoning_effort": "low"
+      },
+      "httpStatus": 502,
+      "contentType": "application/json",
+      "evidence": {
+        "error": {
+          "message": "/backend-api/conversation failed: status=422, body=",
+          "type": "server_error",
+          "param": null,
+          "code": "upstream_error"
+        }
+      },
+      "errors": [],
+      "elapsedMs": 2293,
+      "category": "capability"
+    },
+    {
+      "name": "23 seed acceptance",
+      "state": "PASS",
+      "note": "Acceptance only; OpenAI does not promise deterministic output.",
+      "request": {
+        "model": "gpt-6-thinking",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Reply with exactly OK."
+          }
+        ],
+        "max_completion_tokens": 1024,
+        "stream": false,
+        "seed": 42
+      },
+      "httpStatus": 200,
+      "contentType": "application/json",
+      "errors": [],
+      "evidence": {
+        "id": "chatcmpl-1f47294512fd4001a67cea8dc13ac3c4",
+        "object": "chat.completion",
+        "model": "gpt-6-thinking",
+        "created": 1793032642,
+        "choices": [
+          {
+            "index": 0,
+            "finish_reason": "stop",
+            "message": {
+              "role": "assistant",
+              "content": "OK"
+            }
+          }
+        ],
+        "usage": {
+          "prompt_tokens": 12,
+          "completion_tokens": 1,
+          "total_tokens": 13,
+          "prompt_tokens_details": {
+            "text_tokens": 12,
+            "image_tokens": 0,
+            "cached_tokens": 0
+          },
+          "completion_tokens_details": {
+            "text_tokens": 1,
+            "image_tokens": 0,
+            "reasoning_tokens": 0
+          }
+        }
+      },
+      "elapsedMs": 5232,
+      "category": "capability"
+    },
+    {
+      "name": "24 logprobs and top_logprobs",
+      "state": "FAIL",
+      "request": {
+        "model": "gpt-6-thinking",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Reply with exactly OK."
+          }
+        ],
+        "max_completion_tokens": 1024,
+        "stream": false,
+        "logprobs": true,
+        "top_logprobs": 2
+      },
+      "httpStatus": 200,
+      "contentType": "application/json",
+      "errors": [
+        "logprobs requested but missing or malformed"
+      ],
+      "evidence": {
+        "id": "chatcmpl-de30c977e0a148c385008742f7d03efd",
+        "object": "chat.completion",
+        "model": "gpt-6-thinking",
+        "created": 1793032652,
+        "choices": [
+          {
+            "index": 0,
+            "finish_reason": "stop",
+            "message": {
+              "role": "assistant",
+              "content": "OK"
+            }
+          }
+        ],
+        "usage": {
+          "prompt_tokens": 12,
+          "completion_tokens": 1,
+          "total_tokens": 13,
+          "prompt_tokens_details": {
+            "text_tokens": 12,
+            "image_tokens": 0,
+            "cached_tokens": 0
+          },
+          "completion_tokens_details": {
+            "text_tokens": 1,
+            "image_tokens": 0,
+            "reasoning_tokens": 0
+          }
+        }
+      },
+      "elapsedMs": 10952,
+      "category": "capability"
+    },
+    {
+      "name": "25 legacy functions/function_call",
+      "state": "FAIL",
+      "request": {
+        "model": "gpt-6-thinking",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Call get_weather for Paris. Do not answer from memory."
+          }
+        ],
+        "max_completion_tokens": 1024,
+        "stream": false,
+        "functions": [
+          {
+            "name": "get_weather",
+            "description": "Get the temperature for a city.",
+            "strict": true,
+            "parameters": {
+              "type": "object",
+              "properties": {
+                "city": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "city"
+              ],
+              "additionalProperties": false
+            }
+          }
+        ],
+        "function_call": {
+          "name": "get_weather"
+        }
+      },
+      "httpStatus": 200,
+      "contentType": "application/json",
+      "errors": [
+        "legacy function_call missing"
+      ],
+      "evidence": {
+        "id": "chatcmpl-0c0485118e0942ce988b9d37523cfd63",
+        "object": "chat.completion",
+        "model": "gpt-6-thinking",
+        "created": 1793032662,
+        "choices": [
+          {
+            "index": 0,
+            "finish_reason": "stop",
+            "message": {
+              "role": "assistant",
+              "content": "I checked live weather data for Paris, France, rather than answering from memory.\n\n<box border radius=\"xl\" padding={4} gap={3}>\n  <row align=\"center\" gap={3}>\n    <AsyncImage query=\"overcast cloudy sky weather icon\" aspectRatio=\"1:1\" maxWidth=\"76px\"/>\n    <box flex=\"1\" gap={1}>\n      <title size=\"xl\">Paris, France</title>\n      <text color=\"secondary\" size=\"sm\">Latest available weather report · October 27 forecast</text>\n      <title size=\"2xl\">11–14°C</title>\n      <text>Cloudy with a chance of light rain</text>\n    </box>\n  </row>\n  <divider color=\"subtle\"/>\n  <grid columns={3} gap={2}>\n    <grid-item>\n      <icon name=\"cloud-rain\" size=\"xl\" color=\"secondary\"/>\n      <text color=\"secondary\" size=\"xs\">Rain chance</text>\n      <title size=\"md\">~59%</title>\n    </grid-item>\n    <grid-item>\n      <icon name=\"wind\" size=\"xl\" color=\"secondary\"/>\n      <text color=\"secondary\" size=\"xs\">Wind</text>\n      <title size=\"md\">12 km/h</title>\n    </grid-item>\n    <grid-item>\n      <icon name=\"droplets\" size=\"xl\" color=\"secondary\"/>\n      <text color=\"secondary\" size=\"xs\">Humidity</text>\n      <title size=\"md\">84%</title>\n    </grid-item>\n  </grid>\n  <text color=\"secondary\" size=\"xs\">Source: <Link url=\"https://www.lemonde.fr/climat/meteo/paris-75056/\" title=\"Le Monde weather forecast\"/>. The latest retrieved report may not reflect the exact current conditions.</text>\n</box>\n\n**Suggestion:** Bring a light jacket and a compact umbrella if you're heading outdoors."
+            }
+          }
+        ],
+        "usage": {
+          "prompt_tokens": 19,
+          "completion_tokens": 411,
+          "total_tokens": 430,
+          "prompt_tokens_details": {
+            "text_tokens": 19,
+            "image_tokens": 0,
+            "cached_tokens": 0
+          },
+          "completion_tokens_details": {
+            "text_tokens": 411,
+            "image_tokens": 0,
+            "reasoning_tokens": 0
+          }
+        }
+      },
+      "elapsedMs": 20687,
+      "category": "capability"
+    },
+    {
+      "name": "26 vision input with synthetic image",
+      "state": "ERROR",
+      "note": "Tests image-input acceptance, not vision accuracy or image generation.",
+      "request": {
+        "model": "gpt-6-thinking",
+        "messages": [
+          {
+            "role": "user",
+            "content": [
+              {
+                "type": "text",
+                "text": "Acknowledge that an image was attached. Reply with exactly IMAGE_OK."
+              },
+              {
+                "type": "image_url",
+                "image_url": {
+                  "url": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/lXcAAAAASUVORK5CYII="
+                }
+              }
+            ]
+          }
+        ],
+        "max_completion_tokens": 1024,
+        "stream": false
+      },
+      "httpStatus": 502,
+      "contentType": "application/json",
+      "evidence": {
+        "error": {
+          "message": "/backend-api/conversation failed: status=400, body=",
+          "type": "server_error",
+          "param": null,
+          "code": "upstream_error"
+        }
+      },
+      "errors": [],
+      "elapsedMs": 6269,
+      "category": "capability"
+    },
+    {
+      "name": "27 SSE normal",
+      "state": "PASS",
+      "request": {
+        "model": "gpt-6-thinking",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Reply with exactly OK."
+          }
+        ],
+        "max_completion_tokens": 1024,
+        "stream": true
+      },
+      "httpStatus": 200,
+      "contentType": "text/event-stream; charset=utf-8",
+      "errors": [],
+      "evidence": {
+        "chunks": 2,
+        "done": true,
+        "idsStable": true,
+        "models": [
+          "gpt-6-thinking"
+        ],
+        "usage": null,
+        "choices": [
+          {
+            "index": 0,
+            "content": "OK",
+            "finishReason": "stop",
+            "tool_calls": []
+          }
+        ]
+      },
+      "elapsedMs": 5015,
+      "category": "capability"
+    },
+    {
+      "name": "28 SSE include_usage",
+      "state": "FAIL",
+      "request": {
+        "model": "gpt-6-thinking",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Reply with exactly OK."
+          }
+        ],
+        "max_completion_tokens": 1024,
+        "stream": true,
+        "stream_options": {
+          "include_usage": true
+        }
+      },
+      "httpStatus": 200,
+      "contentType": "text/event-stream; charset=utf-8",
+      "errors": [
+        "invalid chunk.object",
+        "chunk lacks id/created/model",
+        "chunk.choices is not an array",
+        "stream id/model changed across chunks",
+        "include_usage requested but final empty-choices usage chunk is missing or invalid"
+      ],
+      "evidence": {
+        "chunks": 3,
+        "done": true,
+        "idsStable": false,
+        "models": [
+          "gpt-6-thinking",
+          null
+        ],
+        "usage": null,
+        "choices": [
+          {
+            "index": 0,
+            "content": "OK",
+            "finishReason": "stop",
+            "tool_calls": []
+          }
+        ]
+      },
+      "elapsedMs": 823,
+      "category": "capability"
+    },
+    {
+      "name": "29 SSE tool-call deltas",
+      "state": "FAIL",
+      "request": {
+        "model": "gpt-6-thinking",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Call get_weather for Paris. Do not answer from memory."
+          }
+        ],
+        "max_completion_tokens": 1024,
+        "stream": true,
+        "tools": [
+          {
+            "type": "function",
+            "function": {
+              "name": "get_weather",
+              "description": "Get the temperature for a city.",
+              "strict": true,
+              "parameters": {
+                "type": "object",
+                "properties": {
+                  "city": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "city"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        ],
+        "tool_choice": {
+          "type": "function",
+          "function": {
+            "name": "get_weather"
+          }
+        }
+      },
+      "httpStatus": 200,
+      "contentType": "text/event-stream; charset=utf-8",
+      "errors": [
+        "no tool_calls returned"
+      ],
+      "evidence": {
+        "chunks": 6,
+        "done": true,
+        "idsStable": true,
+        "models": [
+          "gpt-6-thinking"
+        ],
+        "usage": null,
+        "choices": [
+          {
+            "index": 0,
+            "content": "I can’t execute `get_weather` or other tool calls through this backend, so I can’t retrieve live weather for Paris. I won’t answer from memory or guess at current conditions.",
+            "finishReason": "stop",
+            "tool_calls": []
+          }
+        ]
+      },
+      "elapsedMs": 7839,
+      "category": "capability"
+    },
+    {
+      "name": "30 SSE n=2 choices",
+      "state": "FAIL",
+      "request": {
+        "model": "gpt-6-thinking",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Reply with exactly OK."
+          }
+        ],
+        "max_completion_tokens": 1024,
+        "stream": true,
+        "n": 2
+      },
+      "httpStatus": 200,
+      "contentType": "text/event-stream; charset=utf-8",
+      "errors": [
+        "wrong number of streamed choices"
+      ],
+      "evidence": {
+        "chunks": 2,
+        "done": true,
+        "idsStable": true,
+        "models": [
+          "gpt-6-thinking"
+        ],
+        "usage": null,
+        "choices": [
+          {
+            "index": 0,
+            "content": "OK",
+            "finishReason": "stop",
+            "tool_calls": []
+          }
+        ]
+      },
+      "elapsedMs": 6,
+      "category": "capability"
+    },
+    {
+      "name": "31 missing authentication",
+      "state": "PASS",
+      "request": {
+        "model": "gpt-6-thinking",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Reply with exactly OK."
+          }
+        ],
+        "max_completion_tokens": 1024,
+        "stream": false
+      },
+      "httpStatus": 401,
+      "contentType": "application/json",
+      "evidence": {
+        "error": {
+          "message": "密钥无效或已失效，请重新登录",
+          "type": "authentication_error",
+          "param": null,
+          "code": "invalid_api_key"
+        }
+      },
+      "errors": [],
+      "elapsedMs": 10,
+      "category": "protocol-validation"
+    },
+    {
+      "name": "32 invalid API key",
+      "state": "PASS",
+      "request": {
+        "model": "gpt-6-thinking",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Reply with exactly OK."
+          }
+        ],
+        "max_completion_tokens": 1024,
+        "stream": false
+      },
+      "httpStatus": 401,
+      "contentType": "application/json",
+      "evidence": {
+        "error": {
+          "message": "密钥无效或已失效，请重新登录",
+          "type": "authentication_error",
+          "param": null,
+          "code": "invalid_api_key"
+        }
+      },
+      "errors": [],
+      "elapsedMs": 5,
+      "category": "protocol-validation"
+    },
+    {
+      "name": "33 nonexistent model",
+      "state": "FAIL",
+      "request": {
+        "model": "compat-definitely-nonexistent-model-20261026",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Reply with exactly OK."
+          }
+        ],
+        "max_completion_tokens": 1024,
+        "stream": false
+      },
+      "httpStatus": 502,
+      "contentType": "application/json",
+      "evidence": {
+        "error": {
+          "message": "model 'compat-definitely-nonexistent-model-20261026' is not available to any active account",
+          "type": "server_error",
+          "param": null,
+          "code": "upstream_error"
+        }
+      },
+      "errors": [
+        "expected HTTP 400/404, got 502"
+      ],
+      "elapsedMs": 7,
+      "category": "protocol-validation"
+    },
+    {
+      "name": "34 missing model",
+      "state": "FAIL",
+      "request": {
+        "messages": [
+          {
+            "role": "user",
+            "content": "Reply with exactly OK."
+          }
+        ],
+        "max_completion_tokens": 1024,
+        "stream": false
+      },
+      "httpStatus": 200,
+      "contentType": "application/json",
+      "evidence": {
+        "id": "chatcmpl-26d8b88fc310444bb5c29563642e98c4",
+        "object": "chat.completion",
+        "model": "auto",
+        "created": 1793032671,
+        "choices": [
+          {
+            "index": 0,
+            "finish_reason": "stop",
+            "message": {
+              "role": "assistant",
+              "content": "OK"
+            }
+          }
+        ],
+        "usage": {
+          "prompt_tokens": 12,
+          "completion_tokens": 1,
+          "total_tokens": 13,
+          "prompt_tokens_details": {
+            "text_tokens": 12,
+            "image_tokens": 0,
+            "cached_tokens": 0
+          },
+          "completion_tokens_details": {
+            "text_tokens": 1,
+            "image_tokens": 0,
+            "reasoning_tokens": 0
+          }
+        }
+      },
+      "errors": [
+        "expected HTTP 400/422, got 200",
+        "error must contain message and type"
+      ],
+      "elapsedMs": 7694,
+      "category": "protocol-validation"
+    },
+    {
+      "name": "35 missing messages",
+      "state": "PASS",
+      "request": {
+        "model": "gpt-6-thinking",
+        "max_completion_tokens": 1024,
+        "stream": false
+      },
+      "httpStatus": 400,
+      "contentType": "application/json",
+      "evidence": {
+        "error": {
+          "message": "messages or prompt is required",
+          "type": "invalid_request_error",
+          "param": null,
+          "code": "bad_request"
+        }
+      },
+      "errors": [],
+      "elapsedMs": 9,
+      "category": "protocol-validation"
+    },
+    {
+      "name": "36 empty messages",
+      "state": "PASS",
+      "request": {
+        "model": "gpt-6-thinking",
+        "messages": [],
+        "max_completion_tokens": 1024,
+        "stream": false
+      },
+      "httpStatus": 400,
+      "contentType": "application/json",
+      "evidence": {
+        "error": {
+          "message": "messages or prompt is required",
+          "type": "invalid_request_error",
+          "param": null,
+          "code": "bad_request"
+        }
+      },
+      "errors": [],
+      "elapsedMs": 8,
+      "category": "protocol-validation"
+    },
+    {
+      "name": "37 messages wrong type",
+      "state": "PASS",
+      "request": {
+        "model": "gpt-6-thinking",
+        "messages": "not-an-array",
+        "max_completion_tokens": 1024,
+        "stream": false
+      },
+      "httpStatus": 422,
+      "contentType": "application/json",
+      "evidence": {
+        "error": {
+          "message": "messages: Input should be a valid list",
+          "type": "invalid_request_error",
+          "param": null,
+          "code": "bad_request"
+        }
+      },
+      "errors": [],
+      "elapsedMs": 8,
+      "category": "protocol-validation"
+    },
+    {
+      "name": "38 invalid message role",
+      "state": "FAIL",
+      "request": {
+        "model": "gpt-6-thinking",
+        "messages": [
+          {
+            "role": "invalid_role",
+            "content": "OK"
+          }
+        ],
+        "max_completion_tokens": 1024,
+        "stream": false
+      },
+      "httpStatus": 502,
+      "contentType": "application/json",
+      "evidence": {
+        "error": {
+          "message": "/backend-api/conversation failed: status=422, body=",
+          "type": "server_error",
+          "param": null,
+          "code": "upstream_error"
+        }
+      },
+      "errors": [
+        "expected HTTP 400/422, got 502"
+      ],
+      "elapsedMs": 4558,
+      "category": "protocol-validation"
+    },
+    {
+      "name": "39 temperature outside range",
+      "state": "FAIL",
+      "request": {
+        "model": "gpt-6-thinking",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Reply with exactly OK."
+          }
+        ],
+        "max_completion_tokens": 1024,
+        "stream": false,
+        "temperature": 3
+      },
+      "httpStatus": 200,
+      "contentType": "application/json",
+      "evidence": {
+        "id": "chatcmpl-e91c662870654229ad852581c2326168",
+        "object": "chat.completion",
+        "model": "gpt-6-thinking",
+        "created": 1793032677,
+        "choices": [
+          {
+            "index": 0,
+            "finish_reason": "stop",
+            "message": {
+              "role": "assistant",
+              "content": "OK"
+            }
+          }
+        ],
+        "usage": {
+          "prompt_tokens": 12,
+          "completion_tokens": 1,
+          "total_tokens": 13,
+          "prompt_tokens_details": {
+            "text_tokens": 12,
+            "image_tokens": 0,
+            "cached_tokens": 0
+          },
+          "completion_tokens_details": {
+            "text_tokens": 1,
+            "image_tokens": 0,
+            "reasoning_tokens": 0
+          }
+        }
+      },
+      "errors": [
+        "expected HTTP 400/422, got 200",
+        "error must contain message and type"
+      ],
+      "elapsedMs": 5627,
+      "category": "protocol-validation"
+    },
+    {
+      "name": "40 n=0 rejected",
+      "state": "FAIL",
+      "request": {
+        "model": "gpt-6-thinking",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Reply with exactly OK."
+          }
+        ],
+        "max_completion_tokens": 1024,
+        "stream": false,
+        "n": 0
+      },
+      "httpStatus": 200,
+      "contentType": "application/json",
+      "evidence": {
+        "id": "chatcmpl-de30c977e0a148c385008742f7d03efd",
+        "object": "chat.completion",
+        "model": "gpt-6-thinking",
+        "created": 1793032652,
+        "choices": [
+          {
+            "index": 0,
+            "finish_reason": "stop",
+            "message": {
+              "role": "assistant",
+              "content": "OK"
+            }
+          }
+        ],
+        "usage": {
+          "prompt_tokens": 12,
+          "completion_tokens": 1,
+          "total_tokens": 13,
+          "prompt_tokens_details": {
+            "text_tokens": 12,
+            "image_tokens": 0,
+            "cached_tokens": 0
+          },
+          "completion_tokens_details": {
+            "text_tokens": 1,
+            "image_tokens": 0,
+            "reasoning_tokens": 0
+          }
+        }
+      },
+      "errors": [
+        "expected HTTP 400/422, got 200",
+        "error must contain message and type"
+      ],
+      "elapsedMs": 4,
+      "category": "protocol-validation"
+    },
+    {
+      "name": "41 negative token limit",
+      "state": "FAIL",
+      "request": {
+        "model": "gpt-6-thinking",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Reply with exactly OK."
+          }
+        ],
+        "max_completion_tokens": -1,
+        "stream": false
+      },
+      "httpStatus": 200,
+      "contentType": "application/json",
+      "evidence": {
+        "id": "chatcmpl-544af918bf5f49ecbcb7516a5f7a33d9",
+        "object": "chat.completion",
+        "model": "gpt-6-thinking",
+        "created": 1793032681,
+        "choices": [
+          {
+            "index": 0,
+            "finish_reason": "stop",
+            "message": {
+              "role": "assistant",
+              "content": "OK"
+            }
+          }
+        ],
+        "usage": {
+          "prompt_tokens": 12,
+          "completion_tokens": 1,
+          "total_tokens": 13,
+          "prompt_tokens_details": {
+            "text_tokens": 12,
+            "image_tokens": 0,
+            "cached_tokens": 0
+          },
+          "completion_tokens_details": {
+            "text_tokens": 1,
+            "image_tokens": 0,
+            "reasoning_tokens": 0
+          }
+        }
+      },
+      "errors": [
+        "expected HTTP 400/422, got 200",
+        "error must contain message and type"
+      ],
+      "elapsedMs": 5328,
+      "category": "protocol-validation"
+    },
+    {
+      "name": "42 malformed JSON body",
+      "state": "FAIL",
+      "request": {
+        "model": "gpt-6-thinking",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Reply with exactly OK."
+          }
+        ],
+        "max_completion_tokens": 1024,
+        "stream": false
+      },
+      "httpStatus": 422,
+      "contentType": "application/json",
+      "evidence": {
+        "error": {
+          "message": "1: JSON decode error",
+          "type": "invalid_request_error",
+          "param": null,
+          "code": "bad_request"
+        }
+      },
+      "errors": [
+        "expected HTTP 400, got 422"
+      ],
+      "elapsedMs": 4,
+      "category": "protocol-validation"
+    },
+    {
+      "name": "43 malformed tool declaration",
+      "state": "FAIL",
+      "request": {
+        "model": "gpt-6-thinking",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Reply with exactly OK."
+          }
+        ],
+        "max_completion_tokens": 1024,
+        "stream": false,
+        "tools": [
+          {
+            "type": "function",
+            "function": {
+              "parameters": {}
+            }
+          }
+        ],
+        "tool_choice": "required"
+      },
+      "httpStatus": 200,
+      "contentType": "application/json",
+      "evidence": {
+        "id": "chatcmpl-c02bc8c8dc354f599b7a6c8324909fb1",
+        "object": "chat.completion",
+        "model": "gpt-6-thinking",
+        "created": 1793032684,
+        "choices": [
+          {
+            "index": 0,
+            "finish_reason": "stop",
+            "message": {
+              "role": "assistant",
+              "content": "OK"
+            }
+          }
+        ],
+        "usage": {
+          "prompt_tokens": 67,
+          "completion_tokens": 1,
+          "total_tokens": 68,
+          "prompt_tokens_details": {
+            "text_tokens": 67,
+            "image_tokens": 0,
+            "cached_tokens": 0
+          },
+          "completion_tokens_details": {
+            "text_tokens": 1,
+            "image_tokens": 0,
+            "reasoning_tokens": 0
+          }
+        }
+      },
+      "errors": [
+        "expected HTTP 400/422, got 200",
+        "error must contain message and type"
+      ],
+      "elapsedMs": 7514,
+      "category": "protocol-validation"
+    },
+    {
+      "name": "44 GET chat/completions rejected",
+      "state": "FAIL",
+      "request": {
+        "model": "gpt-6-thinking",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Reply with exactly OK."
+          }
+        ],
+        "max_completion_tokens": 1024,
+        "stream": false
+      },
+      "httpStatus": 200,
+      "contentType": "text/html; charset=utf-8",
+      "evidence": {
+        "nonJsonBody": "<!DOCTYPE html><html lang=\"zh-CN\"><head><meta charSet=\"utf-8\"/><meta name=\"viewport\" content=\"width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no\"/><link rel=\"stylesheet\" href=\"/_next/static/chunks/0yvynf4qtqgia.css\" data-precedence=\"next\"/><link rel=\"preload\" as=\"script\" fetchPriority=\"low\" href=\"/_next/static/chunks/16-p57oh0g~3s.js\"/><script src=\"/_next/static/chunks/02i7dfk7"
+      },
+      "errors": [
+        "expected HTTP 404/405, got 200",
+        "error must contain message and type"
+      ],
+      "elapsedMs": 10,
+      "category": "protocol-validation"
+    },
+    {
+      "name": "45 nonexistent endpoint",
+      "state": "FAIL",
+      "request": {
+        "model": "gpt-6-thinking",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Reply with exactly OK."
+          }
+        ],
+        "max_completion_tokens": 1024,
+        "stream": false
+      },
+      "httpStatus": 405,
+      "contentType": "application/json",
+      "evidence": {
+        "error": {
+          "message": "Method Not Allowed",
+          "type": "invalid_request_error",
+          "param": null,
+          "code": "bad_request"
+        }
+      },
+      "errors": [
+        "expected HTTP 404, got 405"
+      ],
+      "elapsedMs": 6,
+      "category": "protocol-validation"
+    },
+    {
+      "name": "46 invalid response_format",
+      "state": "FAIL",
+      "request": {
+        "model": "gpt-6-thinking",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Reply with exactly OK."
+          }
+        ],
+        "max_completion_tokens": 1024,
+        "stream": false,
+        "response_format": {
+          "type": "compat_invalid_format"
+        }
+      },
+      "httpStatus": 200,
+      "contentType": "application/json",
+      "evidence": {
+        "id": "chatcmpl-ce8322aa9c4f4542ab4177e09fdcb53b",
+        "object": "chat.completion",
+        "model": "gpt-6-thinking",
+        "created": 1793032686,
+        "choices": [
+          {
+            "index": 0,
+            "finish_reason": "stop",
+            "message": {
+              "role": "assistant",
+              "content": "OK"
+            }
+          }
+        ],
+        "usage": {
+          "prompt_tokens": 12,
+          "completion_tokens": 1,
+          "total_tokens": 13,
+          "prompt_tokens_details": {
+            "text_tokens": 12,
+            "image_tokens": 0,
+            "cached_tokens": 0
+          },
+          "completion_tokens_details": {
+            "text_tokens": 1,
+            "image_tokens": 0,
+            "reasoning_tokens": 0
+          }
+        }
+      },
+      "errors": [
+        "expected HTTP 400/422, got 200",
+        "error must contain message and type"
+      ],
+      "elapsedMs": 5530,
+      "category": "protocol-validation"
+    },
+    {
+      "name": "47 stream with invalid stream_options",
+      "state": "FAIL",
+      "request": {
+        "model": "gpt-6-thinking",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Reply with exactly OK."
+          }
+        ],
+        "max_completion_tokens": 1024,
+        "stream": true,
+        "stream_options": "invalid"
+      },
+      "httpStatus": 200,
+      "contentType": "text/event-stream; charset=utf-8",
+      "evidence": {
+        "nonJsonBody": ": stream-open\n\ndata: {\"id\": \"chatcmpl-af5ab5c8b4314ed189c2dc6fa1d718ca\", \"object\": \"chat.completion.chunk\", \"created\": 1793032658, \"model\": \"gpt-6-thinking\", \"choices\": [{\"index\": 0, \"delta\": {\"role\": \"assistant\", \"content\": \"OK\"}, \"finish_reason\": null}]}\n\ndata: {\"id\": \"chatcmpl-af5ab5c8b4314ed189c2dc6fa1d718ca\", \"object\": \"chat.completion.chunk\", \"created\": 1793032658, \"model\": \"gpt-6-thinking\","
+      },
+      "errors": [
+        "expected HTTP 400/422, got 200",
+        "error must contain message and type"
+      ],
+      "elapsedMs": 8,
+      "category": "protocol-validation"
+    },
+    {
+      "name": "48 orphan tool result",
+      "state": "FAIL",
+      "request": {
+        "model": "gpt-6-thinking",
+        "messages": [
+          {
+            "role": "tool",
+            "tool_call_id": "call_nonexistent",
+            "content": "21"
+          },
+          {
+            "role": "user",
+            "content": "Reply with exactly OK."
+          }
+        ],
+        "max_completion_tokens": 1024,
+        "stream": false
+      },
+      "httpStatus": 502,
+      "contentType": "application/json",
+      "evidence": {
+        "error": {
+          "message": "/backend-api/conversation failed: status=500, body=",
+          "type": "server_error",
+          "param": null,
+          "code": "upstream_error"
+        }
+      },
+      "errors": [
+        "expected HTTP 400/422, got 502"
+      ],
+      "elapsedMs": 3855,
+      "category": "protocol-validation"
+    },
+    {
+      "name": "49 models list",
+      "state": "PASS",
+      "request": {
+        "model": "gpt-6-thinking",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Reply with exactly OK."
+          }
+        ],
+        "max_completion_tokens": 1024,
+        "stream": false
+      },
+      "httpStatus": 200,
+      "contentType": "application/json",
+      "errors": [],
+      "evidence": {
+        "object": "list",
+        "modelCount": 21,
+        "requestedModelListed": true
+      },
+      "elapsedMs": 7,
+      "category": "protocol-validation"
+    },
+    {
+      "name": "50 retrieve requested model",
+      "state": "FAIL",
+      "request": {
+        "model": "gpt-6-thinking",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Reply with exactly OK."
+          }
+        ],
+        "max_completion_tokens": 1024,
+        "stream": false
+      },
+      "httpStatus": 200,
+      "contentType": "text/html; charset=utf-8",
+      "errors": [
+        "model metadata endpoint returned HTTP 200 with HTML instead of JSON"
+      ],
+      "elapsedMs": 6,
+      "category": "protocol-validation"
+    },
+    {
+      "name": "51 Responses API basic probe",
+      "state": "PASS",
+      "request": {
+        "model": "gpt-6-thinking",
+        "input": "Reply with exactly OK.",
+        "max_output_tokens": 1024
+      },
+      "httpStatus": 200,
+      "contentType": "application/json",
+      "errors": [],
+      "evidence": {
+        "id": "resp_86cf8612c28641f99928aa5344d52d29",
+        "object": "response",
+        "model": "gpt-6-thinking",
+        "usage": {
+          "input_tokens": 12,
+          "output_tokens": 1,
+          "total_tokens": 13,
+          "input_tokens_details": {
+            "text_tokens": 12,
+            "image_tokens": 0,
+            "cached_tokens": 0
+          },
+          "output_tokens_details": {
+            "text_tokens": 1,
+            "image_tokens": 0,
+            "reasoning_tokens": 0
+          }
+        },
+        "error": null,
+        "output": [
+          {
+            "type": "message",
+            "role": "assistant",
+            "content": [
+              {
+                "type": "output_text",
+                "text": "OK"
+              }
+            ]
+          }
+        ]
+      },
+      "elapsedMs": 6021,
+      "category": "capability"
+    },
+    {
+      "name": "52 OpenAI SDK parsing",
+      "state": "PASS",
+      "request": {
+        "model": "gpt-6-thinking",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Reply with exactly OK."
+          }
+        ],
+        "max_completion_tokens": 1024,
+        "stream": false
+      },
+      "httpStatus": 200,
+      "errors": [],
+      "evidence": {
+        "id": "chatcmpl-de30c977e0a148c385008742f7d03efd",
+        "object": "chat.completion",
+        "model": "gpt-6-thinking",
+        "created": 1793032652,
+        "choices": [
+          {
+            "index": 0,
+            "finish_reason": "stop",
+            "message": {
+              "role": "assistant",
+              "content": "OK"
+            }
+          }
+        ],
+        "usage": {
+          "prompt_tokens": 12,
+          "completion_tokens": 1,
+          "total_tokens": 13,
+          "prompt_tokens_details": {
+            "text_tokens": 12,
+            "image_tokens": 0,
+            "cached_tokens": 0
+          },
+          "completion_tokens_details": {
+            "text_tokens": 1,
+            "image_tokens": 0,
+            "reasoning_tokens": 0
+          }
+        }
+      },
+      "elapsedMs": 13,
+      "category": "capability"
+    }
+  ],
+  "observations": {
+    "reusedResponseIds": [
+      {
+        "id": "chatcmpl-7d0fbe44475e49feba9738d127c0fdbc",
+        "cases": [
+          "01 basic JSON and response envelope",
+          "08 multiple choices n=2"
+        ]
+      },
+      {
+        "id": "chatcmpl-de30c977e0a148c385008742f7d03efd",
+        "cases": [
+          "24 logprobs and top_logprobs",
+          "40 n=0 rejected",
+          "52 OpenAI SDK parsing"
+        ]
+      }
+    ],
+    "streamUsageRecheck": {
+      "file": "stream-usage-recheck.json",
+      "finding": "A follow-up raw SSE response returned valid content chunks and DONE but still omitted the requested usage chunk. The extra malformed frame observed in the original run was not reproduced."
+    },
+    "interpretation": "Basic JSON envelopes and ordinary SSE work. This is not full Chat Completions feature compatibility. Prompt-following failures are separated from schema/parameter failures. Reused IDs across differing parameter sets are evidence of response reuse, not proof of a particular cache implementation."
+  }
+}

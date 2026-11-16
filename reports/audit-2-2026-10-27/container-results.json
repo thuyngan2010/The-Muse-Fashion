@@ -1,0 +1,24 @@
+{
+  "api": {
+    "productionReadiness": 200,
+    "corsCredentials": true,
+    "unlistedOriginBlocked": true,
+    "linuxImageDecoder": true
+  },
+  "web": {
+    "runtimeRemoteApiConfig": true,
+    "runtimeConfigNoStore": true,
+    "spaFallback": true,
+    "securityHeadersOnHtmlConfigJsAnd404": true,
+    "uploadProxy": {
+      "small": 502,
+      "tenMiB": 502,
+      "tooLarge": 413
+    }
+  },
+  "migrations": {
+    "fresh": "3 completed",
+    "rerun": "passed without reapplying"
+  },
+  "providerScope": "synthetic merchant only; no provider request or funds transfer"
+}

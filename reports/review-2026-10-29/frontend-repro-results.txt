@@ -1,0 +1,14 @@
+
+ RUN  v5.0.5 C:/Users/htech/Downloads/fashion-commerce
+
+ ✓ reports/review-2026-10-29/frontend-repro.spec.ts > Read-only audit: reproduce current frontend defects > reproduces old community media ID being sent after replacing an image and editing a second time 5ms
+ ✓ reports/review-2026-10-29/frontend-repro.spec.ts > Read-only audit: reproduce current frontend defects > reproduces review photo IDs being discarded when editing from order detail 1ms
+ ✓ reports/review-2026-10-29/frontend-repro.spec.ts > Read-only audit: reproduce current frontend defects > reproduces voucher ending at 07:00 Vietnam on a day labeled "Đến hết ngày" 2ms
+ ✓ reports/review-2026-10-29/frontend-repro.spec.ts > Read-only audit: reproduce current frontend defects > reproduces voucher saving stuck true after the required date is cleared 1ms
+ ✓ reports/review-2026-10-29/frontend-repro.spec.ts > Read-only audit: reproduce current frontend defects > reproduces historical AI result purchase link pointing at the currently selected other product 1ms
+
+ Test Files  1 passed (1)
+      Tests  5 passed (5)
+   Start at  13:01:49
+   Duration  778ms (import 72%, transform 14%, setup 11%, tests 2%, worker 1%)
+
