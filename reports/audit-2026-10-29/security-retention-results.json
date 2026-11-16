@@ -1,0 +1,22 @@
+{
+  "isolatedDb": "audit_media_retention_mvsdr6kf_31013d",
+  "finalizeRemovedExpiry": true,
+  "createPostStatus": 201,
+  "deletePostStatus": 204,
+  "deletedMediaHasExpiry": false,
+  "simulatedDeletionAgeDays": 40,
+  "cleanupSelectedRecords": 0,
+  "objectStorageCalls": 0,
+  "mediaStatusAfterCleanup": "READY",
+  "finalizeReadyUpdate": {
+    "$set": {
+      "status": "READY",
+      "contentType": "image/png",
+      "sizeBytes": 90
+    },
+    "$unset": {
+      "finalizeLeaseUntil": 1,
+      "expiresAt": 1
+    }
+  }
+}

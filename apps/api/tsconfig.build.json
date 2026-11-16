@@ -1,0 +1,11 @@
+{
+  "extends": "./tsconfig.json",
+  "exclude": [
+    "src/**/*.spec.ts",
+    "src/scripts/seed.ts",
+    "src/scripts/bootstrap-admin.ts",
+    "src/scripts/ensure-e2e-admin.ts",
+    "src/scripts/flush-emails.ts",
+    "src/scripts/live-e2e.ts"
+  ]
+}

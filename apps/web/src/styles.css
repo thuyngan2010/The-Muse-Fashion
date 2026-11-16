@@ -1,0 +1,146 @@
+:root {
+  --color-text: #24211e;
+  --color-muted: #6e665e;
+  --color-primary: #26231f;
+  --color-canvas: #faf8f5;
+  --color-surface: #ffffff;
+  --color-border: #d8d1c8;
+  --color-divider: #ebe6df;
+  --color-accent: #78563d;
+  --color-accent-soft: #f1e9df;
+  --color-success: #276346;
+  --color-warning: #895b13;
+  --color-danger: #b53332;
+  --color-info: #285f91;
+  --radius-control: 8px;
+  --radius-card: 12px;
+  --shadow-card: 0 4px 24px #35271908;
+  --shadow-floating: 0 16px 48px #35271924, 0 2px 6px #3527190a;
+  color: var(--color-text);
+  background: var(--color-canvas);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  line-height: 1.6;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--color-canvas); }
+a { color: inherit; text-decoration: none; }
+button, input, select, textarea { font: inherit; }
+button { cursor: pointer; }
+button, a, input, select, textarea { -webkit-tap-highlight-color: transparent; }
+h1, h2, h3, h4 { line-height: 1.3; text-wrap: balance; }
+p { text-wrap: pretty; }
+img { max-width: 100%; }
+::selection { background: #e9dac8; color: var(--color-text); }
+/* A visible ring is shared by links, navigation and every keyboard control. */
+:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 3px; }
+.btn-primary, .btn-outline, .btn-danger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 10px 20px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-control);
+  font-size: .875rem;
+  font-weight: 600;
+  line-height: 1.5;
+  text-align: center;
+  text-decoration: none;
+  transition: background-color .16s, border-color .16s, box-shadow .16s;
+}
+.btn-primary { background: var(--color-primary); color: white; }
+.btn-primary:hover:not(:disabled) { background: #443b32; box-shadow: 0 2px 6px #24211e18; }
+.btn-outline { background: transparent; border-color: var(--color-border); color: var(--color-text); }
+.btn-outline:hover:not(:disabled) { background: var(--color-accent-soft); border-color: #ad9986; }
+.btn-danger { background: var(--color-danger); color: white; }
+.btn-danger:hover:not(:disabled) { background: #922b2b; }
+button:disabled { cursor: not-allowed; }
+.btn-primary:disabled, .btn-outline:disabled, .btn-danger:disabled { opacity: .5; box-shadow: none; }
+/* Types are explicit so radios, checkboxes and file inputs keep native behavior. */
+input:not([type]), input[type="text"], input[type="search"], input[type="email"],
+input[type="password"], input[type="tel"], input[type="url"], input[type="number"],
+input[type="date"], input[type="datetime-local"], select, textarea {
+  min-height: 44px;
+  max-width: 100%;
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  background: var(--color-surface);
+  color: var(--color-text);
+  line-height: 1.5;
+  transition: border-color .16s, box-shadow .16s;
+}
+textarea { resize: vertical; }
+input::placeholder, textarea::placeholder { color: #80766c; opacity: 1; }
+input[type="checkbox"], input[type="radio"] { accent-color: var(--color-accent); width: 16px; height: 16px; flex-shrink: 0; }
+/* Extra specificity keeps focus visible over page-scoped outline resets. */
+body input:focus-visible, body select:focus-visible, body textarea:focus-visible {
+  outline: 2px solid var(--color-accent); outline-offset: 2px; border-color: var(--color-accent);
+}
+input:disabled, select:disabled, textarea:disabled { background: var(--color-canvas); color: var(--color-muted); cursor: not-allowed; }
+body input[aria-invalid="true"], body textarea[aria-invalid="true"], body select[aria-invalid="true"] { border-color: var(--color-danger); }
+input[type="file"] { max-width: 100%; font-size: .875rem; color: var(--color-muted); }
+input::file-selector-button { font: inherit; color: var(--color-text); background: var(--color-canvas); border: 1px solid var(--color-border); border-radius: var(--radius-control); padding: 10px 14px; margin-right: 12px; cursor: pointer; }
+/* Shared primitives used across customer and operational pages. */
+body .form-group > span, body .form-group > label { font-weight: 500; line-height: 1.5; }
+body .page-header { gap: 16px; }
+body .status-badge.status-badge, body .status-pill.status-pill, body .default-badge.default-badge {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-height: 26px; padding: 4px 10px; border-radius: 999px;
+  font-size: .75rem; font-weight: 600; line-height: 1.4;
+}
+body .status-pending_payment.status-pending_payment, body .status-cancel_pending_refund.status-cancel_pending_refund { color: var(--color-warning); background: #faf0da; }
+body .status-confirmed.status-confirmed, body .status-delivered.status-delivered { color: var(--color-success); background: #e9f3ed; }
+body .status-preparing.status-preparing { color: var(--color-info); background: #eaf1f8; }
+body .status-shipping.status-shipping { color: #65508c; background: #f0eaf7; }
+body .status-cancelled.status-cancelled { color: var(--color-danger); background: #fbeceb; }
+body .table-header.table-header { line-height: 1.5; font-size: .75rem; letter-spacing: .025em; }
+body .table-row.table-row { line-height: 1.5; font-variant-numeric: tabular-nums; }
+body .table-row.table-row:hover { background-color: #faf8f5; }
+table { border-collapse: collapse; font-variant-numeric: tabular-nums; }
+th { text-align: left; font-weight: 600; }
+th, td { line-height: 1.5; }
+body .btn-action.btn-action, body .page-btn.page-btn, body .pill-btn.pill-btn { min-height: 36px; line-height: 1.5; }
+@media (max-width: 600px) {
+  body input:not([type="checkbox"]):not([type="radio"]), body select, body textarea { font-size: 1rem; }
+  body .btn-action.btn-action, body .page-btn.page-btn, body .pill-btn.pill-btn { min-height: 44px; }
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+.fade-in { animation: fadeIn .25s ease-out forwards; }
+
+/* Feedback shared by async pages, including those with no local notice rule. */
+.notice { padding:14px 18px; margin:16px 0; border:1px solid var(--color-divider); border-radius:var(--radius-control); background:var(--color-canvas); color:var(--color-muted); font-size:.875rem; line-height:1.65; overflow-wrap:anywhere; }
+.notice.error { background:#fbeceb; border-color:#edc6c3; color:var(--color-danger); }
+button { transition:background-color 150ms ease,border-color 150ms ease,color 150ms ease,box-shadow 150ms ease; }
+button:disabled { cursor:not-allowed; }
+/* Compact actions retain their own semantic colors while sharing hit areas. */
+body :is(.btn-primary-sm,.btn-outline-sm,.btn-sm-outline,.btn-ghost-sm,.btn-xs,.btn-sub-action,.btn-rev-action,.copy-btn) {
+  min-height:36px; border-radius:var(--radius-control); line-height:1.5;
+}
+body :is(.btn-submit,.btn-place-order,.btn-generate,.add-to-cart-btn) { min-height:48px; line-height:1.5; }
+body :is(.tab-nav,.status-filter-pills) { flex-wrap:wrap; gap:8px; }
+body :is(.tab-btn,.option-btn) { min-height:44px; }
+body :is(.breadcrumb,.modal-actions) { flex-wrap:wrap; }
+body :is(.btn-primary,.btn-outline,.btn-danger,.btn-submit,.btn-place-order,.btn-generate,.add-to-cart-btn):active:not(:disabled) { box-shadow:inset 0 0 0 2px #78563d55; }
+@keyframes fc-fade-in { from { opacity:0; } to { opacity:1; } }
+@keyframes fc-menu-in { from { opacity:0; transform:translateY(-4px); } to { opacity:1; transform:translateY(0); } }
+@keyframes fc-dialog-in { from { opacity:0; transform:translateY(8px) scale(.985); } to { opacity:1; transform:translateY(0) scale(1); } }
+/* Opacity-only page entrance avoids changing containing blocks for fixed elements.
+   It runs on route creation, not on polling or signal updates, and never delays input. */
+@media (prefers-reduced-motion:no-preference) {
+  .site-main:not(.admin-mode) > router-outlet + *,
+  .admin-page-content > router-outlet + * { display:block; animation:fc-fade-in 180ms ease-out; }
+}
+@media (max-width:600px) {
+  body :is(.btn-primary-sm,.btn-outline-sm,.btn-sm-outline,.btn-ghost-sm,.btn-xs,.btn-sub-action,.btn-rev-action,.copy-btn) { min-height:44px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
+}

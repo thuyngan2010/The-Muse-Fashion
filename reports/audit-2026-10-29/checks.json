@@ -1,0 +1,23 @@
+{
+  "date": "2026-10-29",
+  "timezone": "Asia/Saigon",
+  "head": "59a7b94",
+  "preExistingModifiedFrontendFiles": 36,
+  "productionSourceChangedByAudit": false,
+  "build": "passed",
+  "apiUnit": { "passed": 156, "failed": 0 },
+  "webUnit": { "passed": 41, "failed": 0 },
+  "existingAuditRegression": { "passed": 22, "failed": 0 },
+  "webRuntimeConfig": { "passed": 5, "failed": 0 },
+  "integration": { "passed": 70, "failed": 0, "skipped": 2, "evidence": "integration-results.json" },
+  "newFrontendDiagnostics": { "passed": 5, "failed": 0, "meaning": "Current defects reproduced", "evidence": "frontend-results.json" },
+  "documentationChecks": "passed",
+  "environmentChecks": "passed",
+  "scriptTargetChecks": "passed",
+  "openApiRouteChecks": { "status": "passed", "routes": 113 },
+  "dependencyAudit": { "critical": 0, "high": 0, "moderate": 0, "lowPackageEntries": 4, "rootAdvisories": 1, "evidence": "npm-audit.json" },
+  "confirmedFindings": { "P2": 6, "P3": 1 },
+  "liveProvidersCalled": false,
+  "browserTestsRun": false,
+  "auditMongoContainerRemoved": true
+}

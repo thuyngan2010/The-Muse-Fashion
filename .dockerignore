@@ -1,0 +1,16 @@
+.git
+.github
+.vercel
+node_modules
+**/node_modules
+**/dist
+**/.angular
+**/coverage
+**/.env
+**/.env.*
+!**/.env.example
+.tmp
+local-emails
+*.log
+*.pem
+docs

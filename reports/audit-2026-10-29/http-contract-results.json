@@ -1,0 +1,60 @@
+{
+  "isolatedDatabase": "audit_http_contracts_mvsdy3ka_b0afc1",
+  "results": {
+    "salesDates": {
+      "uiDatesRevenue": 0,
+      "fullVietnamDayRevenue": 100000,
+      "sameDayStatus": 400,
+      "uiEnd": "2026-10-27T00:00:00.000Z"
+    },
+    "vouchers": {
+      "capAfterOmittedField": 50000,
+      "capAfterExplicitNull": null,
+      "usedCount": 8,
+      "hasUsageCount": false
+    },
+    "reviewControls": {
+      "publicFields": [
+        "id",
+        "productId",
+        "stars",
+        "content",
+        "mediaIds"
+      ],
+      "adminEditStatus": 403,
+      "adminDeleteStatus": 403
+    },
+    "refundApiLifecycle": [
+      {
+        "index": 0,
+        "refundStates": [
+          "SUCCEEDED",
+          "SUCCEEDED"
+        ],
+        "refundedTotal": 100000,
+        "orderState": "CANCEL_PENDING_REFUND",
+        "orderStateAfterReplay": "CANCEL_PENDING_REFUND"
+      },
+      {
+        "index": 1,
+        "refundStates": [
+          "SUCCEEDED",
+          "SUCCEEDED"
+        ],
+        "refundedTotal": 100000,
+        "orderState": "CANCEL_PENDING_REFUND",
+        "orderStateAfterReplay": "CANCEL_PENDING_REFUND"
+      },
+      {
+        "index": 2,
+        "refundStates": [
+          "SUCCEEDED",
+          "SUCCEEDED"
+        ],
+        "refundedTotal": 100000,
+        "orderState": "CANCEL_PENDING_REFUND",
+        "orderStateAfterReplay": "CANCEL_PENDING_REFUND"
+      }
+    ]
+  }
+}

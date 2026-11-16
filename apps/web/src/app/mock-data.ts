@@ -1,0 +1,210 @@
+import type { Category, ProductDetail, ProductSummary, Lookbook, CommunityPost } from '@fashion/contracts';
+
+export const MOCK_CATEGORIES: Category[] = [
+  { id: 'cat-ao', name: 'Áo & Sơ mi', slug: 'ao-so-mi', description: 'Các mẫu áo sơ mi lụa, áo dệt kim cao cấp' },
+  { id: 'cat-dam', name: 'Đầm & Váy', slug: 'dam-vay', description: 'Đầm dạ hội, đầm dự tiệc và váy dạo phố' },
+  { id: 'cat-blazer', name: 'Blazer & Suits', slug: 'blazer-suits', description: 'Blazer may đo thủ công, form dáng chuẩn mực' },
+  { id: 'cat-quan', name: 'Quần & Trousers', slug: 'quan-trousers', description: 'Quần âu xếp ly, quần lụa ống suông' },
+  { id: 'cat-phu-kien', name: 'Phụ kiện', slug: 'phu-kien', description: 'Túi da thủ công và phụ kiện thời trang' },
+];
+
+export const MOCK_PRODUCTS: ProductDetail[] = [
+  {
+    id: 'prod-001',
+    name: 'Blazer May Đo Cashmere Wool Ý',
+    slug: 'blazer-may-do-cashmere-wool-y',
+    description: 'Chiếc blazer mang phong cách tối giản thanh lịch, dệt từ sợi Cashmere Wool cao cấp nhập khẩu từ Ý. Thiết kế ve áo notch cổ điển, cầu vai đệm nhẹ tạo phom đứng sang trọng và thoải mái suốt ngày dài.',
+    material: '80% Virgin Wool, 20% Cashmere Ý, lót lụa Cupro',
+    price: 3850000,
+    currency: 'VND',
+    status: 'PUBLISHED',
+    categoryId: 'cat-blazer',
+    images: [
+      'https://images.unsplash.com/photo-1591047139829-d91aecb6caea?q=80&w=900&auto=format&fit=crop',
+      'https://images.unsplash.com/photo-1584273143981-41c073dfe8f8?q=80&w=900&auto=format&fit=crop',
+    ],
+    sizeGuide: [
+      { size: 'S', measurements: { height: 160, weight: 50, bust: 84, waist: 66, hip: 90 } },
+      { size: 'M', measurements: { height: 165, weight: 55, bust: 88, waist: 70, hip: 94 } },
+      { size: 'L', measurements: { height: 170, weight: 62, bust: 92, waist: 74, hip: 98 } },
+      { size: 'XL', measurements: { height: 175, weight: 70, bust: 96, waist: 78, hip: 102 } },
+    ],
+    variants: [
+      { id: 'var-001-1', sku: 'BLZ-IT-BLK-S', color: 'Đen Noir', size: 'S', price: 3850000, stockOnHand: 25, reserved: 0, available: 25, status: 'ACTIVE' },
+      { id: 'var-001-2', sku: 'BLZ-IT-BLK-M', color: 'Đen Noir', size: 'M', price: 3850000, stockOnHand: 30, reserved: 2, available: 28, status: 'ACTIVE' },
+      { id: 'var-001-3', sku: 'BLZ-IT-BLK-L', color: 'Đen Noir', size: 'L', price: 3850000, stockOnHand: 15, reserved: 0, available: 15, status: 'ACTIVE' },
+      { id: 'var-001-4', sku: 'BLZ-IT-BGE-S', color: 'Be Sữa', size: 'S', price: 3850000, stockOnHand: 20, reserved: 0, available: 20, status: 'ACTIVE' },
+      { id: 'var-001-5', sku: 'BLZ-IT-BGE-M', color: 'Be Sữa', size: 'M', price: 3850000, stockOnHand: 18, reserved: 1, available: 17, status: 'ACTIVE' },
+    ],
+  },
+  {
+    id: 'prod-002',
+    name: 'Đầm Dạ Hội Lụa Satin Cổ Đổ',
+    slug: 'dam-da-hoi-lua-satin-co-do',
+    description: 'Thiết kế đầm dạ tiệc tối giản tôn vinh đường cong tự nhiên với kỹ thuật cắt vải chéo bias-cut. Chất liệu lụa Mulberry Satin óng ả bắt sáng tinh tế, tạo nên vẻ đẹp quyến rũ bất tận.',
+    material: '100% Lụa Mulberry Satin 19 Momme',
+    price: 2950000,
+    currency: 'VND',
+    status: 'PUBLISHED',
+    categoryId: 'cat-dam',
+    images: [
+      'https://images.unsplash.com/photo-1566174053879-31528523f8ae?q=80&w=900&auto=format&fit=crop',
+      'https://images.unsplash.com/photo-1572804013309-59a88b7e92f1?q=80&w=900&auto=format&fit=crop',
+    ],
+    sizeGuide: [
+      { size: 'XS', measurements: { height: 155, weight: 45, bust: 80, waist: 62, hip: 86 } },
+      { size: 'S', measurements: { height: 160, weight: 50, bust: 84, waist: 66, hip: 90 } },
+      { size: 'M', measurements: { height: 165, weight: 56, bust: 88, waist: 70, hip: 94 } },
+      { size: 'L', measurements: { height: 170, weight: 62, bust: 92, waist: 74, hip: 98 } },
+    ],
+    variants: [
+      { id: 'var-002-1', sku: 'DRS-SAT-EMR-S', color: 'Xanh Emerald', size: 'S', price: 2950000, stockOnHand: 12, reserved: 0, available: 12, status: 'ACTIVE' },
+      { id: 'var-002-2', sku: 'DRS-SAT-EMR-M', color: 'Xanh Emerald', size: 'M', price: 2950000, stockOnHand: 15, reserved: 1, available: 14, status: 'ACTIVE' },
+      { id: 'var-002-3', sku: 'DRS-SAT-CHM-S', color: 'Champagne Gold', size: 'S', price: 2950000, stockOnHand: 10, reserved: 0, available: 10, status: 'ACTIVE' },
+      { id: 'var-002-4', sku: 'DRS-SAT-CHM-M', color: 'Champagne Gold', size: 'M', price: 2950000, stockOnHand: 14, reserved: 0, available: 14, status: 'ACTIVE' },
+    ],
+  },
+  {
+    id: 'prod-003',
+    name: 'Áo Sơ Mi Lụa Silk Dáng Rộng Oversized',
+    slug: 'ao-so-mi-lua-silk-dang-rong-oversized',
+    description: 'Mẫu sơ mi mang cảm hứng menswear phóng khoáng nhưng giữ nét nữ tính mềm mại nhờ chất lụa cát bay bổng. Cổ áo mở phóng khoáng, tay áo dài măng séc kép sang trọng.',
+    material: '100% Lụa Silk Habotai thiên nhiên',
+    price: 1850000,
+    currency: 'VND',
+    status: 'PUBLISHED',
+    categoryId: 'cat-ao',
+    images: [
+      'https://images.unsplash.com/photo-1598554747436-c9293d6a588f?q=80&w=900&auto=format&fit=crop',
+      'https://images.unsplash.com/photo-1602810318383-e386cc2a3ccf?q=80&w=900&auto=format&fit=crop',
+    ],
+    sizeGuide: [
+      { size: 'S', measurements: { height: 160, weight: 50, bust: 84, waist: 66, hip: 90 } },
+      { size: 'M', measurements: { height: 165, weight: 55, bust: 88, waist: 70, hip: 94 } },
+      { size: 'L', measurements: { height: 170, weight: 62, bust: 92, waist: 74, hip: 98 } },
+    ],
+    variants: [
+      { id: 'var-003-1', sku: 'SHT-SLK-WHT-S', color: 'Trắng Ngà (Ivory)', size: 'S', price: 1850000, stockOnHand: 40, reserved: 0, available: 40, status: 'ACTIVE' },
+      { id: 'var-003-2', sku: 'SHT-SLK-WHT-M', color: 'Trắng Ngà (Ivory)', size: 'M', price: 1850000, stockOnHand: 35, reserved: 0, available: 35, status: 'ACTIVE' },
+      { id: 'var-003-3', sku: 'SHT-SLK-BLU-S', color: 'Xanh Pastel', size: 'S', price: 1850000, stockOnHand: 25, reserved: 0, available: 25, status: 'ACTIVE' },
+      { id: 'var-003-4', sku: 'SHT-SLK-BLU-M', color: 'Xanh Pastel', size: 'M', price: 1850000, stockOnHand: 20, reserved: 0, available: 20, status: 'ACTIVE' },
+    ],
+  },
+  {
+    id: 'prod-004',
+    name: 'Quần Âu Xếp Ly Ống Rộng Pleated Trouser',
+    slug: 'quan-au-xep-ly-ong-rong-pleated-trouser',
+    description: 'Mẫu quần âu chuẩn phom kiến trúc đương đại với phần cạp cao và hai đường ly đôi sâu phía trước. Tỷ lệ ống suông rủ tự nhiên kéo dài đôi chân và dễ dàng kết hợp cùng blazer hoặc áo thun cao cấp.',
+    material: '70% Wool pha Viscose cao cấp, chống nhăn',
+    price: 2150000,
+    currency: 'VND',
+    status: 'PUBLISHED',
+    categoryId: 'cat-quan',
+    images: [
+      'https://images.unsplash.com/photo-1509631179647-0177331693ae?q=80&w=900&auto=format&fit=crop',
+      'https://images.unsplash.com/photo-1551488831-00ddcb6c6bd3?q=80&w=900&auto=format&fit=crop',
+    ],
+    sizeGuide: [
+      { size: 'S', measurements: { height: 160, weight: 50, bust: 84, waist: 66, hip: 90 } },
+      { size: 'M', measurements: { height: 165, weight: 55, bust: 88, waist: 70, hip: 94 } },
+      { size: 'L', measurements: { height: 170, weight: 62, bust: 92, waist: 74, hip: 98 } },
+    ],
+    variants: [
+      { id: 'var-004-1', sku: 'TRS-PLT-KHK-S', color: 'Khaki Nâu Đất', size: 'S', price: 2150000, stockOnHand: 22, reserved: 0, available: 22, status: 'ACTIVE' },
+      { id: 'var-004-2', sku: 'TRS-PLT-KHK-M', color: 'Khaki Nâu Đất', size: 'M', price: 2150000, stockOnHand: 30, reserved: 1, available: 29, status: 'ACTIVE' },
+      { id: 'var-004-3', sku: 'TRS-PLT-BLK-S', color: 'Đen Than', size: 'S', price: 2150000, stockOnHand: 28, reserved: 0, available: 28, status: 'ACTIVE' },
+      { id: 'var-004-4', sku: 'TRS-PLT-BLK-M', color: 'Đen Than', size: 'M', price: 2150000, stockOnHand: 25, reserved: 0, available: 25, status: 'ACTIVE' },
+    ],
+  },
+  {
+    id: 'prod-005',
+    name: 'Áo Khoác Dáng Dài Wool Trench Coat',
+    slug: 'ao-khoac-dang-dai-wool-trench-coat',
+    description: 'Kiểu áo khoác măng tô dáng dài vượt thời gian. Thiết kế hàng khuy đôi cổ điển, thắt đai eo tôn dáng và chi tiết xẻ lưng tinh tế, thích hợp cho những ngày se lạnh sang trọng.',
+    material: '90% Wool Merino, 10% Polyamide giữ ấm',
+    price: 4950000,
+    currency: 'VND',
+    status: 'PUBLISHED',
+    categoryId: 'cat-blazer',
+    images: [
+      'https://images.unsplash.com/photo-1544441893-675973e31985?q=80&w=900&auto=format&fit=crop',
+      'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?q=80&w=900&auto=format&fit=crop',
+    ],
+    sizeGuide: [
+      { size: 'S', measurements: { height: 160, weight: 50, bust: 84, waist: 66, hip: 90 } },
+      { size: 'M', measurements: { height: 165, weight: 55, bust: 88, waist: 70, hip: 94 } },
+      { size: 'L', measurements: { height: 170, weight: 62, bust: 92, waist: 74, hip: 98 } },
+    ],
+    variants: [
+      { id: 'var-005-1', sku: 'TRC-WL-CAM-S', color: 'Camel Cổ Điển', size: 'S', price: 4950000, stockOnHand: 15, reserved: 0, available: 15, status: 'ACTIVE' },
+      { id: 'var-005-2', sku: 'TRC-WL-CAM-M', color: 'Camel Cổ Điển', size: 'M', price: 4950000, stockOnHand: 18, reserved: 0, available: 18, status: 'ACTIVE' },
+      { id: 'var-005-3', sku: 'TRC-WL-GRY-M', color: 'Xám Khói', size: 'M', price: 4950000, stockOnHand: 10, reserved: 0, available: 10, status: 'ACTIVE' },
+    ],
+  },
+  {
+    id: 'prod-006',
+    name: 'Túi Xách Da Bò Thủ Công Minimalist Leather Tote',
+    slug: 'tui-xach-da-bo-thu-cong-minimalist-leather-tote',
+    description: 'Mẫu túi da cỡ trung được chế tác hoàn toàn thủ công từ da bò mộc tự nhiên. Ngăn chứa rộng rãi đựng vừa laptop 14-inch cùng các vật dụng cá nhân, khóa nam châm tiện dụng.',
+    material: '100% Da bò thật mộc Full Grain Leather',
+    price: 3200000,
+    currency: 'VND',
+    status: 'PUBLISHED',
+    categoryId: 'cat-phu-kien',
+    images: [
+      'https://images.unsplash.com/photo-1590874103328-eac38a683ce7?q=80&w=900&auto=format&fit=crop',
+      'https://images.unsplash.com/photo-1548036328-c9fa89d128fa?q=80&w=900&auto=format&fit=crop',
+    ],
+    sizeGuide: [],
+    variants: [
+      { id: 'var-006-1', sku: 'BAG-TOT-TAN-ONESIZE', color: 'Nâu Da Bò (Tan)', size: 'Free Size', price: 3200000, stockOnHand: 20, reserved: 0, available: 20, status: 'ACTIVE' },
+      { id: 'var-006-2', sku: 'BAG-TOT-BLK-ONESIZE', color: 'Đen Mờ (Matte Black)', size: 'Free Size', price: 3200000, stockOnHand: 16, reserved: 0, available: 16, status: 'ACTIVE' },
+    ],
+  },
+];
+
+export const MOCK_LOOKBOOKS: Lookbook[] = [
+  {
+    id: 'lb-01',
+    title: 'Autumn in Milan · Sự Giao Thoa Cổ Điển & Đương Đại',
+    description: 'Bộ ảnh lấy cảm hứng từ những gam màu trung tính của mùa thu nước Ý, kết hợp hài hòa giữa áo khoác Cashmere và quần tây ống suông phóng khoáng.',
+    mainImageUrl: 'https://images.unsplash.com/photo-1490481651871-ab68de25d43d?q=80&w=1200&auto=format&fit=crop',
+    tags: ['Autumn2026', 'QuietLuxury', 'Tailoring'],
+    products: MOCK_PRODUCTS.slice(0, 3),
+  },
+  {
+    id: 'lb-02',
+    title: 'The Modern Minimalist · Tinh Thần Tối Giản Vĩnh Cửu',
+    description: 'Khẳng định dấu ấn cá nhân qua phom dáng chuẩn mực, chất liệu vải thượng hạng và những đường cắt dứt khoát không thừa thãi.',
+    mainImageUrl: 'https://images.unsplash.com/photo-1469334031218-e382a71b716b?q=80&w=1200&auto=format&fit=crop',
+    tags: ['Minimalism', 'Silk', 'Monochrome'],
+    products: MOCK_PRODUCTS.slice(2, 5),
+  },
+  {
+    id: 'lb-03',
+    title: 'Evening Reverie · Bản Giao Hưởng Dạ Tiệc Sang Trọng',
+    description: 'Ánh sáng lung linh của buổi dạ tiệc được gói gọn trong chất lụa Satin óng ả và đường nét kiêu kỳ của những thiết kế đầm tiệc tôn dáng.',
+    mainImageUrl: 'https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?q=80&w=1200&auto=format&fit=crop',
+    tags: ['EveningWear', 'SatinDress', 'Elegance'],
+    products: [MOCK_PRODUCTS[1], MOCK_PRODUCTS[5]],
+  },
+];
+
+export const MOCK_COMMUNITY_POSTS: CommunityPost[] = [
+  {
+    id: 'post-01',
+    ownerId: 'user-001',
+    authorName: 'Minh Thư (Stylist)',
+    caption: 'Một buổi sáng nắng nhẹ tại Hà Nội với chiếc blazer Cashmere phối cùng sơ mi lụa trắng. Đơn giản nhưng tạo cảm giác cực kỳ tự tin khi gặp khách hàng!',
+    mediaUrls: ['https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=900&auto=format&fit=crop'],
+    createdAt: new Date(Date.now() - 2 * 3600 * 1000).toISOString(),
+  },
+  {
+    id: 'post-02',
+    ownerId: 'user-002',
+    authorName: 'Khánh Linh',
+    caption: 'Đầm satin màu Emerald quả thực lên ảnh xuất sắc hơn mong đợi. Chất lụa mát rượi và phom rủ rất tôn dáng. Rate 10/10 cho đội ngũ thiết kế!',
+    mediaUrls: ['https://images.unsplash.com/photo-1517841905240-472988babdf9?q=80&w=900&auto=format&fit=crop'],
+    createdAt: new Date(Date.now() - 24 * 3600 * 1000).toISOString(),
+  },
+];

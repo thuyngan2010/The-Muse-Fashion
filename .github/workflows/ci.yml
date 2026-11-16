@@ -1,0 +1,93 @@
+name: CI
+on:
+  push:
+  pull_request:
+jobs:
+  docs-and-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm run check:docs
+      - run: npm run check:env
+      - run: npm run check:scripts
+      - run: npm ci --no-audit
+      - run: npm audit --audit-level=high
+      - run: npm run build
+      - run: npm run check:routes
+      - run: npm run test:audit
+      - run: npm run test:web:config
+      - run: npm run test --workspace @fashion/web
+      - run: sh scripts/test-web-runtime-config.sh
+      - run: npm test
+
+  integration:
+    # Quality gate: migrations, MongoDB transactions, RBAC/ownership, session revocation and the
+    # signed GPM Pay webhook all run against a real single-node replica set and the compiled API.
+    runs-on: ubuntu-latest
+    needs: docs-and-build
+    timeout-minutes: 20
+    env:
+      MONGO_BASE: mongodb://127.0.0.1:27017
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Start MongoDB replica set
+        run: |
+          docker run -d --name mongo -p 27017:27017 mongo:8.0 mongod --bind_ip_all --replSet rs0
+          for _ in $(seq 1 30); do
+            docker exec mongo mongosh --quiet --eval 'db.adminCommand({ ping: 1 }).ok' && break
+            sleep 2
+          done
+          docker exec mongo mongosh --quiet --eval "rs.initiate({ _id: 'rs0', members: [{ _id: 0, host: '127.0.0.1:27017' }] })"
+          for _ in $(seq 1 30); do
+            docker exec mongo mongosh --quiet --eval 'db.hello().isWritablePrimary' | grep -q true && exit 0
+            sleep 2
+          done
+          echo "MongoDB replica set did not elect a primary" && exit 1
+      - run: npm ci --no-audit
+      - run: npm run build:api
+      - name: Migration gate (fresh database, then idempotent re-run with verify)
+        env:
+          MONGODB_URI: ${{ env.MONGO_BASE }}/fc_ci_migrate?replicaSet=rs0
+        run: |
+          npm run migrate --workspace @fashion/api
+          npm run migrate --workspace @fashion/api
+      - name: Integration and E2E tests
+        env:
+          MONGODB_TEST_URI: ${{ env.MONGO_BASE }}/?replicaSet=rs0
+        run: npm run test:integration
+      - name: API image migration gate
+        run: |
+          docker build -f Dockerfile.api -t fashion-api-ci .
+          docker run --rm --network container:mongo \
+            -e MONGODB_URI=mongodb://127.0.0.1:27017/fc_ci_image_migrate?replicaSet=rs0 \
+            --entrypoint node fashion-api-ci apps/api/dist/scripts/migrate.js
+          docker run --rm --network container:mongo \
+            -e MONGODB_URI=mongodb://127.0.0.1:27017/fc_ci_image_migrate?replicaSet=rs0 \
+            --entrypoint node fashion-api-ci apps/api/dist/scripts/migrate.js
+      - name: MongoDB logs on failure
+        if: failure()
+        run: docker logs mongo | tail -n 200
+
+  container-build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        dockerfile: [Dockerfile.api, Dockerfile.web]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ${{ matrix.dockerfile }}
+          push: false
+          cache-from: type=gha,scope=${{ matrix.dockerfile }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.dockerfile }}

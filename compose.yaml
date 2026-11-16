@@ -1,0 +1,36 @@
+services:
+  mongo:
+    image: mongo:8.0
+    container_name: fashion-mongo
+    restart: unless-stopped
+    command: ["mongod", "--bind_ip_all", "--replSet", "rs0"]
+    ports:
+      - "127.0.0.1:27017:27017"
+    volumes:
+      - mongo_data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand({ping:1}).ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  mongo-init:
+    image: mongo:8.0
+    depends_on:
+      mongo:
+        condition: service_healthy
+    restart: "no"
+    entrypoint:
+      - mongosh
+      - mongodb://mongo:27017/?directConnection=true
+      - --eval
+      - |
+        try { rs.status(); }
+        catch (e) {
+          rs.initiate({ _id: 'rs0', members: [{ _id: 0, host: '127.0.0.1:27017' }] });
+        }
+        for (let attempt = 0; attempt < 30 && !db.hello().isWritablePrimary; attempt++) sleep(1000);
+        if (!db.hello().isWritablePrimary) throw new Error('MongoDB replica set did not elect a primary');
+
+volumes:
+  mongo_data:

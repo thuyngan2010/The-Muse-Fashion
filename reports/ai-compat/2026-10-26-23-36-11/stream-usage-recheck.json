@@ -1,0 +1,36 @@
+{
+  "status": 200,
+  "contentType": "text/event-stream; charset=utf-8",
+  "frames": [
+    {
+      "id": "chatcmpl-759a27927fed45cf8d008320ecc5e20c",
+      "object": "chat.completion.chunk",
+      "created": 1793032869,
+      "model": "gpt-6-thinking",
+      "choices": [
+        {
+          "index": 0,
+          "delta": {
+            "role": "assistant",
+            "content": "OK"
+          },
+          "finish_reason": null
+        }
+      ]
+    },
+    {
+      "id": "chatcmpl-759a27927fed45cf8d008320ecc5e20c",
+      "object": "chat.completion.chunk",
+      "created": 1793032869,
+      "model": "gpt-6-thinking",
+      "choices": [
+        {
+          "index": 0,
+          "delta": {},
+          "finish_reason": "stop"
+        }
+      ]
+    },
+    "[DONE]"
+  ]
+}

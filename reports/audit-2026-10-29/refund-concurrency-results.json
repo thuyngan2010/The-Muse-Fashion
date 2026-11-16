@@ -1,0 +1,555 @@
+{
+  "isolatedTestDatabase": "fc_audit_refund_race_mvsdst8a_aa366c",
+  "results": [
+    {
+      "iteration": 0,
+      "responses": [
+        {
+          "status": 200,
+          "body": {
+            "id": "6ae22f702fd8db44273ecffa",
+            "paymentAttemptId": "6ae22f6f2fd8db44273ecff9",
+            "orderId": "6ae22f6e2fd8db44273ecff8",
+            "amount": 50000,
+            "state": "SUCCEEDED",
+            "reason": "Two approved partial refunds",
+            "proposedBy": "6ae22f702fd8db44273ecffc",
+            "approvedBy": "6ae22f692fd8db44273ecff6",
+            "confirmedBy": "6ae22f692fd8db44273ecff6",
+            "bankReference": "2a68642c-169b-46e4-a604-d7e134cd9c7e",
+            "approvedAt": "2026-10-28T17:22:56.696Z",
+            "refundedAt": "2026-10-28T17:22:57.738Z",
+            "beneficiary": {
+              "bankBin": "970422",
+              "accountNumberMasked": "******9999",
+              "accountName": "AUDIT CUSTOMER"
+            }
+          }
+        },
+        {
+          "status": 200,
+          "body": {
+            "id": "6ae22f702fd8db44273ecffb",
+            "paymentAttemptId": "6ae22f6f2fd8db44273ecff9",
+            "orderId": "6ae22f6e2fd8db44273ecff8",
+            "amount": 50000,
+            "state": "SUCCEEDED",
+            "reason": "Two approved partial refunds",
+            "proposedBy": "6ae22f702fd8db44273ecffd",
+            "approvedBy": "6ae22f692fd8db44273ecff6",
+            "confirmedBy": "6ae22f692fd8db44273ecff6",
+            "bankReference": "8ae4eeb9-b3cf-4d91-a793-471aee8032e0",
+            "approvedAt": "2026-10-28T17:22:56.696Z",
+            "refundedAt": "2026-10-28T17:22:57.741Z",
+            "beneficiary": {
+              "bankBin": "970422",
+              "accountNumberMasked": "******9999",
+              "accountName": "AUDIT CUSTOMER"
+            }
+          }
+        }
+      ],
+      "orderState": "CANCEL_PENDING_REFUND",
+      "refundedTotal": 100000,
+      "refundStates": [
+        "SUCCEEDED",
+        "SUCCEEDED"
+      ]
+    },
+    {
+      "iteration": 1,
+      "responses": [
+        {
+          "status": 200,
+          "body": {
+            "id": "6ae22f752fd8db44273ed000",
+            "paymentAttemptId": "6ae22f752fd8db44273ecfff",
+            "orderId": "6ae22f722fd8db44273ecffe",
+            "amount": 50000,
+            "state": "SUCCEEDED",
+            "reason": "Two approved partial refunds",
+            "proposedBy": "6ae22f752fd8db44273ed002",
+            "approvedBy": "6ae22f692fd8db44273ecff6",
+            "confirmedBy": "6ae22f692fd8db44273ecff6",
+            "bankReference": "b9e301f5-b5da-4c2c-a718-107f5cc2dcbe",
+            "approvedAt": "2026-10-28T17:23:01.680Z",
+            "refundedAt": "2026-10-28T17:23:02.534Z",
+            "beneficiary": {
+              "bankBin": "970422",
+              "accountNumberMasked": "******9999",
+              "accountName": "AUDIT CUSTOMER"
+            }
+          }
+        },
+        {
+          "status": 200,
+          "body": {
+            "id": "6ae22f752fd8db44273ed001",
+            "paymentAttemptId": "6ae22f752fd8db44273ecfff",
+            "orderId": "6ae22f722fd8db44273ecffe",
+            "amount": 50000,
+            "state": "SUCCEEDED",
+            "reason": "Two approved partial refunds",
+            "proposedBy": "6ae22f752fd8db44273ed003",
+            "approvedBy": "6ae22f692fd8db44273ecff6",
+            "confirmedBy": "6ae22f692fd8db44273ecff6",
+            "bankReference": "14023c73-e9af-4f51-8a50-de84cfb861cf",
+            "approvedAt": "2026-10-28T17:23:01.680Z",
+            "refundedAt": "2026-10-28T17:23:02.536Z",
+            "beneficiary": {
+              "bankBin": "970422",
+              "accountNumberMasked": "******9999",
+              "accountName": "AUDIT CUSTOMER"
+            }
+          }
+        }
+      ],
+      "orderState": "CANCEL_PENDING_REFUND",
+      "refundedTotal": 100000,
+      "refundStates": [
+        "SUCCEEDED",
+        "SUCCEEDED"
+      ]
+    },
+    {
+      "iteration": 2,
+      "responses": [
+        {
+          "status": 200,
+          "body": {
+            "id": "6ae22f892fd8db44273ed006",
+            "paymentAttemptId": "6ae22f802fd8db44273ed005",
+            "orderId": "6ae22f782fd8db44273ed004",
+            "amount": 50000,
+            "state": "SUCCEEDED",
+            "reason": "Two approved partial refunds",
+            "proposedBy": "6ae22f892fd8db44273ed008",
+            "approvedBy": "6ae22f692fd8db44273ecff6",
+            "confirmedBy": "6ae22f692fd8db44273ecff6",
+            "bankReference": "8b430213-adf9-422c-a399-88b6af8f0769",
+            "approvedAt": "2026-10-28T17:23:21.089Z",
+            "refundedAt": "2026-10-28T17:23:23.159Z",
+            "beneficiary": {
+              "bankBin": "970422",
+              "accountNumberMasked": "******9999",
+              "accountName": "AUDIT CUSTOMER"
+            }
+          }
+        },
+        {
+          "status": 200,
+          "body": {
+            "id": "6ae22f892fd8db44273ed007",
+            "paymentAttemptId": "6ae22f802fd8db44273ed005",
+            "orderId": "6ae22f782fd8db44273ed004",
+            "amount": 50000,
+            "state": "SUCCEEDED",
+            "reason": "Two approved partial refunds",
+            "proposedBy": "6ae22f892fd8db44273ed009",
+            "approvedBy": "6ae22f692fd8db44273ecff6",
+            "confirmedBy": "6ae22f692fd8db44273ecff6",
+            "bankReference": "0c6efdf6-2214-44b8-a190-9b2403fd56ed",
+            "approvedAt": "2026-10-28T17:23:21.089Z",
+            "refundedAt": "2026-10-28T17:23:23.158Z",
+            "beneficiary": {
+              "bankBin": "970422",
+              "accountNumberMasked": "******9999",
+              "accountName": "AUDIT CUSTOMER"
+            }
+          }
+        }
+      ],
+      "orderState": "CANCEL_PENDING_REFUND",
+      "refundedTotal": 100000,
+      "refundStates": [
+        "SUCCEEDED",
+        "SUCCEEDED"
+      ]
+    },
+    {
+      "iteration": 3,
+      "responses": [
+        {
+          "status": 200,
+          "body": {
+            "id": "6ae22f8e2fd8db44273ed00c",
+            "paymentAttemptId": "6ae22f8c2fd8db44273ed00b",
+            "orderId": "6ae22f8c2fd8db44273ed00a",
+            "amount": 50000,
+            "state": "SUCCEEDED",
+            "reason": "Two approved partial refunds",
+            "proposedBy": "6ae22f8e2fd8db44273ed00e",
+            "approvedBy": "6ae22f692fd8db44273ecff6",
+            "confirmedBy": "6ae22f692fd8db44273ecff6",
+            "bankReference": "f49b851b-49fe-4514-952f-b573c03d5e41",
+            "approvedAt": "2026-10-28T17:23:26.662Z",
+            "refundedAt": "2026-10-28T17:23:34.957Z",
+            "beneficiary": {
+              "bankBin": "970422",
+              "accountNumberMasked": "******9999",
+              "accountName": "AUDIT CUSTOMER"
+            }
+          }
+        },
+        {
+          "status": 200,
+          "body": {
+            "id": "6ae22f8e2fd8db44273ed00d",
+            "paymentAttemptId": "6ae22f8c2fd8db44273ed00b",
+            "orderId": "6ae22f8c2fd8db44273ed00a",
+            "amount": 50000,
+            "state": "SUCCEEDED",
+            "reason": "Two approved partial refunds",
+            "proposedBy": "6ae22f8e2fd8db44273ed00f",
+            "approvedBy": "6ae22f692fd8db44273ecff6",
+            "confirmedBy": "6ae22f692fd8db44273ecff6",
+            "bankReference": "a41ab734-11e2-4abc-b181-e775514f23b8",
+            "approvedAt": "2026-10-28T17:23:26.662Z",
+            "refundedAt": "2026-10-28T17:23:34.958Z",
+            "beneficiary": {
+              "bankBin": "970422",
+              "accountNumberMasked": "******9999",
+              "accountName": "AUDIT CUSTOMER"
+            }
+          }
+        }
+      ],
+      "orderState": "CANCEL_PENDING_REFUND",
+      "refundedTotal": 100000,
+      "refundStates": [
+        "SUCCEEDED",
+        "SUCCEEDED"
+      ]
+    },
+    {
+      "iteration": 4,
+      "responses": [
+        {
+          "status": 200,
+          "body": {
+            "id": "6ae22f992fd8db44273ed012",
+            "paymentAttemptId": "6ae22f972fd8db44273ed011",
+            "orderId": "6ae22f972fd8db44273ed010",
+            "amount": 50000,
+            "state": "SUCCEEDED",
+            "reason": "Two approved partial refunds",
+            "proposedBy": "6ae22f992fd8db44273ed014",
+            "approvedBy": "6ae22f692fd8db44273ecff6",
+            "confirmedBy": "6ae22f692fd8db44273ecff6",
+            "bankReference": "0e636430-72ab-4fb3-8853-ec5682b7b7a9",
+            "approvedAt": "2026-10-28T17:23:37.215Z",
+            "refundedAt": "2026-10-28T17:23:39.920Z",
+            "beneficiary": {
+              "bankBin": "970422",
+              "accountNumberMasked": "******9999",
+              "accountName": "AUDIT CUSTOMER"
+            }
+          }
+        },
+        {
+          "status": 200,
+          "body": {
+            "id": "6ae22f992fd8db44273ed013",
+            "paymentAttemptId": "6ae22f972fd8db44273ed011",
+            "orderId": "6ae22f972fd8db44273ed010",
+            "amount": 50000,
+            "state": "SUCCEEDED",
+            "reason": "Two approved partial refunds",
+            "proposedBy": "6ae22f992fd8db44273ed015",
+            "approvedBy": "6ae22f692fd8db44273ecff6",
+            "confirmedBy": "6ae22f692fd8db44273ecff6",
+            "bankReference": "6f74d34e-7d60-4208-97f5-ea40dd4b228d",
+            "approvedAt": "2026-10-28T17:23:37.215Z",
+            "refundedAt": "2026-10-28T17:23:39.922Z",
+            "beneficiary": {
+              "bankBin": "970422",
+              "accountNumberMasked": "******9999",
+              "accountName": "AUDIT CUSTOMER"
+            }
+          }
+        }
+      ],
+      "orderState": "CANCEL_PENDING_REFUND",
+      "refundedTotal": 100000,
+      "refundStates": [
+        "SUCCEEDED",
+        "SUCCEEDED"
+      ]
+    },
+    {
+      "iteration": 5,
+      "responses": [
+        {
+          "status": 200,
+          "body": {
+            "id": "6ae22f9d2fd8db44273ed018",
+            "paymentAttemptId": "6ae22f9c2fd8db44273ed017",
+            "orderId": "6ae22f9c2fd8db44273ed016",
+            "amount": 50000,
+            "state": "SUCCEEDED",
+            "reason": "Two approved partial refunds",
+            "proposedBy": "6ae22f9d2fd8db44273ed01a",
+            "approvedBy": "6ae22f692fd8db44273ecff6",
+            "confirmedBy": "6ae22f692fd8db44273ecff6",
+            "bankReference": "5c9a89e2-d72a-4a2d-804d-6f1006207f43",
+            "approvedAt": "2026-10-28T17:23:41.055Z",
+            "refundedAt": "2026-10-28T17:23:41.246Z",
+            "beneficiary": {
+              "bankBin": "970422",
+              "accountNumberMasked": "******9999",
+              "accountName": "AUDIT CUSTOMER"
+            }
+          }
+        },
+        {
+          "status": 200,
+          "body": {
+            "id": "6ae22f9d2fd8db44273ed019",
+            "paymentAttemptId": "6ae22f9c2fd8db44273ed017",
+            "orderId": "6ae22f9c2fd8db44273ed016",
+            "amount": 50000,
+            "state": "SUCCEEDED",
+            "reason": "Two approved partial refunds",
+            "proposedBy": "6ae22f9d2fd8db44273ed01b",
+            "approvedBy": "6ae22f692fd8db44273ecff6",
+            "confirmedBy": "6ae22f692fd8db44273ecff6",
+            "bankReference": "0dd66478-a1b5-4e67-aa66-775c7d367d1e",
+            "approvedAt": "2026-10-28T17:23:41.055Z",
+            "refundedAt": "2026-10-28T17:23:41.249Z",
+            "beneficiary": {
+              "bankBin": "970422",
+              "accountNumberMasked": "******9999",
+              "accountName": "AUDIT CUSTOMER"
+            }
+          }
+        }
+      ],
+      "orderState": "CANCEL_PENDING_REFUND",
+      "refundedTotal": 100000,
+      "refundStates": [
+        "SUCCEEDED",
+        "SUCCEEDED"
+      ]
+    },
+    {
+      "iteration": 6,
+      "responses": [
+        {
+          "status": 200,
+          "body": {
+            "id": "6ae22f9d2fd8db44273ed01e",
+            "paymentAttemptId": "6ae22f9d2fd8db44273ed01d",
+            "orderId": "6ae22f9d2fd8db44273ed01c",
+            "amount": 50000,
+            "state": "SUCCEEDED",
+            "reason": "Two approved partial refunds",
+            "proposedBy": "6ae22f9d2fd8db44273ed020",
+            "approvedBy": "6ae22f692fd8db44273ecff6",
+            "confirmedBy": "6ae22f692fd8db44273ecff6",
+            "bankReference": "ace0cdc1-dc2f-4e37-80c2-a95d58dc988f",
+            "approvedAt": "2026-10-28T17:23:41.448Z",
+            "refundedAt": "2026-10-28T17:23:42.363Z",
+            "beneficiary": {
+              "bankBin": "970422",
+              "accountNumberMasked": "******9999",
+              "accountName": "AUDIT CUSTOMER"
+            }
+          }
+        },
+        {
+          "status": 200,
+          "body": {
+            "id": "6ae22f9d2fd8db44273ed01f",
+            "paymentAttemptId": "6ae22f9d2fd8db44273ed01d",
+            "orderId": "6ae22f9d2fd8db44273ed01c",
+            "amount": 50000,
+            "state": "SUCCEEDED",
+            "reason": "Two approved partial refunds",
+            "proposedBy": "6ae22f9d2fd8db44273ed021",
+            "approvedBy": "6ae22f692fd8db44273ecff6",
+            "confirmedBy": "6ae22f692fd8db44273ecff6",
+            "bankReference": "be516912-715f-412e-86b1-ff86c9eb8ca2",
+            "approvedAt": "2026-10-28T17:23:41.448Z",
+            "refundedAt": "2026-10-28T17:23:41.814Z",
+            "beneficiary": {
+              "bankBin": "970422",
+              "accountNumberMasked": "******9999",
+              "accountName": "AUDIT CUSTOMER"
+            }
+          }
+        }
+      ],
+      "orderState": "CANCELLED",
+      "refundedTotal": 100000,
+      "refundStates": [
+        "SUCCEEDED",
+        "SUCCEEDED"
+      ]
+    },
+    {
+      "iteration": 7,
+      "responses": [
+        {
+          "status": 200,
+          "body": {
+            "id": "6ae22f9e2fd8db44273ed024",
+            "paymentAttemptId": "6ae22f9e2fd8db44273ed023",
+            "orderId": "6ae22f9e2fd8db44273ed022",
+            "amount": 50000,
+            "state": "SUCCEEDED",
+            "reason": "Two approved partial refunds",
+            "proposedBy": "6ae22f9e2fd8db44273ed026",
+            "approvedBy": "6ae22f692fd8db44273ecff6",
+            "confirmedBy": "6ae22f692fd8db44273ecff6",
+            "bankReference": "f30a4ea2-9f24-4782-9629-c64ae56aaa33",
+            "approvedAt": "2026-10-28T17:23:42.405Z",
+            "refundedAt": "2026-10-28T17:23:42.420Z",
+            "beneficiary": {
+              "bankBin": "970422",
+              "accountNumberMasked": "******9999",
+              "accountName": "AUDIT CUSTOMER"
+            }
+          }
+        },
+        {
+          "status": 200,
+          "body": {
+            "id": "6ae22f9e2fd8db44273ed025",
+            "paymentAttemptId": "6ae22f9e2fd8db44273ed023",
+            "orderId": "6ae22f9e2fd8db44273ed022",
+            "amount": 50000,
+            "state": "SUCCEEDED",
+            "reason": "Two approved partial refunds",
+            "proposedBy": "6ae22f9e2fd8db44273ed027",
+            "approvedBy": "6ae22f692fd8db44273ecff6",
+            "confirmedBy": "6ae22f692fd8db44273ecff6",
+            "bankReference": "33563a29-b2ef-4e53-a4e6-0751000aa7e0",
+            "approvedAt": "2026-10-28T17:23:42.405Z",
+            "refundedAt": "2026-10-28T17:23:42.421Z",
+            "beneficiary": {
+              "bankBin": "970422",
+              "accountNumberMasked": "******9999",
+              "accountName": "AUDIT CUSTOMER"
+            }
+          }
+        }
+      ],
+      "orderState": "CANCEL_PENDING_REFUND",
+      "refundedTotal": 100000,
+      "refundStates": [
+        "SUCCEEDED",
+        "SUCCEEDED"
+      ]
+    },
+    {
+      "iteration": 8,
+      "responses": [
+        {
+          "status": 200,
+          "body": {
+            "id": "6ae22f9e2fd8db44273ed02a",
+            "paymentAttemptId": "6ae22f9e2fd8db44273ed029",
+            "orderId": "6ae22f9e2fd8db44273ed028",
+            "amount": 50000,
+            "state": "SUCCEEDED",
+            "reason": "Two approved partial refunds",
+            "proposedBy": "6ae22f9e2fd8db44273ed02c",
+            "approvedBy": "6ae22f692fd8db44273ecff6",
+            "confirmedBy": "6ae22f692fd8db44273ecff6",
+            "bankReference": "856f13df-5bed-4a16-a281-cda3ac50ecb9",
+            "approvedAt": "2026-10-28T17:23:42.453Z",
+            "refundedAt": "2026-10-28T17:23:42.468Z",
+            "beneficiary": {
+              "bankBin": "970422",
+              "accountNumberMasked": "******9999",
+              "accountName": "AUDIT CUSTOMER"
+            }
+          }
+        },
+        {
+          "status": 200,
+          "body": {
+            "id": "6ae22f9e2fd8db44273ed02b",
+            "paymentAttemptId": "6ae22f9e2fd8db44273ed029",
+            "orderId": "6ae22f9e2fd8db44273ed028",
+            "amount": 50000,
+            "state": "SUCCEEDED",
+            "reason": "Two approved partial refunds",
+            "proposedBy": "6ae22f9e2fd8db44273ed02d",
+            "approvedBy": "6ae22f692fd8db44273ecff6",
+            "confirmedBy": "6ae22f692fd8db44273ecff6",
+            "bankReference": "93d882b2-0f93-4fe9-878c-9f4faa101203",
+            "approvedAt": "2026-10-28T17:23:42.453Z",
+            "refundedAt": "2026-10-28T17:23:42.469Z",
+            "beneficiary": {
+              "bankBin": "970422",
+              "accountNumberMasked": "******9999",
+              "accountName": "AUDIT CUSTOMER"
+            }
+          }
+        }
+      ],
+      "orderState": "CANCEL_PENDING_REFUND",
+      "refundedTotal": 100000,
+      "refundStates": [
+        "SUCCEEDED",
+        "SUCCEEDED"
+      ]
+    },
+    {
+      "iteration": 9,
+      "responses": [
+        {
+          "status": 200,
+          "body": {
+            "id": "6ae22f9e2fd8db44273ed030",
+            "paymentAttemptId": "6ae22f9e2fd8db44273ed02f",
+            "orderId": "6ae22f9e2fd8db44273ed02e",
+            "amount": 50000,
+            "state": "SUCCEEDED",
+            "reason": "Two approved partial refunds",
+            "proposedBy": "6ae22f9e2fd8db44273ed032",
+            "approvedBy": "6ae22f692fd8db44273ecff6",
+            "confirmedBy": "6ae22f692fd8db44273ecff6",
+            "bankReference": "5dccbcc5-13c6-48e6-8435-beeaaf8ff284",
+            "approvedAt": "2026-10-28T17:23:42.496Z",
+            "refundedAt": "2026-10-28T17:23:42.514Z",
+            "beneficiary": {
+              "bankBin": "970422",
+              "accountNumberMasked": "******9999",
+              "accountName": "AUDIT CUSTOMER"
+            }
+          }
+        },
+        {
+          "status": 200,
+          "body": {
+            "id": "6ae22f9e2fd8db44273ed031",
+            "paymentAttemptId": "6ae22f9e2fd8db44273ed02f",
+            "orderId": "6ae22f9e2fd8db44273ed02e",
+            "amount": 50000,
+            "state": "SUCCEEDED",
+            "reason": "Two approved partial refunds",
+            "proposedBy": "6ae22f9e2fd8db44273ed033",
+            "approvedBy": "6ae22f692fd8db44273ecff6",
+            "confirmedBy": "6ae22f692fd8db44273ecff6",
+            "bankReference": "7606d308-8a54-42be-9661-8712189d51d0",
+            "approvedAt": "2026-10-28T17:23:42.496Z",
+            "refundedAt": "2026-10-28T17:23:42.515Z",
+            "beneficiary": {
+              "bankBin": "970422",
+              "accountNumberMasked": "******9999",
+              "accountName": "AUDIT CUSTOMER"
+            }
+          }
+        }
+      ],
+      "orderState": "CANCEL_PENDING_REFUND",
+      "refundedTotal": 100000,
+      "refundStates": [
+        "SUCCEEDED",
+        "SUCCEEDED"
+      ]
+    }
+  ]
+}

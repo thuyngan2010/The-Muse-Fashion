@@ -1,0 +1,2412 @@
+{
+  "startedAt": "2026-10-26 23:47:45",
+  "timezone": "Asia/Saigon",
+  "endpoint": "http://localhost:20128/v1",
+  "model": "ag/gemini-3.8-flash-medium",
+  "scope": "Chat Completions, SSE, function tools, validation/authentication, model discovery; one Responses API probe.",
+  "exclusions": "Not an OpenAI certification. No audio, image generation/editing, embeddings, uploads, stored-completion CRUD, rate-limit stress, billing, or exhaustive parameter-combination testing. Optional capability rejection is distinct from malformed output. Accepted sampler/reasoning parameters do not prove their implementation. BEHAVIOR_FAIL denotes observed prompt-following failures, not a malformed JSON response or proof that the gateway drops roles. FAIL includes strict HTTP-status differences from OpenAI as well as silently ignored feature settings.",
+  "reference": "https://developers.openai.com/api/reference/resources/chat/subresources/completions/methods/create",
+  "counts": {
+    "PASS": 28,
+    "FAIL": 23,
+    "BEHAVIOR_FAIL": 1,
+    "UNSUPPORTED": 0,
+    "ERROR": 0
+  },
+  "durationMs": 83641,
+  "results": [
+    {
+      "name": "01 basic JSON and response envelope",
+      "state": "PASS",
+      "request": {
+        "model": "ag/gemini-3.8-flash-medium",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Reply with exactly OK."
+          }
+        ],
+        "max_completion_tokens": 1024,
+        "stream": false
+      },
+      "httpStatus": 200,
+      "contentType": "application/json",
+      "errors": [],
+      "evidence": {
+        "id": "chatcmpl-MoTfaoz6Itbv1e8Pk_ub0Qo",
+        "object": "chat.completion",
+        "model": "gemini-3.8-flash-n",
+        "created": 1793033269,
+        "choices": [
+          {
+            "index": 0,
+            "finish_reason": "stop",
+            "message": {
+              "role": "assistant",
+              "content": "OK"
+            }
+          }
+        ],
+        "usage": {
+          "prompt_tokens": 2066,
+          "completion_tokens": 1,
+          "total_tokens": 2067,
+          "completion_tokens_details": {
+            "reasoning_tokens": 60
+          }
+        }
+      },
+      "elapsedMs": 4757,
+      "category": "capability"
+    },
+    {
+      "name": "02 multi-turn conversation",
+      "state": "PASS",
+      "request": {
+        "model": "ag/gemini-3.8-flash-medium",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Remember the code LIME42."
+          },
+          {
+            "role": "assistant",
+            "content": "Remembered."
+          },
+          {
+            "role": "user",
+            "content": "Reply only with the code I supplied."
+          }
+        ],
+        "max_completion_tokens": 1024,
+        "stream": false
+      },
+      "httpStatus": 200,
+      "contentType": "application/json",
+      "errors": [],
+      "evidence": {
+        "id": "chatcmpl-MoTfatrOLbX11e8Plc6X4Qc",
+        "object": "chat.completion",
+        "model": "gemini-3.8-flash-n",
+        "created": 1793033270,
+        "choices": [
+          {
+            "index": 0,
+            "finish_reason": "stop",
+            "message": {
+              "role": "assistant",
+              "content": "LIME42"
+            }
+          }
+        ],
+        "usage": {
+          "prompt_tokens": 2138,
+          "completion_tokens": 4,
+          "total_tokens": 2142,
+          "completion_tokens_details": {
+            "reasoning_tokens": 116
+          }
+        }
+      },
+      "elapsedMs": 5371,
+      "category": "prompt-following"
+    },
+    {
+      "name": "03 system instruction priority",
+      "state": "PASS",
+      "request": {
+        "model": "ag/gemini-3.8-flash-medium",
+        "messages": [
+          {
+            "role": "system",
+            "content": "Reply with exactly SYSTEM_OK."
+          },
+          {
+            "role": "user",
+            "content": "Reply with exactly OK."
+          }
+        ],
+        "max_completion_tokens": 1024,
+        "stream": false
+      },
+      "httpStatus": 200,
+      "contentType": "application/json",
+      "errors": [],
+      "evidence": {
+        "id": "chatcmpl-NoTfavz4Oqeqvr0P-YS-6Q8",
+        "object": "chat.completion",
+        "model": "gemini-3.8-flash-n",
+        "created": 1793033274,
+        "choices": [
+          {
+            "index": 0,
+            "finish_reason": "stop",
+            "message": {
+              "role": "assistant",
+              "content": "SYSTEM_OK"
+            }
+          }
+        ],
+        "usage": {
+          "prompt_tokens": 2058,
+          "completion_tokens": 3,
+          "total_tokens": 2061,
+          "completion_tokens_details": {
+            "reasoning_tokens": 44
+          }
+        }
+      },
+      "elapsedMs": 4170,
+      "category": "prompt-following"
+    },
+    {
+      "name": "04 developer role",
+      "state": "BEHAVIOR_FAIL",
+      "request": {
+        "model": "ag/gemini-3.8-flash-medium",
+        "messages": [
+          {
+            "role": "developer",
+            "content": "Reply with exactly DEV_OK."
+          },
+          {
+            "role": "user",
+            "content": "Reply with exactly OK."
+          }
+        ],
+        "max_completion_tokens": 1024,
+        "stream": false
+      },
+      "httpStatus": 200,
+      "contentType": "application/json",
+      "errors": [
+        "Expected \"DEV_OK\", got \"OK\""
+      ],
+      "evidence": {
+        "id": "chatcmpl-OITfaqGxE7izvr0Pvf6RgQI",
+        "object": "chat.completion",
+        "model": "gemini-3.8-flash-n",
+        "created": 1793033275,
+        "choices": [
+          {
+            "index": 0,
+            "finish_reason": "stop",
+            "message": {
+              "role": "assistant",
+              "content": "OK"
+            }
+          }
+        ],
+        "usage": {
+          "prompt_tokens": 2070,
+          "completion_tokens": 1,
+          "total_tokens": 2071,
+          "completion_tokens_details": {
+            "reasoning_tokens": 64
+          }
+        }
+      },
+      "elapsedMs": 4810,
+      "category": "prompt-following"
+    },
+    {
+      "name": "05 array text content parts",
+      "state": "PASS",
+      "request": {
+        "model": "ag/gemini-3.8-flash-medium",
+        "messages": [
+          {
+            "role": "user",
+            "content": [
+              {
+                "type": "text",
+                "text": "Reply with exactly PARTS_OK."
+              }
+            ]
+          }
+        ],
+        "max_completion_tokens": 1024,
+        "stream": false
+      },
+      "httpStatus": 200,
+      "contentType": "application/json",
+      "errors": [],
+      "evidence": {
+        "id": "chatcmpl-O4TfatHhBdaBvr0P1rG4CA",
+        "object": "chat.completion",
+        "model": "gemini-3.8-flash-n",
+        "created": 1793033279,
+        "choices": [
+          {
+            "index": 0,
+            "finish_reason": "stop",
+            "message": {
+              "role": "assistant",
+              "content": "PARTS_OK"
+            }
+          }
+        ],
+        "usage": {
+          "prompt_tokens": 2103,
+          "completion_tokens": 4,
+          "total_tokens": 2107,
+          "completion_tokens_details": {
+            "reasoning_tokens": 95
+          }
+        }
+      },
+      "elapsedMs": 4916,
+      "category": "capability"
+    },
+    {
+      "name": "06 Vietnamese Unicode",
+      "state": "PASS",
+      "request": {
+        "model": "ag/gemini-3.8-flash-medium",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Chỉ trả lời chính xác: Xin chào Việt Nam 🌿"
+          }
+        ],
+        "max_completion_tokens": 1024,
+        "stream": false
+      },
+      "httpStatus": 200,
+      "contentType": "application/json",
+      "errors": [],
+      "evidence": {
+        "id": "chatcmpl-O4TfavnpO9bv1e8Pk_ub0Qo",
+        "object": "chat.completion",
+        "model": "gemini-3.8-flash-n",
+        "created": 1793033280,
+        "choices": [
+          {
+            "index": 0,
+            "finish_reason": "stop",
+            "message": {
+              "role": "assistant",
+              "content": "Xin chào Việt Nam 🌿"
+            }
+          }
+        ],
+        "usage": {
+          "prompt_tokens": 2142,
+          "completion_tokens": 6,
+          "total_tokens": 2148,
+          "completion_tokens_details": {
+            "reasoning_tokens": 128
+          }
+        }
+      },
+      "elapsedMs": 5218,
+      "category": "prompt-following"
+    },
+    {
+      "name": "07 exact-text instruction with quotes/newlines",
+      "state": "PASS",
+      "note": "Prompt-following check, not proof of a JSON wire-escaping defect.",
+      "request": {
+        "model": "ag/gemini-3.8-flash-medium",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Repeat exactly the text between <text> and </text>, without fences: <text>A \"quote\"\nB \\ slash</text>"
+          }
+        ],
+        "max_completion_tokens": 1024,
+        "stream": false
+      },
+      "httpStatus": 200,
+      "contentType": "application/json",
+      "errors": [],
+      "evidence": {
+        "id": "chatcmpl-P4Tfatz9IvjC1e8P75uykQs",
+        "object": "chat.completion",
+        "model": "gemini-3.8-flash-n",
+        "created": 1793033283,
+        "choices": [
+          {
+            "index": 0,
+            "finish_reason": "stop",
+            "message": {
+              "role": "assistant",
+              "content": "A \"quote\"\nB \\ slash"
+            }
+          }
+        ],
+        "usage": {
+          "prompt_tokens": 2185,
+          "completion_tokens": 8,
+          "total_tokens": 2193,
+          "completion_tokens_details": {
+            "reasoning_tokens": 155
+          }
+        }
+      },
+      "elapsedMs": 4381,
+      "category": "prompt-following"
+    },
+    {
+      "name": "08 multiple choices n=2",
+      "state": "FAIL",
+      "request": {
+        "model": "ag/gemini-3.8-flash-medium",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Reply with exactly OK."
+          }
+        ],
+        "max_completion_tokens": 1024,
+        "stream": false,
+        "n": 2
+      },
+      "httpStatus": 200,
+      "contentType": "application/json",
+      "errors": [
+        "n=2 did not return two distinct choices"
+      ],
+      "evidence": {
+        "id": "chatcmpl-QoTfaq35FOuBvr0Potbi4QE",
+        "object": "chat.completion",
+        "model": "gemini-3.8-flash-n",
+        "created": 1793033285,
+        "choices": [
+          {
+            "index": 0,
+            "finish_reason": "stop",
+            "message": {
+              "role": "assistant",
+              "content": "OK"
+            }
+          }
+        ],
+        "usage": {
+          "prompt_tokens": 2071,
+          "completion_tokens": 1,
+          "total_tokens": 2072,
+          "completion_tokens_details": {
+            "reasoning_tokens": 65
+          }
+        }
+      },
+      "elapsedMs": 4695,
+      "category": "capability"
+    },
+    {
+      "name": "09 temperature=0 acceptance",
+      "state": "PASS",
+      "note": "Acceptance only; sampling semantics cannot be proven by one sample.",
+      "request": {
+        "model": "ag/gemini-3.8-flash-medium",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Reply with exactly OK."
+          }
+        ],
+        "max_completion_tokens": 1024,
+        "stream": false,
+        "temperature": 0
+      },
+      "httpStatus": 200,
+      "contentType": "application/json",
+      "errors": [],
+      "evidence": {
+        "id": "chatcmpl-RITfaoOmHo6v9tMPhpqRyQk",
+        "object": "chat.completion",
+        "model": "gemini-3.8-flash-n",
+        "created": 1793033288,
+        "choices": [
+          {
+            "index": 0,
+            "finish_reason": "stop",
+            "message": {
+              "role": "assistant",
+              "content": "OK"
+            }
+          }
+        ],
+        "usage": {
+          "prompt_tokens": 2106,
+          "completion_tokens": 1,
+          "total_tokens": 2107,
+          "completion_tokens_details": {
+            "reasoning_tokens": 100
+          }
+        }
+      },
+      "elapsedMs": 4593,
+      "category": "capability"
+    },
+    {
+      "name": "10 top_p acceptance",
+      "state": "PASS",
+      "note": "Acceptance only; not a statistical sampler test.",
+      "request": {
+        "model": "ag/gemini-3.8-flash-medium",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Reply with exactly OK."
+          }
+        ],
+        "max_completion_tokens": 1024,
+        "stream": false,
+        "top_p": 0.5
+      },
+      "httpStatus": 200,
+      "contentType": "application/json",
+      "errors": [],
+      "evidence": {
+        "id": "chatcmpl-RoTfavOvMp62vr0P1-LF2AE",
+        "object": "chat.completion",
+        "model": "gemini-3.8-flash-n",
+        "created": 1793033289,
+        "choices": [
+          {
+            "index": 0,
+            "finish_reason": "stop",
+            "message": {
+              "role": "assistant",
+              "content": "OK"
+            }
+          }
+        ],
+        "usage": {
+          "prompt_tokens": 2067,
+          "completion_tokens": 1,
+          "total_tokens": 2068,
+          "completion_tokens_details": {
+            "reasoning_tokens": 61
+          }
+        }
+      },
+      "elapsedMs": 4594,
+      "category": "capability"
+    },
+    {
+      "name": "11 frequency and presence penalties",
+      "state": "PASS",
+      "note": "Acceptance only.",
+      "request": {
+        "model": "ag/gemini-3.8-flash-medium",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Reply with exactly OK."
+          }
+        ],
+        "max_completion_tokens": 1024,
+        "stream": false,
+        "frequency_penalty": 0.5,
+        "presence_penalty": 0.5
+      },
+      "httpStatus": 200,
+      "contentType": "application/json",
+      "errors": [],
+      "evidence": {
+        "id": "chatcmpl-SITfasuvO-uBvr0Potbi4QE",
+        "object": "chat.completion",
+        "model": "gemini-3.8-flash-n",
+        "created": 1793033293,
+        "choices": [
+          {
+            "index": 0,
+            "finish_reason": "stop",
+            "message": {
+              "role": "assistant",
+              "content": "OK"
+            }
+          }
+        ],
+        "usage": {
+          "prompt_tokens": 2094,
+          "completion_tokens": 1,
+          "total_tokens": 2095,
+          "completion_tokens_details": {
+            "reasoning_tokens": 88
+          }
+        }
+      },
+      "elapsedMs": 5121,
+      "category": "capability"
+    },
+    {
+      "name": "12 max_completion_tokens=1 enforced",
+      "state": "FAIL",
+      "request": {
+        "model": "ag/gemini-3.8-flash-medium",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Count from 1 to 30, separated by spaces. Output every number."
+          }
+        ],
+        "max_completion_tokens": 1,
+        "stream": false
+      },
+      "httpStatus": 200,
+      "contentType": "application/json",
+      "errors": [
+        "truncated completion must finish with length",
+        "completion token cap was exceeded"
+      ],
+      "evidence": {
+        "id": "chatcmpl-SoTfaoWrHtyl1e8Ppp3W0AE",
+        "object": "chat.completion",
+        "model": "gemini-3.8-flash-n",
+        "created": 1793033296,
+        "choices": [
+          {
+            "index": 0,
+            "finish_reason": "stop",
+            "message": {
+              "role": "assistant",
+              "content": "1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30"
+            }
+          }
+        ],
+        "usage": {
+          "prompt_tokens": 2342,
+          "completion_tokens": 80,
+          "total_tokens": 2422,
+          "completion_tokens_details": {
+            "reasoning_tokens": 324
+          }
+        }
+      },
+      "elapsedMs": 6684,
+      "category": "capability"
+    },
+    {
+      "name": "13 legacy max_tokens=1 enforced",
+      "state": "FAIL",
+      "request": {
+        "model": "ag/gemini-3.8-flash-medium",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Count from 1 to 30, separated by spaces. Output every number."
+          }
+        ],
+        "stream": false,
+        "max_tokens": 1
+      },
+      "httpStatus": 200,
+      "contentType": "application/json",
+      "errors": [
+        "truncated completion must finish with length",
+        "completion token cap was exceeded"
+      ],
+      "evidence": {
+        "id": "chatcmpl-TYTfapjALLG3vr0PwJaO6Ak",
+        "object": "chat.completion",
+        "model": "gemini-3.8-flash-n",
+        "created": 1793033298,
+        "choices": [
+          {
+            "index": 0,
+            "finish_reason": "stop",
+            "message": {
+              "role": "assistant",
+              "content": "1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30"
+            }
+          }
+        ],
+        "usage": {
+          "prompt_tokens": 2245,
+          "completion_tokens": 80,
+          "total_tokens": 2325,
+          "completion_tokens_details": {
+            "reasoning_tokens": 227
+          }
+        }
+      },
+      "elapsedMs": 5546,
+      "category": "capability"
+    },
+    {
+      "name": "14 stop sequence enforced",
+      "state": "FAIL",
+      "request": {
+        "model": "ag/gemini-3.8-flash-medium",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Reply exactly ALPHA<END>BETA with no other text."
+          }
+        ],
+        "max_completion_tokens": 1024,
+        "stream": false,
+        "stop": [
+          "<END>"
+        ]
+      },
+      "httpStatus": 200,
+      "contentType": "application/json",
+      "errors": [
+        "Expected \"ALPHA\", got \"ALPHA<END>BETA\""
+      ],
+      "evidence": {
+        "id": "chatcmpl-UYTfatL_F8uA1e8Pna7i-AE",
+        "object": "chat.completion",
+        "model": "gemini-3.8-flash-n",
+        "created": 1793033301,
+        "choices": [
+          {
+            "index": 0,
+            "finish_reason": "stop",
+            "message": {
+              "role": "assistant",
+              "content": "ALPHA<END>BETA"
+            }
+          }
+        ],
+        "usage": {
+          "prompt_tokens": 2143,
+          "completion_tokens": 6,
+          "total_tokens": 2149,
+          "completion_tokens_details": {
+            "reasoning_tokens": 129
+          }
+        }
+      },
+      "elapsedMs": 5223,
+      "category": "capability"
+    },
+    {
+      "name": "15 JSON object output",
+      "state": "PASS",
+      "request": {
+        "model": "ag/gemini-3.8-flash-medium",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Return a JSON object with ok=true and count=3. No markdown."
+          }
+        ],
+        "max_completion_tokens": 1024,
+        "stream": false,
+        "response_format": {
+          "type": "json_object"
+        }
+      },
+      "httpStatus": 200,
+      "contentType": "application/json",
+      "errors": [],
+      "evidence": {
+        "id": "chatcmpl-U4Tfat7WJo20vr0Pj-qH4AE",
+        "object": "chat.completion",
+        "model": "gemini-3.8-flash-n",
+        "created": 1793033304,
+        "choices": [
+          {
+            "index": 0,
+            "finish_reason": "stop",
+            "message": {
+              "role": "assistant",
+              "content": "{\"ok\": true, \"count\": 3}"
+            }
+          }
+        ],
+        "usage": {
+          "prompt_tokens": 2188,
+          "completion_tokens": 11,
+          "total_tokens": 2199,
+          "completion_tokens_details": {
+            "reasoning_tokens": 171
+          }
+        }
+      },
+      "elapsedMs": 6250,
+      "category": "capability"
+    },
+    {
+      "name": "16 strict JSON schema against conflicting prompt",
+      "state": "FAIL",
+      "request": {
+        "model": "ag/gemini-3.8-flash-medium",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Reply in plain prose: NOT_JSON. Add an extra field named extra if you return JSON."
+          }
+        ],
+        "max_completion_tokens": 1024,
+        "stream": false,
+        "response_format": {
+          "type": "json_schema",
+          "json_schema": {
+            "name": "compat_result",
+            "strict": true,
+            "schema": {
+              "type": "object",
+              "properties": {
+                "answer": {
+                  "type": "string",
+                  "enum": [
+                    "OK"
+                  ]
+                },
+                "count": {
+                  "type": "integer",
+                  "enum": [
+                    1
+                  ]
+                }
+              },
+              "required": [
+                "answer",
+                "count"
+              ],
+              "additionalProperties": false
+            }
+          }
+        }
+      },
+      "httpStatus": 200,
+      "contentType": "application/json",
+      "errors": [
+        "strict schema ignored: output is not JSON"
+      ],
+      "evidence": {
+        "id": "chatcmpl-VoTfav2-HoOf1e8Ph7mswQo",
+        "object": "chat.completion",
+        "model": "gemini-3.8-flash-n",
+        "created": 1793033307,
+        "choices": [
+          {
+            "index": 0,
+            "finish_reason": "stop",
+            "message": {
+              "role": "assistant",
+              "content": "NOT_JSON"
+            }
+          }
+        ],
+        "usage": {
+          "prompt_tokens": 2202,
+          "completion_tokens": 2,
+          "total_tokens": 2204,
+          "completion_tokens_details": {
+            "reasoning_tokens": 181
+          }
+        }
+      },
+      "elapsedMs": 5331,
+      "category": "capability"
+    },
+    {
+      "name": "17 forced named function tool",
+      "state": "FAIL",
+      "request": {
+        "model": "ag/gemini-3.8-flash-medium",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Call get_weather for Paris. Do not answer from memory."
+          }
+        ],
+        "max_completion_tokens": 1024,
+        "stream": false,
+        "tools": [
+          {
+            "type": "function",
+            "function": {
+              "name": "get_weather",
+              "description": "Get the temperature for a city.",
+              "strict": true,
+              "parameters": {
+                "type": "object",
+                "properties": {
+                  "city": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "city"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        ],
+        "tool_choice": {
+          "type": "function",
+          "function": {
+            "name": "get_weather"
+          }
+        }
+      },
+      "httpStatus": 200,
+      "contentType": "application/json",
+      "errors": [
+        "message.content must be string or null"
+      ],
+      "evidence": {
+        "id": "chatcmpl-WYTfavrbG9jEvr0P5-vM4QE",
+        "object": "chat.completion",
+        "model": "gemini-3.8-flash-n",
+        "created": 1793033308,
+        "choices": [
+          {
+            "index": 0,
+            "finish_reason": "tool_calls",
+            "message": {
+              "role": "assistant",
+              "tool_calls": [
+                {
+                  "id": "call_get_weather_1793033308946_0",
+                  "type": "function",
+                  "function": {
+                    "name": "get_weather",
+                    "arguments": "{\"city\":\"Paris\"}"
+                  }
+                }
+              ]
+            }
+          }
+        ],
+        "usage": {
+          "prompt_tokens": 2117,
+          "completion_tokens": 16,
+          "total_tokens": 2133,
+          "completion_tokens_details": {
+            "reasoning_tokens": 59
+          }
+        }
+      },
+      "elapsedMs": 3969,
+      "category": "capability"
+    },
+    {
+      "name": "18 required function tool",
+      "state": "FAIL",
+      "request": {
+        "model": "ag/gemini-3.8-flash-medium",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Call get_weather for Paris. Do not answer from memory."
+          }
+        ],
+        "max_completion_tokens": 1024,
+        "stream": false,
+        "tools": [
+          {
+            "type": "function",
+            "function": {
+              "name": "get_weather",
+              "description": "Get the temperature for a city.",
+              "strict": true,
+              "parameters": {
+                "type": "object",
+                "properties": {
+                  "city": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "city"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        ],
+        "tool_choice": "required"
+      },
+      "httpStatus": 200,
+      "contentType": "application/json",
+      "errors": [
+        "message.content must be string or null"
+      ],
+      "evidence": {
+        "id": "chatcmpl-W4TfatbPKvOSvr0Pg5erQQ",
+        "object": "chat.completion",
+        "model": "gemini-3.8-flash-n",
+        "created": 1793033310,
+        "choices": [
+          {
+            "index": 0,
+            "finish_reason": "tool_calls",
+            "message": {
+              "role": "assistant",
+              "tool_calls": [
+                {
+                  "id": "call_get_weather_1793033310937_0",
+                  "type": "function",
+                  "function": {
+                    "name": "get_weather",
+                    "arguments": "{\"city\":\"Paris\"}"
+                  }
+                }
+              ]
+            }
+          }
+        ],
+        "usage": {
+          "prompt_tokens": 2107,
+          "completion_tokens": 16,
+          "total_tokens": 2123,
+          "completion_tokens_details": {
+            "reasoning_tokens": 49
+          }
+        }
+      },
+      "elapsedMs": 3760,
+      "category": "capability"
+    },
+    {
+      "name": "19 tool_choice none",
+      "state": "PASS",
+      "request": {
+        "model": "ag/gemini-3.8-flash-medium",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Reply with exactly OK."
+          }
+        ],
+        "max_completion_tokens": 1024,
+        "stream": false,
+        "tools": [
+          {
+            "type": "function",
+            "function": {
+              "name": "get_weather",
+              "description": "Get the temperature for a city.",
+              "strict": true,
+              "parameters": {
+                "type": "object",
+                "properties": {
+                  "city": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "city"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        ],
+        "tool_choice": "none"
+      },
+      "httpStatus": 200,
+      "contentType": "application/json",
+      "errors": [],
+      "evidence": {
+        "id": "chatcmpl-XYTfapHGM-u_vr0PkvmG8Ak",
+        "object": "chat.completion",
+        "model": "gemini-3.8-flash-n",
+        "created": 1793033312,
+        "choices": [
+          {
+            "index": 0,
+            "finish_reason": "stop",
+            "message": {
+              "role": "assistant",
+              "content": "OK"
+            }
+          }
+        ],
+        "usage": {
+          "prompt_tokens": 2077,
+          "completion_tokens": 1,
+          "total_tokens": 2078,
+          "completion_tokens_details": {
+            "reasoning_tokens": 27
+          }
+        }
+      },
+      "elapsedMs": 3652,
+      "category": "capability"
+    },
+    {
+      "name": "20 function tool result round trip",
+      "state": "PASS",
+      "request": {
+        "model": "ag/gemini-3.8-flash-medium",
+        "messages": [
+          {
+            "role": "user",
+            "content": "What is the temperature in Paris? Reply only with the numeric temperature returned by the tool."
+          },
+          {
+            "role": "assistant",
+            "content": null,
+            "tool_calls": [
+              {
+                "id": "call_compat_paris",
+                "type": "function",
+                "function": {
+                  "name": "get_weather",
+                  "arguments": "{\"city\":\"Paris\"}"
+                }
+              }
+            ]
+          },
+          {
+            "role": "tool",
+            "tool_call_id": "call_compat_paris",
+            "content": "{\"temperature\":21}"
+          }
+        ],
+        "max_completion_tokens": 1024,
+        "stream": false,
+        "tools": [
+          {
+            "type": "function",
+            "function": {
+              "name": "get_weather",
+              "description": "Get the temperature for a city.",
+              "strict": true,
+              "parameters": {
+                "type": "object",
+                "properties": {
+                  "city": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "city"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        ]
+      },
+      "httpStatus": 200,
+      "contentType": "application/json",
+      "errors": [],
+      "evidence": {
+        "id": "chatcmpl-X4TfarHnG7C9vr0PouP5qA4",
+        "object": "chat.completion",
+        "model": "gemini-3.8-flash-n",
+        "created": 1793033314,
+        "choices": [
+          {
+            "index": 0,
+            "finish_reason": "stop",
+            "message": {
+              "role": "assistant",
+              "content": "21"
+            }
+          }
+        ],
+        "usage": {
+          "prompt_tokens": 2122,
+          "completion_tokens": 2,
+          "total_tokens": 2124,
+          "completion_tokens_details": {
+            "reasoning_tokens": 28
+          }
+        }
+      },
+      "elapsedMs": 3237,
+      "category": "capability"
+    },
+    {
+      "name": "21 parallel tool calls",
+      "state": "FAIL",
+      "note": "Parallel calls are permitted, not guaranteed; count is reported separately.",
+      "request": {
+        "model": "ag/gemini-3.8-flash-medium",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Call get_weather for BOTH Paris and Tokyo. Make two calls in this response."
+          }
+        ],
+        "max_completion_tokens": 1024,
+        "stream": false,
+        "tools": [
+          {
+            "type": "function",
+            "function": {
+              "name": "get_weather",
+              "description": "Get the temperature for a city.",
+              "strict": true,
+              "parameters": {
+                "type": "object",
+                "properties": {
+                  "city": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "city"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        ],
+        "tool_choice": "required",
+        "parallel_tool_calls": true
+      },
+      "httpStatus": 200,
+      "contentType": "application/json",
+      "errors": [
+        "message.content must be string or null"
+      ],
+      "evidence": {
+        "id": "chatcmpl-YYTfaoPsD8uA1e8Pna7i-AE",
+        "object": "chat.completion",
+        "model": "gemini-3.8-flash-n",
+        "created": 1793033316,
+        "choices": [
+          {
+            "index": 0,
+            "finish_reason": "tool_calls",
+            "message": {
+              "role": "assistant",
+              "tool_calls": [
+                {
+                  "id": "call_get_weather_1793033316367_0",
+                  "type": "function",
+                  "function": {
+                    "name": "get_weather",
+                    "arguments": "{\"city\":\"Paris\"}"
+                  }
+                },
+                {
+                  "id": "call_get_weather_1793033316367_1",
+                  "type": "function",
+                  "function": {
+                    "name": "get_weather",
+                    "arguments": "{\"city\":\"Tokyo\"}"
+                  }
+                }
+              ]
+            }
+          }
+        ],
+        "usage": {
+          "prompt_tokens": 2089,
+          "completion_tokens": 32,
+          "total_tokens": 2121,
+          "completion_tokens_details": {
+            "reasoning_tokens": 27
+          }
+        },
+        "parallelCallCount": 2
+      },
+      "elapsedMs": 3767,
+      "category": "capability"
+    },
+    {
+      "name": "22 reasoning_effort low acceptance",
+      "state": "PASS",
+      "note": "Acceptance only; cannot verify internal reasoning behavior.",
+      "request": {
+        "model": "ag/gemini-3.8-flash-medium",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Reply with exactly OK."
+          }
+        ],
+        "max_completion_tokens": 1024,
+        "stream": false,
+        "reasoning_effort": "low"
+      },
+      "httpStatus": 200,
+      "contentType": "application/json",
+      "errors": [],
+      "evidence": {
+        "id": "chatcmpl-YoTfatvyKdyl1e8PrZ3W0AE",
+        "object": "chat.completion",
+        "model": "gemini-3.8-flash-n",
+        "created": 1793033319,
+        "choices": [
+          {
+            "index": 0,
+            "finish_reason": "stop",
+            "message": {
+              "role": "assistant",
+              "content": "OK"
+            }
+          }
+        ],
+        "usage": {
+          "prompt_tokens": 2091,
+          "completion_tokens": 1,
+          "total_tokens": 2092,
+          "completion_tokens_details": {
+            "reasoning_tokens": 85
+          }
+        }
+      },
+      "elapsedMs": 4902,
+      "category": "capability"
+    },
+    {
+      "name": "23 seed acceptance",
+      "state": "PASS",
+      "note": "Acceptance only; OpenAI does not promise deterministic output.",
+      "request": {
+        "model": "ag/gemini-3.8-flash-medium",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Reply with exactly OK."
+          }
+        ],
+        "max_completion_tokens": 1024,
+        "stream": false,
+        "seed": 42
+      },
+      "httpStatus": 200,
+      "contentType": "application/json",
+      "errors": [],
+      "evidence": {
+        "id": "chatcmpl-ZITfar-uOKeqvr0P-YS-6Q8",
+        "object": "chat.completion",
+        "model": "gemini-3.8-flash-n",
+        "created": 1793033320,
+        "choices": [
+          {
+            "index": 0,
+            "finish_reason": "stop",
+            "message": {
+              "role": "assistant",
+              "content": "OK"
+            }
+          }
+        ],
+        "usage": {
+          "prompt_tokens": 2092,
+          "completion_tokens": 1,
+          "total_tokens": 2093,
+          "completion_tokens_details": {
+            "reasoning_tokens": 86
+          }
+        }
+      },
+      "elapsedMs": 4276,
+      "category": "capability"
+    },
+    {
+      "name": "24 logprobs and top_logprobs",
+      "state": "FAIL",
+      "request": {
+        "model": "ag/gemini-3.8-flash-medium",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Reply with exactly OK."
+          }
+        ],
+        "max_completion_tokens": 1024,
+        "stream": false,
+        "logprobs": true,
+        "top_logprobs": 2
+      },
+      "httpStatus": 200,
+      "contentType": "application/json",
+      "errors": [
+        "logprobs requested but missing or malformed"
+      ],
+      "evidence": {
+        "id": "chatcmpl-Z4TfarH1Kviyvr0PodngyQo",
+        "object": "chat.completion",
+        "model": "gemini-3.8-flash-n",
+        "created": 1793033322,
+        "choices": [
+          {
+            "index": 0,
+            "finish_reason": "stop",
+            "message": {
+              "role": "assistant",
+              "content": "OK"
+            }
+          }
+        ],
+        "usage": {
+          "prompt_tokens": 2072,
+          "completion_tokens": 1,
+          "total_tokens": 2073,
+          "completion_tokens_details": {
+            "reasoning_tokens": 66
+          }
+        }
+      },
+      "elapsedMs": 3345,
+      "category": "capability"
+    },
+    {
+      "name": "25 legacy functions/function_call",
+      "state": "FAIL",
+      "request": {
+        "model": "ag/gemini-3.8-flash-medium",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Call get_weather for Paris. Do not answer from memory."
+          }
+        ],
+        "max_completion_tokens": 1024,
+        "stream": false,
+        "functions": [
+          {
+            "name": "get_weather",
+            "description": "Get the temperature for a city.",
+            "strict": true,
+            "parameters": {
+              "type": "object",
+              "properties": {
+                "city": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "city"
+              ],
+              "additionalProperties": false
+            }
+          }
+        ],
+        "function_call": {
+          "name": "get_weather"
+        }
+      },
+      "httpStatus": 200,
+      "contentType": "application/json",
+      "errors": [
+        "legacy function_call missing"
+      ],
+      "evidence": {
+        "id": "chatcmpl-aYTfaqb5B7Gy9tMPq8T9uAo",
+        "object": "chat.completion",
+        "model": "gemini-3.8-flash-n",
+        "created": 1793033324,
+        "choices": [
+          {
+            "index": 0,
+            "finish_reason": "stop",
+            "message": {
+              "role": "assistant",
+              "content": "I cannot call the `get_weather` function because I do not have access to any external tools or live weather APIs in this environment."
+            }
+          }
+        ],
+        "usage": {
+          "prompt_tokens": 2090,
+          "completion_tokens": 27,
+          "total_tokens": 2117,
+          "completion_tokens_details": {
+            "reasoning_tokens": 76
+          }
+        }
+      },
+      "elapsedMs": 3767,
+      "category": "capability"
+    },
+    {
+      "name": "26 vision input with synthetic image",
+      "state": "PASS",
+      "note": "Tests image-input acceptance, not vision accuracy or image generation.",
+      "request": {
+        "model": "ag/gemini-3.8-flash-medium",
+        "messages": [
+          {
+            "role": "user",
+            "content": [
+              {
+                "type": "text",
+                "text": "Acknowledge that an image was attached. Reply with exactly IMAGE_OK."
+              },
+              {
+                "type": "image_url",
+                "image_url": {
+                  "url": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/lXcAAAAASUVORK5CYII="
+                }
+              }
+            ]
+          }
+        ],
+        "max_completion_tokens": 1024,
+        "stream": false
+      },
+      "httpStatus": 200,
+      "contentType": "application/json",
+      "errors": [],
+      "evidence": {
+        "id": "chatcmpl-aoTfapiNOdbv1e8Pk_ub0Qo",
+        "object": "chat.completion",
+        "model": "gemini-3.8-flash-n",
+        "created": 1793033326,
+        "choices": [
+          {
+            "index": 0,
+            "finish_reason": "stop",
+            "message": {
+              "role": "assistant",
+              "content": "IMAGE_OK"
+            }
+          }
+        ],
+        "usage": {
+          "prompt_tokens": 3159,
+          "completion_tokens": 3,
+          "total_tokens": 3162,
+          "completion_tokens_details": {
+            "reasoning_tokens": 53
+          }
+        }
+      },
+      "elapsedMs": 4181,
+      "category": "capability"
+    },
+    {
+      "name": "27 SSE normal",
+      "state": "FAIL",
+      "request": {
+        "model": "ag/gemini-3.8-flash-medium",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Reply with exactly OK."
+          }
+        ],
+        "max_completion_tokens": 1024,
+        "stream": true
+      },
+      "httpStatus": 200,
+      "contentType": "text/event-stream",
+      "errors": [
+        "missing data: [DONE]"
+      ],
+      "evidence": {
+        "chunks": 3,
+        "done": false,
+        "idsStable": true,
+        "models": [
+          "gemini-3.8-flash-n"
+        ],
+        "usage": {
+          "prompt_tokens": 2006,
+          "completion_tokens": 64,
+          "total_tokens": 2070,
+          "completion_tokens_details": {
+            "reasoning_tokens": 63
+          }
+        },
+        "nonstandardFrames": [],
+        "choices": [
+          {
+            "index": 0,
+            "content": "OK",
+            "finishReason": "stop",
+            "tool_calls": []
+          }
+        ]
+      },
+      "elapsedMs": 2808,
+      "category": "capability"
+    },
+    {
+      "name": "28 SSE include_usage",
+      "state": "FAIL",
+      "request": {
+        "model": "ag/gemini-3.8-flash-medium",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Reply with exactly OK."
+          }
+        ],
+        "max_completion_tokens": 1024,
+        "stream": true,
+        "stream_options": {
+          "include_usage": true
+        }
+      },
+      "httpStatus": 200,
+      "contentType": "text/event-stream",
+      "errors": [
+        "missing data: [DONE]",
+        "include_usage requested but final empty-choices usage chunk is missing or invalid"
+      ],
+      "evidence": {
+        "chunks": 3,
+        "done": false,
+        "idsStable": true,
+        "models": [
+          "gemini-3.8-flash-n"
+        ],
+        "usage": {
+          "prompt_tokens": 2006,
+          "completion_tokens": 65,
+          "total_tokens": 2071,
+          "completion_tokens_details": {
+            "reasoning_tokens": 64
+          }
+        },
+        "nonstandardFrames": [],
+        "choices": [
+          {
+            "index": 0,
+            "content": "OK",
+            "finishReason": "stop",
+            "tool_calls": []
+          }
+        ]
+      },
+      "elapsedMs": 2522,
+      "category": "capability"
+    },
+    {
+      "name": "29 SSE tool-call deltas",
+      "state": "FAIL",
+      "request": {
+        "model": "ag/gemini-3.8-flash-medium",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Call get_weather for Paris. Do not answer from memory."
+          }
+        ],
+        "max_completion_tokens": 1024,
+        "stream": true,
+        "tools": [
+          {
+            "type": "function",
+            "function": {
+              "name": "get_weather",
+              "description": "Get the temperature for a city.",
+              "strict": true,
+              "parameters": {
+                "type": "object",
+                "properties": {
+                  "city": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "city"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        ],
+        "tool_choice": {
+          "type": "function",
+          "function": {
+            "name": "get_weather"
+          }
+        }
+      },
+      "httpStatus": 200,
+      "contentType": "text/event-stream",
+      "errors": [
+        "missing data: [DONE]"
+      ],
+      "evidence": {
+        "chunks": 3,
+        "done": false,
+        "idsStable": true,
+        "models": [
+          "gemini-3.8-flash-n"
+        ],
+        "usage": {
+          "prompt_tokens": 2058,
+          "completion_tokens": 72,
+          "total_tokens": 2130,
+          "completion_tokens_details": {
+            "reasoning_tokens": 56
+          }
+        },
+        "nonstandardFrames": [],
+        "choices": [
+          {
+            "index": 0,
+            "content": "",
+            "finishReason": "tool_calls",
+            "tool_calls": [
+              {
+                "id": "call_2796513",
+                "type": "function",
+                "function": {
+                  "name": "get_weather",
+                  "arguments": "{\"city\":\"Paris\"}"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "elapsedMs": 2923,
+      "category": "capability"
+    },
+    {
+      "name": "30 SSE n=2 choices",
+      "state": "FAIL",
+      "request": {
+        "model": "ag/gemini-3.8-flash-medium",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Reply with exactly OK."
+          }
+        ],
+        "max_completion_tokens": 1024,
+        "stream": true,
+        "n": 2
+      },
+      "httpStatus": 200,
+      "contentType": "text/event-stream",
+      "errors": [
+        "missing data: [DONE]",
+        "wrong number of streamed choices"
+      ],
+      "evidence": {
+        "chunks": 3,
+        "done": false,
+        "idsStable": true,
+        "models": [
+          "gemini-3.8-flash-n"
+        ],
+        "usage": {
+          "prompt_tokens": 2006,
+          "completion_tokens": 66,
+          "total_tokens": 2072,
+          "completion_tokens_details": {
+            "reasoning_tokens": 65
+          }
+        },
+        "nonstandardFrames": [],
+        "choices": [
+          {
+            "index": 0,
+            "content": "OK",
+            "finishReason": "stop",
+            "tool_calls": []
+          }
+        ]
+      },
+      "elapsedMs": 2895,
+      "category": "capability"
+    },
+    {
+      "name": "31 missing authentication",
+      "state": "PASS",
+      "request": {
+        "model": "ag/gemini-3.8-flash-medium",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Reply with exactly OK."
+          }
+        ],
+        "max_completion_tokens": 1024,
+        "stream": false
+      },
+      "httpStatus": 401,
+      "contentType": "application/json",
+      "evidence": {
+        "error": {
+          "message": "Missing API key",
+          "type": "authentication_error",
+          "code": "invalid_api_key"
+        }
+      },
+      "errors": [],
+      "elapsedMs": 8,
+      "category": "protocol-validation"
+    },
+    {
+      "name": "32 invalid API key",
+      "state": "PASS",
+      "request": {
+        "model": "ag/gemini-3.8-flash-medium",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Reply with exactly OK."
+          }
+        ],
+        "max_completion_tokens": 1024,
+        "stream": false
+      },
+      "httpStatus": 401,
+      "contentType": "application/json",
+      "evidence": {
+        "error": {
+          "message": "Invalid API key",
+          "type": "authentication_error",
+          "code": "invalid_api_key"
+        }
+      },
+      "errors": [],
+      "elapsedMs": 7,
+      "category": "protocol-validation"
+    },
+    {
+      "name": "33 nonexistent model",
+      "state": "PASS",
+      "request": {
+        "model": "compat-definitely-nonexistent-model-20261026",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Reply with exactly OK."
+          }
+        ],
+        "max_completion_tokens": 1024,
+        "stream": false
+      },
+      "httpStatus": 404,
+      "contentType": "application/json",
+      "evidence": {
+        "error": {
+          "message": "No active credentials for provider: openai",
+          "type": "invalid_request_error",
+          "code": "model_not_found"
+        }
+      },
+      "errors": [],
+      "elapsedMs": 10,
+      "category": "protocol-validation"
+    },
+    {
+      "name": "34 missing model",
+      "state": "PASS",
+      "request": {
+        "messages": [
+          {
+            "role": "user",
+            "content": "Reply with exactly OK."
+          }
+        ],
+        "max_completion_tokens": 1024,
+        "stream": false
+      },
+      "httpStatus": 400,
+      "contentType": "application/json",
+      "evidence": {
+        "error": {
+          "message": "Missing model",
+          "type": "invalid_request_error",
+          "code": "bad_request"
+        }
+      },
+      "errors": [],
+      "elapsedMs": 7,
+      "category": "protocol-validation"
+    },
+    {
+      "name": "35 missing messages",
+      "state": "PASS",
+      "request": {
+        "model": "ag/gemini-3.8-flash-medium",
+        "max_completion_tokens": 1024,
+        "stream": false
+      },
+      "httpStatus": 400,
+      "contentType": "application/json",
+      "evidence": {
+        "error": {
+          "message": "[400]: {\n  \"error\": {\n    \"code\": 400,\n    \"message\": \"* GenerateContentRequest.contents: contents is not specified\\n\",\n    \"status\": \"INVALID_ARGUMENT\"\n  }\n}\n",
+          "type": "invalid_request_error",
+          "code": "bad_request"
+        }
+      },
+      "errors": [],
+      "elapsedMs": 289,
+      "category": "protocol-validation"
+    },
+    {
+      "name": "36 empty messages",
+      "state": "PASS",
+      "request": {
+        "model": "ag/gemini-3.8-flash-medium",
+        "messages": [],
+        "max_completion_tokens": 1024,
+        "stream": false
+      },
+      "httpStatus": 400,
+      "contentType": "application/json",
+      "evidence": {
+        "error": {
+          "message": "[400]: {\n  \"error\": {\n    \"code\": 400,\n    \"message\": \"* GenerateContentRequest.contents: contents is not specified\\n\",\n    \"status\": \"INVALID_ARGUMENT\"\n  }\n}\n",
+          "type": "invalid_request_error",
+          "code": "bad_request"
+        }
+      },
+      "errors": [],
+      "elapsedMs": 225,
+      "category": "protocol-validation"
+    },
+    {
+      "name": "37 messages wrong type",
+      "state": "PASS",
+      "request": {
+        "model": "ag/gemini-3.8-flash-medium",
+        "messages": "not-an-array",
+        "max_completion_tokens": 1024,
+        "stream": false
+      },
+      "httpStatus": 400,
+      "contentType": "application/json",
+      "evidence": {
+        "error": {
+          "message": "[400]: {\n  \"error\": {\n    \"code\": 400,\n    \"message\": \"* GenerateContentRequest.contents: contents is not specified\\n\",\n    \"status\": \"INVALID_ARGUMENT\"\n  }\n}\n",
+          "type": "invalid_request_error",
+          "code": "bad_request"
+        }
+      },
+      "errors": [],
+      "elapsedMs": 286,
+      "category": "protocol-validation"
+    },
+    {
+      "name": "38 invalid message role",
+      "state": "PASS",
+      "request": {
+        "model": "ag/gemini-3.8-flash-medium",
+        "messages": [
+          {
+            "role": "invalid_role",
+            "content": "OK"
+          }
+        ],
+        "max_completion_tokens": 1024,
+        "stream": false
+      },
+      "httpStatus": 400,
+      "contentType": "application/json",
+      "evidence": {
+        "error": {
+          "message": "[400]: {\n  \"error\": {\n    \"code\": 400,\n    \"message\": \"* GenerateContentRequest.contents: contents is not specified\\n\",\n    \"status\": \"INVALID_ARGUMENT\"\n  }\n}\n",
+          "type": "invalid_request_error",
+          "code": "bad_request"
+        }
+      },
+      "errors": [],
+      "elapsedMs": 212,
+      "category": "protocol-validation"
+    },
+    {
+      "name": "39 temperature outside range",
+      "state": "PASS",
+      "request": {
+        "model": "ag/gemini-3.8-flash-medium",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Reply with exactly OK."
+          }
+        ],
+        "max_completion_tokens": 1024,
+        "stream": false,
+        "temperature": 3
+      },
+      "httpStatus": 400,
+      "contentType": "application/json",
+      "evidence": {
+        "error": {
+          "message": "[400]: {\n  \"error\": {\n    \"code\": 400,\n    \"message\": \"* GenerateContentRequest.generation_config.temperature: temperature must be in the range [0.0, 2.0].\\n\",\n    \"status\": \"INVALID_ARGUMENT\"\n  }\n}\n",
+          "type": "invalid_request_error",
+          "code": "bad_request"
+        }
+      },
+      "errors": [],
+      "elapsedMs": 203,
+      "category": "protocol-validation"
+    },
+    {
+      "name": "40 n=0 rejected",
+      "state": "FAIL",
+      "request": {
+        "model": "ag/gemini-3.8-flash-medium",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Reply with exactly OK."
+          }
+        ],
+        "max_completion_tokens": 1024,
+        "stream": false,
+        "n": 0
+      },
+      "httpStatus": 200,
+      "contentType": "application/json",
+      "evidence": {
+        "id": "chatcmpl-c4TfaoT9NbG3vr0Pg_OCkA8",
+        "object": "chat.completion",
+        "model": "gemini-3.8-flash-n",
+        "created": 1793033336,
+        "choices": [
+          {
+            "index": 0,
+            "finish_reason": "stop",
+            "message": {
+              "role": "assistant",
+              "content": "OK"
+            }
+          }
+        ],
+        "usage": {
+          "prompt_tokens": 2079,
+          "completion_tokens": 1,
+          "total_tokens": 2080,
+          "completion_tokens_details": {
+            "reasoning_tokens": 73
+          }
+        }
+      },
+      "errors": [
+        "expected HTTP 400/422, got 200",
+        "error must contain message and type"
+      ],
+      "elapsedMs": 4806,
+      "category": "protocol-validation"
+    },
+    {
+      "name": "41 negative token limit",
+      "state": "FAIL",
+      "request": {
+        "model": "ag/gemini-3.8-flash-medium",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Reply with exactly OK."
+          }
+        ],
+        "max_completion_tokens": -1,
+        "stream": false
+      },
+      "httpStatus": 200,
+      "contentType": "application/json",
+      "evidence": {
+        "id": "chatcmpl-dITfavD-HsuA1e8Pna7i-AE",
+        "object": "chat.completion",
+        "model": "gemini-3.8-flash-n",
+        "created": 1793033335,
+        "choices": [
+          {
+            "index": 0,
+            "finish_reason": "stop",
+            "message": {
+              "role": "assistant",
+              "content": "OK"
+            }
+          }
+        ],
+        "usage": {
+          "prompt_tokens": 2082,
+          "completion_tokens": 1,
+          "total_tokens": 2083,
+          "completion_tokens_details": {
+            "reasoning_tokens": 76
+          }
+        }
+      },
+      "errors": [
+        "expected HTTP 400/422, got 200",
+        "error must contain message and type"
+      ],
+      "elapsedMs": 3654,
+      "category": "protocol-validation"
+    },
+    {
+      "name": "42 malformed JSON body",
+      "state": "PASS",
+      "request": {
+        "model": "ag/gemini-3.8-flash-medium",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Reply with exactly OK."
+          }
+        ],
+        "max_completion_tokens": 1024,
+        "stream": false
+      },
+      "httpStatus": 400,
+      "contentType": "application/json",
+      "evidence": {
+        "error": {
+          "message": "Invalid JSON body",
+          "type": "invalid_request_error",
+          "code": "bad_request"
+        }
+      },
+      "errors": [],
+      "elapsedMs": 7,
+      "category": "protocol-validation"
+    },
+    {
+      "name": "43 malformed tool declaration",
+      "state": "FAIL",
+      "request": {
+        "model": "ag/gemini-3.8-flash-medium",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Reply with exactly OK."
+          }
+        ],
+        "max_completion_tokens": 1024,
+        "stream": false,
+        "tools": [
+          {
+            "type": "function",
+            "function": {
+              "parameters": {}
+            }
+          }
+        ],
+        "tool_choice": "required"
+      },
+      "httpStatus": 200,
+      "contentType": "application/json",
+      "evidence": {
+        "id": "chatcmpl-eITfavnQCvHCvr0Plov3gAc",
+        "object": "chat.completion",
+        "model": "gemini-3.8-flash-n",
+        "created": 1793033338,
+        "choices": [
+          {
+            "index": 0,
+            "finish_reason": "stop",
+            "message": {
+              "role": "assistant",
+              "content": "OK"
+            }
+          }
+        ],
+        "usage": {
+          "prompt_tokens": 2068,
+          "completion_tokens": 1,
+          "total_tokens": 2069,
+          "completion_tokens_details": {
+            "reasoning_tokens": 18
+          }
+        }
+      },
+      "errors": [
+        "expected HTTP 400/422, got 200",
+        "error must contain message and type"
+      ],
+      "elapsedMs": 2497,
+      "category": "protocol-validation"
+    },
+    {
+      "name": "44 GET chat/completions rejected",
+      "state": "FAIL",
+      "request": {
+        "model": "ag/gemini-3.8-flash-medium",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Reply with exactly OK."
+          }
+        ],
+        "max_completion_tokens": 1024,
+        "stream": false
+      },
+      "httpStatus": 405,
+      "contentType": null,
+      "evidence": {},
+      "errors": [
+        "error must contain message and type"
+      ],
+      "elapsedMs": 8,
+      "category": "protocol-validation"
+    },
+    {
+      "name": "45 nonexistent endpoint",
+      "state": "FAIL",
+      "request": {
+        "model": "ag/gemini-3.8-flash-medium",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Reply with exactly OK."
+          }
+        ],
+        "max_completion_tokens": 1024,
+        "stream": false
+      },
+      "httpStatus": 404,
+      "contentType": "text/html; charset=utf-8",
+      "evidence": {
+        "nonJsonBody": "<!DOCTYPE html><html lang=\"en\"><head><meta charSet=\"utf-8\"/><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"/><link rel=\"preload\" href=\"/_next/static/media/e4af272ccee01ff0-s.p.woff2\" as=\"font\" crossorigin=\"\" type=\"font/woff2\"/><link rel=\"stylesheet\" href=\"/_next/static/css/2e1a9a933f2e668f.css\" data-precedence=\"next\"/><link rel=\"stylesheet\" href=\"/_next/static/css/2815babf0b950"
+      },
+      "errors": [
+        "error must contain message and type"
+      ],
+      "elapsedMs": 10,
+      "category": "protocol-validation"
+    },
+    {
+      "name": "46 invalid response_format",
+      "state": "FAIL",
+      "request": {
+        "model": "ag/gemini-3.8-flash-medium",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Reply with exactly OK."
+          }
+        ],
+        "max_completion_tokens": 1024,
+        "stream": false,
+        "response_format": {
+          "type": "compat_invalid_format"
+        }
+      },
+      "httpStatus": 200,
+      "contentType": "application/json",
+      "evidence": {
+        "id": "chatcmpl-eYTfapqUD420vr0Pj-qH4AE",
+        "object": "chat.completion",
+        "model": "gemini-3.8-flash-n",
+        "created": 1793033340,
+        "choices": [
+          {
+            "index": 0,
+            "finish_reason": "stop",
+            "message": {
+              "role": "assistant",
+              "content": "OK"
+            }
+          }
+        ],
+        "usage": {
+          "prompt_tokens": 2074,
+          "completion_tokens": 1,
+          "total_tokens": 2075,
+          "completion_tokens_details": {
+            "reasoning_tokens": 68
+          }
+        }
+      },
+      "errors": [
+        "expected HTTP 400/422, got 200",
+        "error must contain message and type"
+      ],
+      "elapsedMs": 3954,
+      "category": "protocol-validation"
+    },
+    {
+      "name": "47 stream with invalid stream_options",
+      "state": "FAIL",
+      "request": {
+        "model": "ag/gemini-3.8-flash-medium",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Reply with exactly OK."
+          }
+        ],
+        "max_completion_tokens": 1024,
+        "stream": true,
+        "stream_options": "invalid"
+      },
+      "httpStatus": 200,
+      "contentType": "text/event-stream",
+      "evidence": {
+        "nonJsonBody": "data: {\"id\":\"chatcmpl-eoTfar_BKb_Dvr0PlNau6Ao\",\"object\":\"chat.completion.chunk\",\"created\":1793033341,\"model\":\"gemini-3.8-flash-n\",\"choices\":[{\"index\":0,\"delta\":{\"role\":\"assistant\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-eoTfar_BKb_Dvr0PlNau6Ao\",\"object\":\"chat.completion.chunk\",\"created\":1793033341,\"model\":\"gemini-3.8-flash-n\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"OK\"},\"finish_reason\":n"
+      },
+      "errors": [
+        "expected HTTP 400/422, got 200",
+        "error must contain message and type"
+      ],
+      "elapsedMs": 2820,
+      "category": "protocol-validation"
+    },
+    {
+      "name": "48 orphan tool result",
+      "state": "FAIL",
+      "request": {
+        "model": "ag/gemini-3.8-flash-medium",
+        "messages": [
+          {
+            "role": "tool",
+            "tool_call_id": "call_nonexistent",
+            "content": "21"
+          },
+          {
+            "role": "user",
+            "content": "Reply with exactly OK."
+          }
+        ],
+        "max_completion_tokens": 1024,
+        "stream": false
+      },
+      "httpStatus": 200,
+      "contentType": "application/json",
+      "evidence": {
+        "id": "chatcmpl-fITfatjiLdaBvr0P1rG4CA",
+        "object": "chat.completion",
+        "model": "gemini-3.8-flash-n",
+        "created": 1793033344,
+        "choices": [
+          {
+            "index": 0,
+            "finish_reason": "stop",
+            "message": {
+              "role": "assistant",
+              "content": "OK"
+            }
+          }
+        ],
+        "usage": {
+          "prompt_tokens": 2097,
+          "completion_tokens": 1,
+          "total_tokens": 2098,
+          "completion_tokens_details": {
+            "reasoning_tokens": 91
+          }
+        }
+      },
+      "errors": [
+        "expected HTTP 400/422, got 200",
+        "error must contain message and type"
+      ],
+      "elapsedMs": 4268,
+      "category": "protocol-validation"
+    },
+    {
+      "name": "49 models list",
+      "state": "PASS",
+      "request": {
+        "model": "ag/gemini-3.8-flash-medium",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Reply with exactly OK."
+          }
+        ],
+        "max_completion_tokens": 1024,
+        "stream": false
+      },
+      "httpStatus": 200,
+      "contentType": "application/json",
+      "errors": [],
+      "evidence": {
+        "object": "list",
+        "modelCount": 30,
+        "requestedModelListed": true
+      },
+      "elapsedMs": 17,
+      "category": "protocol-validation"
+    },
+    {
+      "name": "50 retrieve requested model",
+      "state": "PASS",
+      "request": {
+        "model": "ag/gemini-3.8-flash-medium",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Reply with exactly OK."
+          }
+        ],
+        "max_completion_tokens": 1024,
+        "stream": false
+      },
+      "httpStatus": 200,
+      "contentType": "application/json",
+      "errors": [],
+      "evidence": {
+        "id": "ag/gemini-3.8-flash-medium",
+        "object": "model",
+        "owned_by": "ag",
+        "capabilities": {
+          "vision": true,
+          "pdf": false,
+          "audioInput": true,
+          "videoInput": true,
+          "imageOutput": false,
+          "audioOutput": false,
+          "search": true,
+          "tools": true,
+          "reasoning": true,
+          "thinkingFormat": "gemini-level",
+          "thinkingCanDisable": false,
+          "thinkingRange": null,
+          "thinkingEffortSupported": false,
+          "contextWindow": 1048576,
+          "maxOutput": 65536
+        },
+        "context_length": 1048576,
+        "max_completion_tokens": 65536
+      },
+      "elapsedMs": 10,
+      "category": "protocol-validation"
+    },
+    {
+      "name": "51 Responses API basic probe",
+      "state": "FAIL",
+      "request": {
+        "model": "ag/gemini-3.8-flash-medium",
+        "input": "Reply with exactly OK.",
+        "max_output_tokens": 1024
+      },
+      "httpStatus": 200,
+      "contentType": "text/event-stream",
+      "errors": [
+        "successful response is not JSON"
+      ],
+      "evidence": {
+        "nonJsonBody": "event: response.created\ndata: {\"type\":\"response.created\",\"response\":{\"id\":\"resp_chatcmpl-foTfari9CoC2vr0P-7ex4Ao\",\"object\":\"response\",\"created_at\":1793033344,\"status\":\"in_progress\",\"background\":false,\"error\":null,\"output\":[]},\"sequence_number\":1}\n\nevent: response.in_progress\ndata: {\"type\":\"response.in_progress\",\"response\":{\"id\":\"resp_chatcmpl-foTfari9CoC2vr0P-7ex4Ao\",\"object\":\"response\",\"created_a"
+      },
+      "elapsedMs": 3522,
+      "category": "capability"
+    },
+    {
+      "name": "52 OpenAI SDK parsing",
+      "state": "PASS",
+      "request": {
+        "model": "ag/gemini-3.8-flash-medium",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Reply with exactly OK."
+          }
+        ],
+        "max_completion_tokens": 1024,
+        "stream": false
+      },
+      "httpStatus": 200,
+      "errors": [],
+      "evidence": {
+        "id": "chatcmpl-gITfaq_kOf_e9tMP8s2qwA8",
+        "object": "chat.completion",
+        "model": "gemini-3.8-flash-n",
+        "created": 1793033348,
+        "choices": [
+          {
+            "index": 0,
+            "finish_reason": "stop",
+            "message": {
+              "role": "assistant",
+              "content": "OK"
+            }
+          }
+        ],
+        "usage": {
+          "prompt_tokens": 2093,
+          "completion_tokens": 1,
+          "total_tokens": 2094,
+          "completion_tokens_details": {
+            "reasoning_tokens": 87
+          }
+        }
+      },
+      "elapsedMs": 4394,
+      "category": "capability"
+    }
+  ]
+}
