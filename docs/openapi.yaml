@@ -1,0 +1,3055 @@
+openapi: 3.1.0
+info:
+  title: Fashion Commerce API
+  version: 1.0.0
+  description: Canonical HTTP contract. Routes have business implementations; 
+    integration acceptance remains pending.
+servers:
+- url: /api/v1
+tags:
+- name: Auth
+- name: Catalog
+- name: Commerce
+- name: Payment
+- name: Operations
+- name: Experience
+- name: Notification
+paths:
+  /health:
+    get:
+      operationId: health
+      security: []
+      x-implementation-status: implemented
+      responses:
+        '200':
+          description: Database and worker readiness
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status]
+                properties:
+                  status: {type: string, const: ok}
+        '503': {$ref: '#/components/responses/Unavailable'}
+  /health/live:
+    get:
+      operationId: healthLive
+      security: []
+      x-implementation-status: implemented
+      responses:
+        '200':
+          description: Process liveness
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status, service, timestamp]
+                properties:
+                  status: {type: string, const: ok}
+                  service: {type: string, const: fashion-api}
+                  timestamp: {type: string, format: date-time}
+  /health/ready:
+    get:
+      operationId: healthReady
+      security: []
+      x-implementation-status: implemented
+      responses:
+        '200':
+          description: Database and worker readiness
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status, service, database, timestamp]
+                properties:
+                  status: {type: string, const: ok}
+                  service: {type: string, const: fashion-api}
+                  database: {type: string, const: ready}
+                  timestamp: {type: string, format: date-time}
+        '503': {$ref: '#/components/responses/Unavailable'}
+  /auth/register:
+    post:
+      tags: [Auth]
+      operationId: register
+      security: []
+      x-implementation-status: partial
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/RegisterRequest'}
+      responses:
+        '201': {$ref: '#/components/responses/AcceptedResource'}
+        '400': {$ref: '#/components/responses/ValidationError'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '429': {$ref: '#/components/responses/RateLimited'}
+        '503': {$ref: '#/components/responses/Unavailable'}
+  /auth/verify-email:
+    post:
+      tags: [Auth]
+      operationId: verifyEmail
+      security: []
+      x-implementation-status: partial
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [token]
+              properties:
+                token: {type: string, minLength: 32, maxLength: 2048}
+      responses:
+        '200': {$ref: '#/components/responses/Message'}
+        '400': {$ref: '#/components/responses/ValidationError'}
+  /auth/login:
+    post:
+      tags: [Auth]
+      operationId: login
+      security: []
+      x-implementation-status: partial
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/LoginRequest'}
+      responses:
+        '201':
+          description: Session created
+          headers:
+            Set-Cookie:
+              description: HttpOnly Secure SameSite=Lax refresh token cookie
+              schema: {type: string}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/AuthSession'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '429': {$ref: '#/components/responses/RateLimited'}
+  /auth/refresh:
+    post:
+      tags: [Auth]
+      operationId: refreshSession
+      security:
+      - refreshCookie: []
+      x-implementation-status: partial
+      responses:
+        '201':
+          description: Rotated session
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/AuthSession'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+  /auth/logout:
+    post:
+      tags: [Auth]
+      operationId: logout
+      security:
+      - refreshCookie: []
+      x-implementation-status: partial
+      responses:
+        '204': {description: Current session revoked}
+  /auth/forgot-password:
+    post:
+      tags: [Auth]
+      operationId: forgotPassword
+      security: []
+      x-implementation-status: partial
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [email]
+              properties:
+                email: {type: string, format: email, maxLength: 254}
+      responses:
+        '202': {$ref: '#/components/responses/Message'}
+        '429': {$ref: '#/components/responses/RateLimited'}
+  /auth/reset-password:
+    post:
+      tags: [Auth]
+      operationId: resetPassword
+      security: []
+      x-implementation-status: partial
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [token, newPassword]
+              properties:
+                token: {type: string, minLength: 32, maxLength: 2048}
+                newPassword: {type: string, minLength: 12, maxLength: 128}
+      responses:
+        '200': {$ref: '#/components/responses/Message'}
+        '400': {$ref: '#/components/responses/ValidationError'}
+  /auth/me:
+    get:
+      tags: [Auth]
+      operationId: getPrincipal
+      x-implementation-status: implemented
+      responses:
+        '200':
+          description: Current principal
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/UserSummary'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+  /products:
+    get:
+      tags: [Catalog]
+      operationId: listProducts
+      security: []
+      x-implementation-status: partial
+      parameters:
+      - {$ref: '#/components/parameters/Page'}
+      - {$ref: '#/components/parameters/Limit'}
+      - name: q
+        in: query
+        description: Whole-keyword text search across indexed product name and description; not substring matching
+        schema: {type: string, maxLength: 100}
+      - name: category
+        in: query
+        schema: {type: string, maxLength: 100}
+      - name: sort
+        in: query
+        schema: {type: string, enum: [newest, price_asc, price_desc, name_asc]}
+      responses:
+        '200':
+          description: Published products
+          content:
+            application/json:
+              schema:
+                allOf:
+                - {$ref: '#/components/schemas/PageMeta'}
+                - type: object
+                  required: [items]
+                  properties:
+                    items:
+                      type: array
+                      items: {$ref: '#/components/schemas/Product'}
+        '400': {$ref: '#/components/responses/ValidationError'}
+    post:
+      tags: [Catalog]
+      operationId: createProduct
+      x-permissions: [ADMIN, catalog.manage]
+      x-implementation-status: partial
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+              - {$ref: '#/components/schemas/ProductWrite'}
+              unevaluatedProperties: false
+      responses:
+        '201':
+          description: Product created
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Product'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '409': {$ref: '#/components/responses/Conflict'}
+  /products/{slug}:
+    get:
+      tags: [Catalog]
+      operationId: getProduct
+      security: []
+      x-implementation-status: partial
+      parameters:
+      - name: slug
+        in: path
+        required: true
+        schema: {type: string, pattern: '^[a-z0-9]+(?:-[a-z0-9]+)*$'}
+      responses:
+        '200':
+          description: Published product detail
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Product'}
+        '404': {$ref: '#/components/responses/NotFound'}
+  /checkout/quote:
+    post:
+      tags: [Commerce]
+      operationId: createCheckoutQuote
+      x-implementation-status: partial
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [addressId]
+              properties:
+                addressId: {$ref: '#/components/schemas/ObjectId'}
+                voucherCode: {type: string, minLength: 1, maxLength: 50}
+                shippingMethod: {type: string, const: STANDARD}
+      responses:
+        '200':
+          description: Server-calculated quote valid for ten minutes
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/CheckoutQuote'}
+        '400': {$ref: '#/components/responses/ValidationError'}
+        '409': {$ref: '#/components/responses/Conflict'}
+  /orders:
+    get:
+      tags: [Commerce]
+      operationId: listOrders
+      x-implementation-status: partial
+      parameters:
+      - {$ref: '#/components/parameters/Page'}
+      - {$ref: '#/components/parameters/Limit'}
+      responses:
+        '200':
+          description: Orders visible to principal
+          content:
+            application/json:
+              schema:
+                allOf:
+                - {$ref: '#/components/schemas/PageMeta'}
+                - type: object
+                  properties:
+                    items:
+                      type: array
+                      items: {$ref: '#/components/schemas/Order'}
+    post:
+      tags: [Commerce]
+      operationId: createOrder
+      x-implementation-status: partial
+      parameters:
+      - {$ref: '#/components/parameters/IdempotencyKey'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [quoteId]
+              properties:
+                quoteId: {type: string, format: uuid}
+      responses:
+        '201':
+          description: Order created and stock reserved
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Order'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '422': {$ref: '#/components/responses/BusinessRuleError'}
+  /orders/{orderId}:
+    get:
+      tags: [Commerce]
+      operationId: getOrder
+      x-implementation-status: partial
+      parameters:
+      - {$ref: '#/components/parameters/OrderId'}
+      responses:
+        '200':
+          description: Owned, globally visible, or assigned order
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Order'}
+        '404': {$ref: '#/components/responses/NotFound'}
+  /orders/{orderId}/cancel:
+    post:
+      tags: [Commerce]
+      operationId: cancelOrder
+      x-implementation-status: partial
+      parameters:
+      - {$ref: '#/components/parameters/OrderId'}
+      - {$ref: '#/components/parameters/IdempotencyKey'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [reason]
+              properties:
+                reason: {type: string, minLength: 3, maxLength: 500}
+      responses:
+        '200':
+          description: Cancelled or cancellation awaiting refund
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Order'}
+        '409': {$ref: '#/components/responses/Conflict'}
+  /payments/attempts:
+    post:
+      tags: [Payment]
+      operationId: createPaymentAttempt
+      x-implementation-status: partial
+      parameters:
+      - {$ref: '#/components/parameters/IdempotencyKey'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [orderId]
+              properties:
+                orderId: {$ref: '#/components/schemas/ObjectId'}
+      responses:
+        '201':
+          description: Pending attempt; amount and bank data come from server 
+            configuration
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/PaymentAttempt'}
+        '409': {$ref: '#/components/responses/Conflict'}
+  /payments/{paymentId}:
+    get:
+      tags: [Payment]
+      operationId: getPayment
+      x-implementation-status: partial
+      parameters:
+      - name: paymentId
+        in: path
+        required: true
+        schema: {$ref: '#/components/schemas/ObjectId'}
+      responses:
+        '200':
+          description: Payment visible to owner or authorized operator
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/PaymentAttempt'}
+        '404': {$ref: '#/components/responses/NotFound'}
+  /webhooks/payment/gpmpay:
+    post:
+      tags: [Payment]
+      operationId: receiveGpmpayWebhook
+      security: []
+      x-implementation-status: partial
+      parameters:
+      - name: X-GPMPay-Signature
+        in: header
+        required: true
+        schema: {type: string, pattern: '^t=[0-9]+,v1=[A-Fa-f0-9]+$'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {type: object, additionalProperties: true}
+      responses:
+        '204': {description: Verified event accepted, ignored: null, reviewed: 
+            null, or deduplicated: null}
+        '400': {$ref: '#/components/responses/ValidationError'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '500': {description: Transaction failed; provider should retry}
+        '404': {description: GPM Pay is not the active payment provider}
+  /webhooks/payment/sepay:
+    post:
+      tags: [Payment]
+      operationId: receiveSepayWebhook
+      security: []
+      x-implementation-status: partial
+      parameters:
+      - name: Authorization
+        in: header
+        required: true
+        schema: {type: string, description: 'Apikey <SEPAY_WEBHOOK_API_KEY>'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {type: object, additionalProperties: true}
+      responses:
+        '200':
+          description: Event accepted, reviewed, or deduplicated
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success]
+                properties:
+                  success: {type: boolean, const: true}
+        '400': {$ref: '#/components/responses/ValidationError'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '500': {description: Transaction failed; SePay should retry}
+        '404': {description: SePay is not the active payment provider}
+  /admin/refunds:
+    post:
+      tags: [Operations]
+      operationId: proposeRefund
+      x-permissions: [ADMIN, refund.propose]
+      x-implementation-status: partial
+      parameters:
+      - {$ref: '#/components/parameters/IdempotencyKey'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [paymentAttemptId, amount, reason, beneficiary]
+              properties:
+                paymentAttemptId: {$ref: '#/components/schemas/ObjectId'}
+                amount: {$ref: '#/components/schemas/Money'}
+                reason: {type: string, minLength: 3, maxLength: 500}
+                beneficiary: {$ref: '#/components/schemas/RefundBeneficiary'}
+      responses:
+        '201':
+          description: Refund proposal created
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Refund'}
+        '422': {$ref: '#/components/responses/BusinessRuleError'}
+    get:
+      tags:
+      - Payment
+      operationId: listAdminRefunds
+      x-implementation-status: partial
+      responses:
+        '200':
+          description: Request processed
+  /admin/refunds/{refundId}:
+    get:
+      tags: [Operations]
+      operationId: getRefund
+      x-permissions: [ADMIN, refund.propose]
+      x-implementation-status: partial
+      parameters:
+      - name: refundId
+        in: path
+        required: true
+        schema: {$ref: '#/components/schemas/ObjectId'}
+      responses:
+        '200':
+          description: Refund status and, for authorized operators, approved 
+            transfer instructions
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Refund'}
+        '404': {$ref: '#/components/responses/NotFound'}
+  /admin/refunds/{refundId}/beneficiary:
+    patch:
+      tags: [Operations]
+      operationId: setRefundBeneficiary
+      x-permissions: [ADMIN, refund.propose]
+      x-implementation-status: partial
+      description: Set recipient before approval, including for an automatic 
+        cancellation proposal. Immutable after approval.
+      parameters:
+      - name: refundId
+        in: path
+        required: true
+        schema: {$ref: '#/components/schemas/ObjectId'}
+      - {$ref: '#/components/parameters/IdempotencyKey'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/RefundBeneficiary'}
+      responses:
+        '200':
+          description: Recipient snapshot stored
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Refund'}
+        '409': {$ref: '#/components/responses/Conflict'}
+  /admin/refunds/{refundId}/complete:
+    patch:
+      tags: [Operations]
+      operationId: completeRefund
+      x-permissions: [ADMIN]
+      x-implementation-status: partial
+      parameters:
+      - name: refundId
+        in: path
+        required: true
+        schema: {$ref: '#/components/schemas/ObjectId'}
+      - {$ref: '#/components/parameters/IdempotencyKey'}
+      description: Manual review fallback only when the outgoing webhook lacks 
+        sufficient counterparty data; requires bank statement evidence.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [bankReference, evidenceObjectKey]
+              properties:
+                bankReference: {type: string, minLength: 3, maxLength: 100}
+                evidenceObjectKey: {type: string, minLength: 1, maxLength: 1024}
+      responses:
+        '200':
+          description: Refund completed after audited manual reconciliation by 
+            an Admin different from proposer
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Refund'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '409': {$ref: '#/components/responses/Conflict'}
+  /admin/refunds/{refundId}/approve:
+    patch:
+      tags: [Operations]
+      operationId: approveRefund
+      x-permissions: [ADMIN]
+      x-implementation-status: partial
+      parameters:
+      - name: refundId
+        in: path
+        required: true
+        schema: {$ref: '#/components/schemas/ObjectId'}
+      - {$ref: '#/components/parameters/IdempotencyKey'}
+      responses:
+        '200':
+          description: Approved by an Admin different from proposer; response 
+            includes recipient VietQR and unique refund reconciliation code; 
+            transfer is still pending
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Refund'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '409': {$ref: '#/components/responses/Conflict'}
+  /admin/refunds/{refundId}/fail:
+    patch:
+      tags: [Operations]
+      operationId: failRefund
+      x-permissions: [ADMIN]
+      x-implementation-status: partial
+      description: Mark failed only after verifying that no outgoing transfer 
+        occurred; late webhook remains in review.
+      parameters:
+      - name: refundId
+        in: path
+        required: true
+        schema: {$ref: '#/components/schemas/ObjectId'}
+      - {$ref: '#/components/parameters/IdempotencyKey'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [reason, evidenceObjectKey]
+              properties:
+                reason: {type: string, minLength: 3, maxLength: 500}
+                evidenceObjectKey: {type: string, minLength: 1, maxLength: 1024}
+      responses:
+        '200':
+          description: Refund marked failed
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Refund'}
+        '409': {$ref: '#/components/responses/Conflict'}
+  /ai/jobs/{jobId}:
+    get:
+      tags: [Experience]
+      operationId: getAiJob
+      x-implementation-status: partial
+      parameters:
+      - name: jobId
+        in: path
+        required: true
+        schema: {$ref: '#/components/schemas/ObjectId'}
+      responses:
+        '200':
+          description: Owned AI job with short-lived result URLs
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/AiJob'}
+        '404': {$ref: '#/components/responses/NotFound'}
+  /notifications:
+    get:
+      tags: [Notification]
+      operationId: listNotifications
+      x-implementation-status: partial
+      parameters:
+      - {$ref: '#/components/parameters/Page'}
+      - {$ref: '#/components/parameters/Limit'}
+      responses:
+        '200':
+          description: Notifications owned by principal
+          content:
+            application/json:
+              schema:
+                allOf:
+                - {$ref: '#/components/schemas/PageMeta'}
+                - type: object
+                  properties:
+                    items:
+                      type: array
+                      items: {$ref: '#/components/schemas/Notification'}
+  /notifications/{notificationId}/read:
+    patch:
+      tags: [Notification]
+      operationId: markNotificationRead
+      x-implementation-status: partial
+      parameters:
+      - name: notificationId
+        in: path
+        required: true
+        schema: {$ref: '#/components/schemas/ObjectId'}
+      responses:
+        '200':
+          description: Idempotently marked as read
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Notification'}
+        '404': {$ref: '#/components/responses/NotFound'}
+  /users/me:
+    get:
+      tags: [Auth]
+      operationId: getMyProfile
+      x-implementation-status: partial
+      responses:
+        '200': {$ref: '#/components/responses/UserProfileResponse'}
+    patch:
+      tags: [Auth]
+      operationId: updateMyProfile
+      x-implementation-status: partial
+      requestBody: {$ref: '#/components/requestBodies/ProfileWrite'}
+      responses:
+        '200': {$ref: '#/components/responses/UserProfileResponse'}
+        '400': {$ref: '#/components/responses/ValidationError'}
+  /users/me/addresses:
+    get:
+      tags: [Auth]
+      operationId: listMyAddresses
+      x-implementation-status: partial
+      responses:
+        '200': {$ref: '#/components/responses/AddressListResponse'}
+    post:
+      tags: [Auth]
+      operationId: createMyAddress
+      x-implementation-status: partial
+      requestBody: {$ref: '#/components/requestBodies/AddressWrite'}
+      responses:
+        '201': {$ref: '#/components/responses/AddressResponse'}
+  /users/me/addresses/{addressId}:
+    patch:
+      tags: [Auth]
+      operationId: updateMyAddress
+      x-implementation-status: partial
+      parameters:
+      - {$ref: '#/components/parameters/AddressId'}
+      requestBody: {$ref: '#/components/requestBodies/AddressWrite'}
+      responses:
+        '200': {$ref: '#/components/responses/AddressResponse'}
+        '404': {$ref: '#/components/responses/NotFound'}
+    delete:
+      tags: [Auth]
+      operationId: deleteMyAddress
+      x-implementation-status: partial
+      parameters:
+      - {$ref: '#/components/parameters/AddressId'}
+      responses:
+        '204': {description: Address deleted}
+        '404': {$ref: '#/components/responses/NotFound'}
+  /auth/change-password:
+    post:
+      tags: [Auth]
+      operationId: changePassword
+      x-implementation-status: partial
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [currentPassword, newPassword]
+              properties:
+                currentPassword: {type: string, minLength: 1, maxLength: 128}
+                newPassword: {type: string, minLength: 12, maxLength: 128}
+      responses:
+        '204': {description: Password changed and all sessions revoked}
+        '400': {$ref: '#/components/responses/ValidationError'}
+  /storage/presign:
+    post:
+      tags: [Experience]
+      operationId: presignUpload
+      x-implementation-status: partial
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [contentType, sizeBytes, purpose]
+              properties:
+                contentType: {type: string, enum: [image/jpeg, image/png, 
+                      image/webp]}
+                sizeBytes: {type: integer, minimum: 1, maximum: 10485760, description: 'Must match the PUT Content-Length exactly; configured limit may be lower.'}
+                purpose: {type: string, enum: [avatar, product, lookbook, 
+                      community, tryon, refund_evidence]}
+      responses:
+        '201': {$ref: '#/components/responses/PresignedUploadResponse'}
+        '503': {$ref: '#/components/responses/Unavailable'}
+  /storage/upload:
+    post:
+      tags: [Experience]
+      operationId: uploadImageFallback
+      x-implementation-status: implemented
+      description: Same-origin fallback for a previously issued upload. Checks ownership, pending state, expiry, MIME and exact size; writes only to the private bucket without overwriting. Finalize remains required.
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [objectKey, file]
+              properties:
+                objectKey: {type: string, minLength: 1, maxLength: 1024}
+                file: {type: string, format: binary, description: 'JPEG, PNG or WebP. Maximum 10 MiB; the configured upload limit may be lower.'}
+      responses:
+        '201':
+          description: Object uploaded or already exists; call finalize to verify it.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  uploaded: {type: boolean, const: true}
+        '400': {$ref: '#/components/responses/ValidationError'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '413': {description: Multipart upload exceeds the size limit}
+        '422': {$ref: '#/components/responses/BusinessRuleError'}
+        '503': {$ref: '#/components/responses/Unavailable'}
+  /storage/finalize:
+    post:
+      tags: [Experience]
+      operationId: finalizeUpload
+      x-implementation-status: partial
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [objectKey]
+              properties:
+                objectKey: {type: string, minLength: 1, maxLength: 1024}
+      responses:
+        '201': {$ref: '#/components/responses/MediaObjectResponse'}
+        '422': {$ref: '#/components/responses/BusinessRuleError'}
+  /categories:
+    get:
+      tags: [Catalog]
+      operationId: listCategories
+      security: []
+      x-implementation-status: partial
+      responses:
+        '200': {$ref: '#/components/responses/CategoryListResponse'}
+    post:
+      tags: [Catalog]
+      operationId: createCategory
+      x-permissions: [ADMIN, catalog.manage]
+      x-implementation-status: partial
+      requestBody: {$ref: '#/components/requestBodies/CategoryWrite'}
+      responses:
+        '201': {$ref: '#/components/responses/CategoryResponse'}
+        '409': {$ref: '#/components/responses/Conflict'}
+  /admin/products/{productId}/variants:
+    post:
+      tags: [Catalog]
+      operationId: createProductVariant
+      x-permissions: [ADMIN, catalog.manage]
+      x-implementation-status: partial
+      parameters:
+      - {$ref: '#/components/parameters/ProductId'}
+      requestBody: {$ref: '#/components/requestBodies/VariantWrite'}
+      responses:
+        '201': {$ref: '#/components/responses/ProductVariantResponse'}
+        '409': {$ref: '#/components/responses/Conflict'}
+  /lookbooks:
+    get:
+      tags: [Catalog]
+      operationId: listLookbooks
+      security: []
+      x-implementation-status: partial
+      responses:
+        '200': {$ref: '#/components/responses/LookbookListResponse'}
+  /lookbooks/{lookbookId}:
+    get:
+      tags: [Catalog]
+      operationId: getLookbook
+      security: []
+      x-implementation-status: partial
+      parameters:
+      - {$ref: '#/components/parameters/LookbookId'}
+      responses:
+        '200': {$ref: '#/components/responses/LookbookResponse'}
+        '404': {$ref: '#/components/responses/NotFound'}
+  /ai/try-on:
+    post:
+      tags: [Experience]
+      operationId: createTryOnJob
+      x-implementation-status: partial
+      parameters:
+      - {$ref: '#/components/parameters/IdempotencyKey'}
+      requestBody: {$ref: '#/components/requestBodies/AiJobWrite'}
+      responses:
+        '202': {$ref: '#/components/responses/AiJobResponse'}
+        '429': {$ref: '#/components/responses/RateLimited'}
+        '503': {$ref: '#/components/responses/Unavailable'}
+  /ai/mix-match:
+    post:
+      tags: [Experience]
+      operationId: createMixMatchJob
+      x-implementation-status: partial
+      parameters:
+      - {$ref: '#/components/parameters/IdempotencyKey'}
+      requestBody: {$ref: '#/components/requestBodies/AiJobWrite'}
+      responses:
+        '202': {$ref: '#/components/responses/AiJobResponse'}
+        '429': {$ref: '#/components/responses/RateLimited'}
+        '503': {$ref: '#/components/responses/Unavailable'}
+  /cart:
+    get:
+      tags: [Commerce]
+      operationId: getCart
+      x-implementation-status: partial
+      responses:
+        '200': {$ref: '#/components/responses/CartResponse'}
+    put:
+      tags: [Commerce]
+      operationId: replaceCart
+      x-implementation-status: partial
+      requestBody: {$ref: '#/components/requestBodies/CartWrite'}
+      responses:
+        '200': {$ref: '#/components/responses/CartResponse'}
+        '409': {$ref: '#/components/responses/Conflict'}
+    delete:
+      tags: [Commerce]
+      operationId: clearCart
+      x-implementation-status: partial
+      responses:
+        '204': {description: Cart cleared}
+  /admin/orders/{orderId}/status:
+    patch:
+      tags: [Operations]
+      operationId: updateOrderStatus
+      x-permissions: [ADMIN, order.manage]
+      x-implementation-status: partial
+      parameters:
+      - {$ref: '#/components/parameters/OrderId'}
+      requestBody: {$ref: '#/components/requestBodies/OrderStatusWrite'}
+      responses:
+        '200':
+          description: Order status updated
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Order'}
+        '409': {$ref: '#/components/responses/Conflict'}
+  /admin/orders/{orderId}/shipment:
+    patch:
+      tags: [Operations]
+      operationId: updateShipment
+      x-permissions: [ADMIN, shipment.manage]
+      x-implementation-status: partial
+      parameters:
+      - {$ref: '#/components/parameters/OrderId'}
+      requestBody: {$ref: '#/components/requestBodies/ShipmentWrite'}
+      responses:
+        '200': {$ref: '#/components/responses/ShipmentResponse'}
+  /admin/inventory:
+    get:
+      tags: [Operations]
+      operationId: listInventory
+      x-permissions: [ADMIN, inventory.manage]
+      x-implementation-status: partial
+      responses:
+        '200': {$ref: '#/components/responses/InventoryListResponse'}
+    patch:
+      tags: [Operations]
+      operationId: adjustInventory
+      x-permissions: [ADMIN, inventory.manage]
+      x-implementation-status: partial
+      parameters:
+      - {$ref: '#/components/parameters/IdempotencyKey'}
+      requestBody: {$ref: '#/components/requestBodies/InventoryAdjustmentWrite'}
+      responses:
+        '200': {$ref: '#/components/responses/InventoryItemResponse'}
+        '409': {$ref: '#/components/responses/Conflict'}
+  /admin/vouchers:
+    get:
+      tags: [Operations]
+      operationId: listVouchers
+      x-permissions: [ADMIN]
+      x-implementation-status: partial
+      responses:
+        '200': {$ref: '#/components/responses/VoucherListResponse'}
+    post:
+      tags: [Operations]
+      operationId: createVoucher
+      x-permissions: [ADMIN]
+      x-implementation-status: partial
+      requestBody: {$ref: '#/components/requestBodies/VoucherWrite'}
+      responses:
+        '201': {$ref: '#/components/responses/VoucherResponse'}
+        '409': {$ref: '#/components/responses/Conflict'}
+  /admin/vouchers/{voucherId}:
+    patch:
+      tags: [Operations]
+      operationId: updateVoucher
+      x-permissions: [ADMIN]
+      x-implementation-status: partial
+      parameters:
+      - {$ref: '#/components/parameters/VoucherId'}
+      requestBody: {$ref: '#/components/requestBodies/VoucherWrite'}
+      responses:
+        '200': {$ref: '#/components/responses/VoucherResponse'}
+    delete:
+      tags:
+      - Commerce
+      operationId: disableVoucher
+      x-implementation-status: partial
+      responses:
+        '204':
+          description: Request processed
+  /reviews:
+    post:
+      tags: [Experience]
+      operationId: createReview
+      x-implementation-status: partial
+      requestBody: {$ref: '#/components/requestBodies/ReviewWrite'}
+      responses:
+        '201': {$ref: '#/components/responses/ReviewResponse'}
+        '409': {$ref: '#/components/responses/Conflict'}
+    get:
+      tags:
+      - Experience
+      operationId: listProductReviews
+      x-implementation-status: partial
+      responses:
+        '200':
+          description: Request processed
+  /reviews/{reviewId}:
+    patch:
+      tags: [Experience]
+      operationId: updateReview
+      x-implementation-status: partial
+      parameters:
+      - {$ref: '#/components/parameters/ReviewId'}
+      requestBody: {$ref: '#/components/requestBodies/ReviewWrite'}
+      responses:
+        '200': {$ref: '#/components/responses/ReviewResponse'}
+        '404': {$ref: '#/components/responses/NotFound'}
+    delete:
+      tags: [Experience]
+      operationId: deleteReview
+      x-implementation-status: partial
+      parameters:
+      - {$ref: '#/components/parameters/ReviewId'}
+      responses:
+        '204': {description: Review soft-deleted}
+  /community/posts:
+    get:
+      tags: [Experience]
+      operationId: listCommunityPosts
+      security: []
+      x-implementation-status: partial
+      responses:
+        '200': {$ref: '#/components/responses/PostListResponse'}
+    post:
+      tags: [Experience]
+      operationId: createCommunityPost
+      x-implementation-status: partial
+      requestBody: {$ref: '#/components/requestBodies/PostWrite'}
+      responses:
+        '201': {$ref: '#/components/responses/PostResponse'}
+  /community/posts/{postId}:
+    patch:
+      tags: [Experience]
+      operationId: updateCommunityPost
+      x-implementation-status: partial
+      parameters:
+      - {$ref: '#/components/parameters/PostId'}
+      requestBody: {$ref: '#/components/requestBodies/PostWrite'}
+      responses:
+        '200': {$ref: '#/components/responses/PostResponse'}
+        '404': {$ref: '#/components/responses/NotFound'}
+    delete:
+      tags: [Experience]
+      operationId: deleteCommunityPost
+      x-implementation-status: partial
+      parameters:
+      - {$ref: '#/components/parameters/PostId'}
+      responses:
+        '204': {description: Post soft-deleted}
+    get:
+      tags:
+      - Experience
+      operationId: getCommunityPost
+      x-implementation-status: partial
+      responses:
+        '200':
+          description: Request processed
+  /community/posts/{postId}/comments:
+    get:
+      tags: [Experience]
+      operationId: listComments
+      security: []
+      x-implementation-status: partial
+      parameters:
+      - {$ref: '#/components/parameters/PostId'}
+      responses:
+        '200': {$ref: '#/components/responses/CommentListResponse'}
+    post:
+      tags: [Experience]
+      operationId: createComment
+      x-implementation-status: partial
+      parameters:
+      - {$ref: '#/components/parameters/PostId'}
+      requestBody: {$ref: '#/components/requestBodies/CommentWrite'}
+      responses:
+        '201': {$ref: '#/components/responses/CommentResponse'}
+  /admin/moderation/{targetId}:
+    patch:
+      tags: [Operations]
+      operationId: moderateContent
+      x-permissions: [ADMIN, content.moderate]
+      x-implementation-status: partial
+      parameters:
+      - {$ref: '#/components/parameters/TargetId'}
+      requestBody: {$ref: '#/components/requestBodies/ModerationWrite'}
+      responses:
+        '200': {$ref: '#/components/responses/ModerationResponse'}
+  /payments:
+    get:
+      tags: [Payment]
+      operationId: listPayments
+      x-implementation-status: partial
+      parameters:
+      - {$ref: '#/components/parameters/Page'}
+      - {$ref: '#/components/parameters/Limit'}
+      responses:
+        '200': {$ref: '#/components/responses/PaymentListResponse'}
+  /admin/users:
+    get:
+      tags:
+        - Operations
+      operationId: listUsers
+      x-permissions:
+        - ADMIN
+      x-implementation-status: partial
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 50
+            default: 20
+        - name: role
+          in: query
+          description: Optional active-user role filter used by staff assignment.
+          schema:
+            type: string
+            enum:
+              - CUSTOMER
+              - STAFF
+              - ADMIN
+      responses:
+        '200':
+          $ref: '#/components/responses/UserListResponse'
+  /admin/users/{userId}:
+    patch:
+      tags: [Operations]
+      operationId: updateUserStatus
+      x-permissions: [ADMIN]
+      x-implementation-status: partial
+      parameters:
+      - {$ref: '#/components/parameters/UserId'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [status]
+              properties:
+                status: {type: string, enum: [ACTIVE, SUSPENDED]}
+      responses:
+        '200':
+          description: User status updated
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/UserSummary'}
+        '409': {$ref: '#/components/responses/Conflict'}
+  /admin/staff/{staffId}/permissions:
+    patch:
+      tags:
+        - Operations
+      operationId: updateStaffPermissions
+      x-permissions:
+        - ADMIN
+      x-implementation-status: implemented
+      parameters:
+        - $ref: '#/components/parameters/StaffId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required:
+                - grants
+              properties:
+                grants:
+                  type: array
+                  uniqueItems: true
+                  items:
+                    $ref: '#/components/schemas/StaffPermissionGrant'
+      responses:
+        '200':
+          description: Complete replacement of Staff grants
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - staffId
+                  - grants
+                properties:
+                  staffId:
+                    $ref: '#/components/schemas/ObjectId'
+                  grants:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/StaffPermissionGrant'
+      description: >-
+        Replace the complete permission set. Read existing grants before editing. Concurrent writes
+        are serialized per staff user.
+    post:
+      tags:
+        - Operations
+      operationId: addStaffPermission
+      x-permissions:
+        - ADMIN
+      x-implementation-status: implemented
+      parameters:
+        - $ref: '#/components/parameters/StaffId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required:
+                - grants
+              properties:
+                grants:
+                  type: array
+                  uniqueItems: true
+                  items:
+                    $ref: '#/components/schemas/StaffPermissionGrant'
+      responses:
+        '201':
+          description: Complete replacement of Staff grants
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - staffId
+                  - grants
+                properties:
+                  staffId:
+                    $ref: '#/components/schemas/ObjectId'
+                  grants:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/StaffPermissionGrant'
+      description: Add grants without removing existing permissions. Duplicate grants are idempotent.
+    get:
+      tags:
+        - Operations
+      operationId: getStaffPermissions
+      x-implementation-status: implemented
+      x-permissions:
+        - ADMIN
+      parameters:
+        - $ref: '#/components/parameters/StaffId'
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - staffId
+                  - grants
+                properties:
+                  staffId:
+                    $ref: '#/components/schemas/ObjectId'
+                  grants:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/StaffPermissionGrant'
+  /admin/reports/sales:
+    get:
+      tags: [Operations]
+      operationId: getSalesReport
+      x-permissions: [ADMIN]
+      x-implementation-status: partial
+      responses:
+        '200': {$ref: '#/components/responses/SalesReportResponse'}
+  /admin/settings:
+    get:
+      tags: [Operations]
+      operationId: getSettings
+      x-permissions: [ADMIN]
+      x-implementation-status: partial
+      responses:
+        '200': {$ref: '#/components/responses/SettingsResponse'}
+    patch:
+      tags: [Operations]
+      operationId: updateSettings
+      x-permissions: [ADMIN]
+      x-implementation-status: partial
+      requestBody: {$ref: '#/components/requestBodies/SettingsWrite'}
+      responses:
+        '200': {$ref: '#/components/responses/SettingsResponse'}
+  /admin/ai-quotas:
+    patch:
+      tags: [Operations]
+      operationId: updateAiQuota
+      x-permissions: [ADMIN]
+      x-implementation-status: partial
+      requestBody: {$ref: '#/components/requestBodies/AiQuotaWrite'}
+      responses:
+        '200': {$ref: '#/components/responses/AiQuotaResponse'}
+    get:
+      tags:
+      - Operations
+      operationId: getAiQuotas
+      x-implementation-status: partial
+      responses:
+        '200':
+          description: Request processed
+  /auth/resend-verification:
+    post:
+      tags:
+      - Auth
+      operationId: resendVerification
+      x-implementation-status: partial
+      responses:
+        '200':
+          description: Request processed
+  /products/{slug}/size-suggestion:
+    post:
+      tags:
+      - Catalog
+      operationId: suggestProductSize
+      x-implementation-status: partial
+      responses:
+        '200':
+          description: Request processed
+  /admin/products:
+    get:
+      tags:
+      - Catalog
+      operationId: listAdminProducts
+      x-implementation-status: partial
+      responses:
+        '200':
+          description: Request processed
+  /admin/products/{productId}:
+    patch:
+      tags:
+        - Catalog
+      operationId: updateProduct
+      x-implementation-status: partial
+      responses:
+        '200':
+          description: Request processed
+    get:
+      tags:
+        - Catalog
+      operationId: getAdminProduct
+      x-implementation-status: implemented
+      x-permissions:
+        - ADMIN
+        - catalog.manage
+      parameters:
+        - name: productId
+          in: path
+          required: true
+          schema:
+            $ref: '#/components/schemas/ObjectId'
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Product'
+  /admin/products/{productId}/variants/{variantId}:
+    patch:
+      tags:
+      - Catalog
+      operationId: updateVariant
+      x-implementation-status: partial
+      responses:
+        '200':
+          description: Request processed
+  /categories/{categoryId}:
+    patch:
+      tags:
+      - Catalog
+      operationId: updateCategory
+      x-implementation-status: partial
+      responses:
+        '200':
+          description: Request processed
+  /admin/lookbooks:
+    get:
+      tags:
+      - Experience
+      operationId: listAdminLookbooks
+      x-implementation-status: partial
+      responses:
+        '200':
+          description: Request processed
+    post:
+      tags:
+      - Experience
+      operationId: createLookbook
+      x-implementation-status: partial
+      responses:
+        '201':
+          description: Request processed
+  /admin/lookbooks/{lookbookId}:
+    patch:
+      tags:
+        - Experience
+      operationId: updateLookbook
+      x-implementation-status: partial
+      responses:
+        '200':
+          description: Request processed
+    get:
+      tags:
+        - Experience
+      operationId: getAdminLookbook
+      x-implementation-status: implemented
+      x-permissions:
+        - ADMIN
+        - catalog.manage
+      parameters:
+        - name: lookbookId
+          in: path
+          required: true
+          schema:
+            $ref: '#/components/schemas/ObjectId'
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Lookbook'
+  /community/posts/{postId}/comments/{commentId}:
+    patch:
+      tags:
+      - Experience
+      operationId: updateComment
+      x-implementation-status: partial
+      responses:
+        '200':
+          description: Request processed
+    delete:
+      tags:
+      - Experience
+      operationId: deleteComment
+      x-implementation-status: partial
+      responses:
+        '204':
+          description: Request processed
+  /notifications/read-all:
+    patch:
+      tags:
+      - Notification
+      operationId: readAllNotifications
+      x-implementation-status: partial
+      responses:
+        '200':
+          description: Request processed
+  /admin/staff:
+    post:
+      tags:
+      - Operations
+      operationId: createStaff
+      x-implementation-status: partial
+      responses:
+        '201':
+          description: Request processed
+  /admin/staff/{staffId}/invitation:
+    post:
+      tags: [Operations]
+      operationId: resendStaffInvitation
+      x-permissions: [ADMIN]
+      parameters:
+      - {$ref: '#/components/parameters/StaffId'}
+      responses:
+        '201':
+          description: Staff invitation queued for email delivery
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+  /admin/orders:
+    get:
+      tags:
+      - Commerce
+      operationId: listAdminOrders
+      x-implementation-status: partial
+      responses:
+        '200':
+          description: Request processed
+  /admin/orders/{orderId}/assign:
+    patch:
+      tags:
+      - Commerce
+      operationId: assignOrder
+      x-implementation-status: partial
+      responses:
+        '200':
+          description: Request processed
+  /admin/inventory/ledger:
+    get:
+      tags:
+      - Commerce
+      operationId: listInventoryLedger
+      x-implementation-status: partial
+      responses:
+        '200':
+          description: Request processed
+  /admin/moderation:
+    get:
+      tags:
+        - Experience
+      operationId: listModerationQueue
+      x-implementation-status: implemented
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - page
+                  - limit
+                  - total
+                  - items
+                properties:
+                  page:
+                    type: integer
+                  limit:
+                    type: integer
+                  total:
+                    type: integer
+                  items:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          $ref: '#/components/schemas/ObjectId'
+                        authorId:
+                          $ref: '#/components/schemas/ObjectId'
+                        targetType:
+                          type: string
+                          enum:
+                            - REVIEW
+                            - POST
+                            - COMMENT
+                        status:
+                          type: string
+                          enum:
+                            - PUBLIC
+                            - HIDDEN
+                            - PENDING_REVIEW
+                        content:
+                          type: string
+                        createdAt:
+                          type: string
+                          format: date-time
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 50
+            default: 20
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum:
+              - PUBLIC
+              - HIDDEN
+              - PENDING_REVIEW
+        - name: targetType
+          in: query
+          schema:
+            type: string
+            enum:
+              - REVIEW
+              - POST
+              - COMMENT
+  /ai/jobs:
+    get:
+      tags:
+      - Experience
+      operationId: listAiJobs
+      x-implementation-status: partial
+      responses:
+        '200':
+          description: Request processed
+  /admin/payment-events:
+    get:
+      tags:
+        - Payment
+      operationId: listPaymentReviewEvents
+      x-implementation-status: partial
+      responses:
+        '200':
+          description: Paginated review queue; private evidence is only in the Admin detail response
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, page, limit, total]
+                properties:
+                  items:
+                    type: array
+                    items: {$ref: '#/components/schemas/PaymentReviewEvent'}
+                  page: {type: integer}
+                  limit: {type: integer}
+                  total: {type: integer}
+      x-permissions: [ADMIN, payment.read:GLOBAL]
+      parameters:
+        - {$ref: '#/components/parameters/Page'}
+        - {$ref: '#/components/parameters/Limit'}
+        - name: view
+          in: query
+          schema:
+            type: string
+            enum:
+              - OPEN
+              - RESOLVED
+              - ALL
+            default: OPEN
+  /admin/payment-events/{eventId}/review:
+    patch:
+      tags:
+        - Payment
+      operationId: reviewPaymentEvent
+      x-implementation-status: partial
+      responses:
+        '200':
+          description: Review or independent approval recorded
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/PaymentReviewEvent'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '422': {$ref: '#/components/responses/BusinessRuleError'}
+      x-permissions: [ADMIN]
+      parameters:
+        - name: eventId
+          in: path
+          required: true
+          schema: {$ref: '#/components/schemas/ObjectId'}
+      description: >-
+        ESCALATED remains open. Refund/external-outflow/no-merchant-receipt proposals become
+        PENDING_APPROVAL; a different Admin must APPROVE using independently owned finalized private
+        evidence. Exact bank amount/reference are required for external settlements. Merchant receipts
+        cannot be CLOSED_NO_ACTION. Records external work only; never pays a bank or reopens an order.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required:
+                - decision
+                - note
+                - evidenceObjectKey
+              properties:
+                decision:
+                  type: string
+                  enum:
+                    - ESCALATED
+                    - CLOSED_NO_ACTION
+                    - REFUNDED_EXTERNALLY
+                    - OUTGOING_RECONCILED
+                    - APPROVE
+                    - REJECT_PROPOSAL
+                note:
+                  type: string
+                  minLength: 10
+                  maxLength: 1000
+                evidenceObjectKey:
+                  type: string
+                  minLength: 1
+                  maxLength: 1024
+                amount:
+                  type: integer
+                  minimum: 1
+                bankReference:
+                  type: string
+                  minLength: 3
+                  maxLength: 100
+  /admin/audit-logs:
+    get:
+      tags:
+      - Operations
+      operationId: listAuditLogs
+      x-implementation-status: partial
+      responses:
+        '200':
+          description: Paginated audit records
+  /admin/categories:
+    get:
+      tags:
+        - Catalog
+      operationId: listAdminCategories
+      x-implementation-status: implemented
+      x-permissions:
+        - ADMIN
+        - catalog.manage
+      parameters: []
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - items
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Category'
+  /reviews/mine:
+    get:
+      tags:
+        - Experience
+      operationId: listMyOrderReviews
+      description: Return the authenticated customer's reviews for either an owned order or up to 50 review IDs. Supply exactly one of orderId or reviewIds. Public review responses do not disclose ownership or order item IDs.
+      x-implementation-status: implemented
+      x-permissions:
+        - CUSTOMER
+      parameters:
+        - name: orderId
+          in: query
+          required: false
+          schema:
+            $ref: '#/components/schemas/ObjectId'
+        - name: reviewIds
+          in: query
+          required: false
+          style: form
+          explode: true
+          schema:
+            type: array
+            minItems: 1
+            maxItems: 50
+            uniqueItems: true
+            items:
+              $ref: '#/components/schemas/ObjectId'
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - items
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Review'
+  /admin/refunds/{refundId}/reject:
+    patch:
+      tags:
+        - Operations
+      operationId: rejectRefundProposal
+      x-implementation-status: implemented
+      x-permissions:
+        - ADMIN
+      parameters:
+        - name: refundId
+          in: path
+          required: true
+          schema:
+            $ref: '#/components/schemas/ObjectId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Refund'
+        '409':
+          $ref: '#/components/responses/Conflict'
+      description: >-
+        Reject a PENDING_APPROVAL proposal without transfer evidence. Approved transfers must use
+        /fail with evidence.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required:
+                - reason
+              properties:
+                reason:
+                  type: string
+                  minLength: 3
+                  maxLength: 500
+  /payments/order/{orderId}/latest:
+    get:
+      tags:
+        - Payment
+      operationId: latestPaymentForOrder
+      x-implementation-status: implemented
+      x-permissions:
+        - CUSTOMER_OWNER
+        - ADMIN
+        - payment.read
+      parameters:
+        - name: orderId
+          in: path
+          required: true
+          schema:
+            $ref: '#/components/schemas/ObjectId'
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentAttempt'
+  /admin/payment-events/{eventId}:
+    get:
+      tags:
+        - Operations
+      operationId: getPaymentEventReview
+      x-implementation-status: implemented
+      x-permissions:
+        - ADMIN
+      parameters:
+        - name: eventId
+          in: path
+          required: true
+          schema:
+            $ref: '#/components/schemas/ObjectId'
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentReviewEvent'
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+    refreshCookie:
+      type: apiKey
+      in: cookie
+      name: refresh_token
+  parameters:
+    Page:
+      name: page
+      in: query
+      schema: {type: integer, minimum: 1, maximum: 1000000, default: 1}
+    Limit:
+      name: limit
+      in: query
+      schema: {type: integer, minimum: 1, maximum: 50, default: 20}
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      schema: {type: string, format: uuid}
+    OrderId:
+      name: orderId
+      in: path
+      required: true
+      schema: {$ref: '#/components/schemas/ObjectId'}
+    AddressId: {name: addressId, in: path, required: true, schema: {$ref: '#/components/schemas/ObjectId'}}
+    ProductId: {name: productId, in: path, required: true, schema: {$ref: '#/components/schemas/ObjectId'}}
+    LookbookId: {name: lookbookId, in: path, required: true, schema: {$ref: '#/components/schemas/ObjectId'}}
+    VoucherId: {name: voucherId, in: path, required: true, schema: {$ref: '#/components/schemas/ObjectId'}}
+    ReviewId: {name: reviewId, in: path, required: true, schema: {$ref: '#/components/schemas/ObjectId'}}
+    PostId: {name: postId, in: path, required: true, schema: {$ref: '#/components/schemas/ObjectId'}}
+    TargetId: {name: targetId, in: path, required: true, schema: {$ref: '#/components/schemas/ObjectId'}}
+    UserId: {name: userId, in: path, required: true, schema: {$ref: '#/components/schemas/ObjectId'}}
+    StaffId: {name: staffId, in: path, required: true, schema: {$ref: '#/components/schemas/ObjectId'}}
+  requestBodies:
+    ProfileWrite:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties: false
+            minProperties: 1
+            properties:
+              fullName: {type: string, minLength: 2, maxLength: 100}
+              phone: {type: [string, 'null'], pattern: '^\\+?[0-9]{8,15}$'}
+              avatarMediaId: {anyOf: [$ref: '#/components/schemas/ObjectId', 
+                      type: 'null']}
+    AddressWrite:
+      required: true
+      content:
+        application/json:
+          schema:
+            allOf:
+            - {$ref: '#/components/schemas/AddressWrite'}
+            unevaluatedProperties: false
+    CategoryWrite:
+      required: true
+      content:
+        application/json:
+          schema:
+            allOf:
+            - {$ref: '#/components/schemas/CategoryWrite'}
+            unevaluatedProperties: false
+    VariantWrite:
+      required: true
+      content:
+        application/json:
+          schema:
+            allOf:
+            - {$ref: '#/components/schemas/VariantWrite'}
+            unevaluatedProperties: false
+    LookbookWrite:
+      required: true
+      content:
+        application/json:
+          schema:
+            allOf:
+            - {$ref: '#/components/schemas/LookbookWrite'}
+            unevaluatedProperties: false
+    CartWrite:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties: false
+            required: [items]
+            properties:
+              items:
+                type: array
+                maxItems: 100
+                items:
+                  type: object
+                  additionalProperties: false
+                  required: [variantId, quantity]
+                  properties:
+                    variantId: {$ref: '#/components/schemas/ObjectId'}
+                    quantity: {type: integer, minimum: 1, maximum: 99}
+    OrderStatusWrite:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties: false
+            required: [state, reason]
+            properties:
+              state: {type: string, enum: [CONFIRMED, PREPARING, SHIPPING, 
+                    DELIVERED, CANCEL_PENDING_REFUND, CANCELLED]}
+              reason: {type: string, minLength: 3, maxLength: 500}
+              expectedVersion: {type: integer, minimum: 1}
+    ShipmentWrite:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties: false
+            required: [carrier, trackingCode, status]
+            properties:
+              carrier: {type: string, minLength: 1, maxLength: 100}
+              trackingCode: {type: string, minLength: 1, maxLength: 100}
+              status: {type: string, enum: [READY, PICKED_UP, IN_TRANSIT, 
+                    DELIVERED, FAILED]}
+              note: {type: string, maxLength: 500}
+    InventoryAdjustmentWrite:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties: false
+            required: [variantId, delta, reason, expectedVersion]
+            properties:
+              variantId: {$ref: '#/components/schemas/ObjectId'}
+              delta: {type: integer, minimum: -100000, maximum: 100000, not: {
+                    const: 0}}
+              reason: {type: string, minLength: 3, maxLength: 500}
+              expectedVersion: {type: integer, minimum: 1}
+    VoucherWrite:
+      required: true
+      content:
+        application/json:
+          schema:
+            allOf:
+            - {$ref: '#/components/schemas/VoucherWrite'}
+            unevaluatedProperties: false
+    ReviewWrite:
+      required: true
+      content:
+        application/json:
+          schema:
+            allOf:
+            - {$ref: '#/components/schemas/ReviewWrite'}
+            unevaluatedProperties: false
+    PostWrite:
+      required: true
+      content:
+        application/json:
+          schema:
+            allOf:
+            - {$ref: '#/components/schemas/PostWrite'}
+            unevaluatedProperties: false
+    CommentWrite:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties: false
+            required: [body]
+            properties:
+              body: {type: string, minLength: 1, maxLength: 2000}
+              parentId: {anyOf: [$ref: '#/components/schemas/ObjectId', type: 'null']}
+    ModerationWrite:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties: false
+            required: [targetType, action, reason]
+            properties:
+              targetType: {type: string, enum: [REVIEW, POST, COMMENT]}
+              action: {type: string, enum: [HIDE, RESTORE]}
+              reason: {type: string, minLength: 3, maxLength: 500}
+    SettingsWrite:
+      required: true
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/SystemSettings'}
+    AiQuotaWrite:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties: false
+            required: [dailyJobs]
+            properties:
+              dailyJobs: {type: integer, minimum: 0, maximum: 100, default: 5}
+    AiJobWrite:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties: false
+            required: [inputMediaId, productIds, consentPolicyVersion]
+            properties:
+              inputMediaId: {$ref: '#/components/schemas/ObjectId'}
+              productIds:
+                type: array
+                minItems: 1
+                maxItems: 5
+                uniqueItems: true
+                items: {$ref: '#/components/schemas/ObjectId'}
+              consentPolicyVersion: {type: string, minLength: 1, maxLength: 50}
+              style: {type: string, enum: [office, streetwear, evening, minimalist], description: 'Optional styling context for outfit planning; participates in idempotency matching.'}
+  schemas:
+    PaymentReviewEvent:
+      type: object
+      required:
+        - id
+        - provider
+        - eventId
+        - resolution
+      properties:
+        id:
+          $ref: '#/components/schemas/ObjectId'
+        provider:
+          type: string
+          enum:
+            - GPMPAY
+            - SEPAY
+        eventId:
+          type: string
+        resolution:
+          type: string
+        transferType:
+          type: string
+        transferAmount:
+          type: integer
+        proposal:
+          type:
+            - object
+            - 'null'
+          properties:
+            decision:
+              type: string
+            proposedBy:
+              $ref: '#/components/schemas/ObjectId'
+            proposedAt:
+              type: string
+              format: date-time
+            amount:
+              type: integer
+        proposalDetail:
+          type:
+            - object
+            - 'null'
+          description: Admin detail only; signed private evidence URL expires.
+          properties:
+            note:
+              type: string
+            bankReference:
+              type: string
+            evidenceUrl:
+              type:
+                - string
+                - 'null'
+    ObjectId:
+      type: string
+      pattern: '^[a-fA-F0-9]{24}$'
+    Money:
+      type: integer
+      minimum: 0
+      description: Integer VND
+    RegisterRequest:
+      type: object
+      additionalProperties: false
+      required: [fullName, email, password]
+      properties:
+        fullName: {type: string, minLength: 2, maxLength: 100}
+        email: {type: string, format: email, maxLength: 254}
+        password: {type: string, minLength: 12, maxLength: 128}
+    LoginRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - email
+        - password
+      properties:
+        email:
+          type: string
+          format: email
+          maxLength: 254
+        password:
+          type: string
+          minLength: 1
+          maxLength: 128
+        remember:
+          type: boolean
+          default: true
+          description: False uses an HttpOnly session cookie; access tokens remain in memory.
+    AuthSession:
+      type: object
+      additionalProperties: false
+      required: [accessToken, tokenType, expiresIn, user]
+      properties:
+        accessToken: {type: string}
+        tokenType: {type: string, const: Bearer}
+        expiresIn: {type: integer, const: 3600}
+        user: {$ref: '#/components/schemas/UserSummary'}
+    UserSummary:
+      type: object
+      required:
+        - id
+        - email
+        - fullName
+        - role
+        - status
+      properties:
+        id:
+          $ref: '#/components/schemas/ObjectId'
+        email:
+          type: string
+          format: email
+        fullName:
+          type: string
+        role:
+          type: string
+          enum:
+            - CUSTOMER
+            - STAFF
+            - ADMIN
+        status:
+          type: string
+          enum:
+            - PENDING_VERIFICATION
+            - ACTIVE
+            - SUSPENDED
+        permissions:
+          type: array
+          items:
+            $ref: '#/components/schemas/StaffPermissionGrant'
+    StaffPermissionGrant:
+      type: object
+      additionalProperties: false
+      required: [permission, scope]
+      properties:
+        permission:
+          type: string
+          enum: [catalog.manage, inventory.manage, order.read, order.manage, 
+              order.cancel, shipment.manage, payment.read, refund.propose, 
+              content.moderate]
+        scope: {type: string, enum: [GLOBAL, ASSIGNED]}
+    ProductWrite:
+      type: object
+      required: [name, slug, status]
+      properties:
+        name: {type: string, minLength: 1, maxLength: 200}
+        slug: {type: string, pattern: '^[a-z0-9]+(?:-[a-z0-9]+)*$'}
+        description: {type: string, maxLength: 10000}
+        status: {type: string, enum: [DRAFT, PUBLISHED, ARCHIVED]}
+    UserProfile:
+      allOf:
+      - {$ref: '#/components/schemas/UserSummary'}
+      - type: object
+        properties:
+          phone: {type: [string, 'null'], pattern: '^\\+?[0-9]{8,15}$'}
+          avatarMediaId: {anyOf: [$ref: '#/components/schemas/ObjectId', type: 'null']}
+          createdAt: {type: string, format: date-time}
+      unevaluatedProperties: false
+    AddressWrite:
+      type: object
+      required: [receiver, phone, line1, ward, district, province]
+      properties:
+        receiver: {type: string, minLength: 2, maxLength: 100}
+        phone: {type: string, pattern: '^\\+?[0-9]{8,15}$'}
+        line1: {type: string, minLength: 3, maxLength: 255}
+        ward: {type: string, minLength: 1, maxLength: 100}
+        district: {type: string, minLength: 1, maxLength: 100}
+        province: {type: string, minLength: 1, maxLength: 100}
+        note: {type: string, maxLength: 300}
+        isDefault: {type: boolean, default: false}
+    Address:
+      allOf:
+      - {$ref: '#/components/schemas/AddressWrite'}
+      - type: object
+        required: [id]
+        properties:
+          id: {$ref: '#/components/schemas/ObjectId'}
+      unevaluatedProperties: false
+    CategoryWrite:
+      type: object
+      required: [name, slug, status]
+      properties:
+        name: {type: string, minLength: 1, maxLength: 100}
+        slug: {type: string, pattern: '^[a-z0-9]+(?:-[a-z0-9]+)*$'}
+        parentId: {anyOf: [$ref: '#/components/schemas/ObjectId', type: 'null']}
+        status: {type: string, enum: [ACTIVE, HIDDEN]}
+    Category:
+      allOf:
+      - {$ref: '#/components/schemas/CategoryWrite'}
+      - type: object
+        required: [id]
+        properties:
+          id: {$ref: '#/components/schemas/ObjectId'}
+      unevaluatedProperties: false
+    VariantWrite:
+      type: object
+      required: [sku, size, color, price, stockOnHand]
+      properties:
+        sku: {type: string, minLength: 1, maxLength: 80, pattern: '^[A-Za-z0-9._-]+$'}
+        size: {type: string, minLength: 1, maxLength: 30}
+        color: {type: string, minLength: 1, maxLength: 50}
+        price: {$ref: '#/components/schemas/Money'}
+        stockOnHand: {type: integer, minimum: 0}
+    ProductVariant:
+      allOf:
+      - {$ref: '#/components/schemas/VariantWrite'}
+      - type: object
+        required: [id, reserved, available]
+        properties:
+          id: {$ref: '#/components/schemas/ObjectId'}
+          reserved: {type: integer, minimum: 0}
+          available: {type: integer, minimum: 0}
+      unevaluatedProperties: false
+    LookbookWrite:
+      type: object
+      required: [title, status, mainMediaId, items]
+      properties:
+        title: {type: string, minLength: 1, maxLength: 200}
+        description: {type: string, maxLength: 5000}
+        status: {type: string, enum: [DRAFT, PUBLISHED, HIDDEN]}
+        mainMediaId: {$ref: '#/components/schemas/ObjectId'}
+        tags:
+          type: array
+          maxItems: 20
+          uniqueItems: true
+          items: {type: string, minLength: 1, maxLength: 50}
+        items:
+          type: array
+          minItems: 1
+          maxItems: 50
+          items:
+            type: object
+            additionalProperties: false
+            required: [productId, x, y]
+            properties:
+              productId: {$ref: '#/components/schemas/ObjectId'}
+              x: {type: number, minimum: 0, maximum: 1}
+              y: {type: number, minimum: 0, maximum: 1}
+    Lookbook:
+      allOf:
+      - {$ref: '#/components/schemas/LookbookWrite'}
+      - type: object
+        required: [id, version]
+        properties:
+          id: {$ref: '#/components/schemas/ObjectId'}
+          version: {type: integer, minimum: 1}
+      unevaluatedProperties: false
+    PresignedUpload:
+      type: object
+      additionalProperties: false
+      required: [uploadUrl, objectKey, expiresInSeconds, contentLengthBytes, requiredHeaders]
+      properties:
+        uploadUrl: {type: string, format: uri}
+        objectKey: {type: string}
+        expiresInSeconds: {type: integer, minimum: 1, maximum: 300}
+        contentLengthBytes: {type: integer, minimum: 1, maximum: 10485760}
+        requiredHeaders: {type: object, additionalProperties: {type: string}}
+    MediaObject:
+      type: object
+      additionalProperties: false
+      required: [id, purpose, visibility, status, contentType, sizeBytes]
+      properties:
+        id: {$ref: '#/components/schemas/ObjectId'}
+        purpose: {type: string, enum: [avatar, product, lookbook, community, 
+              tryon]}
+        visibility: {type: string, enum: [PRIVATE, PUBLIC]}
+        status: {type: string, enum: [ACTIVE, QUARANTINED, DELETED]}
+        contentType: {type: string, enum: [image/jpeg, image/png, image/webp]}
+        sizeBytes: {type: integer, minimum: 1, maximum: 10485760}
+        expiresAt: {type: [string, 'null'], format: date-time}
+    Cart:
+      type: object
+      additionalProperties: false
+      required: [items, subtotal, updatedAt]
+      properties:
+        items:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required: [variantId, sku, productName, quantity, unitPrice, 
+                available]
+            properties:
+              variantId: {$ref: '#/components/schemas/ObjectId'}
+              sku: {type: string}
+              productName: {type: string}
+              quantity: {type: integer, minimum: 1, maximum: 99}
+              unitPrice: {$ref: '#/components/schemas/Money'}
+              available: {type: integer, minimum: 0}
+        subtotal: {$ref: '#/components/schemas/Money'}
+        updatedAt: {type: string, format: date-time}
+    Shipment:
+      type: object
+      additionalProperties: false
+      required: [id, orderId, carrier, trackingCode, status, updatedAt]
+      properties:
+        id: {$ref: '#/components/schemas/ObjectId'}
+        orderId: {$ref: '#/components/schemas/ObjectId'}
+        carrier: {type: string}
+        trackingCode: {type: string}
+        status: {type: string, enum: [READY, PICKED_UP, IN_TRANSIT, DELIVERED, 
+              FAILED]}
+        updatedAt: {type: string, format: date-time}
+    InventoryItem:
+      type: object
+      additionalProperties: false
+      required: [variantId, sku, stockOnHand, reserved, available, version]
+      properties:
+        variantId: {$ref: '#/components/schemas/ObjectId'}
+        sku: {type: string}
+        stockOnHand: {type: integer, minimum: 0}
+        reserved: {type: integer, minimum: 0}
+        available: {type: integer, minimum: 0}
+        version: {type: integer, minimum: 1}
+    VoucherWrite:
+      type: object
+      required: [code, type, value, validFrom, validTo, usageLimit, status]
+      properties:
+        code: {type: string, minLength: 3, maxLength: 50, pattern: '^[A-Z0-9_-]+$'}
+        type: {type: string, enum: [FIXED, PERCENT]}
+        value: {type: integer, minimum: 1}
+        maxDiscount: {anyOf: [$ref: '#/components/schemas/Money', type: 'null']}
+        minimumSubtotal: {$ref: '#/components/schemas/Money'}
+        validFrom: {type: string, format: date-time}
+        validTo: {type: string, format: date-time}
+        usageLimit: {type: integer, minimum: 1}
+        status: {type: string, enum: [ACTIVE, DISABLED]}
+    Voucher:
+      allOf:
+      - {$ref: '#/components/schemas/VoucherWrite'}
+      - type: object
+        required: [id, usedCount]
+        properties:
+          id: {$ref: '#/components/schemas/ObjectId'}
+          usedCount: {type: integer, minimum: 0}
+      unevaluatedProperties: false
+    ReviewWrite:
+      type: object
+      required: [orderItemId, stars, content]
+      properties:
+        orderItemId: {$ref: '#/components/schemas/ObjectId'}
+        stars: {type: integer, minimum: 1, maximum: 5}
+        content: {type: string, minLength: 1, maxLength: 5000}
+        mediaIds:
+          type: array
+          maxItems: 5
+          uniqueItems: true
+          items: {$ref: '#/components/schemas/ObjectId'}
+    Review:
+      allOf:
+      - {$ref: '#/components/schemas/ReviewWrite'}
+      - type: object
+        required: [id, customerId, status, createdAt]
+        properties:
+          id: {$ref: '#/components/schemas/ObjectId'}
+          customerId: {$ref: '#/components/schemas/ObjectId'}
+          status: {type: string, enum: [PUBLIC, HIDDEN, PENDING_REVIEW]}
+          createdAt: {type: string, format: date-time}
+      unevaluatedProperties: false
+    PostWrite:
+      type: object
+      required: [caption, mediaIds]
+      properties:
+        caption: {type: string, minLength: 1, maxLength: 5000}
+        mediaIds:
+          type: array
+          minItems: 1
+          maxItems: 10
+          uniqueItems: true
+          items: {$ref: '#/components/schemas/ObjectId'}
+    CommunityPost:
+      allOf:
+      - {$ref: '#/components/schemas/PostWrite'}
+      - type: object
+        required: [id, authorId, status, createdAt]
+        properties:
+          id: {$ref: '#/components/schemas/ObjectId'}
+          authorId: {$ref: '#/components/schemas/ObjectId'}
+          status: {type: string, enum: [PUBLIC, HIDDEN, PENDING_REVIEW]}
+          createdAt: {type: string, format: date-time}
+      unevaluatedProperties: false
+    Comment:
+      type: object
+      additionalProperties: false
+      required: [id, postId, authorId, body, status, createdAt]
+      properties:
+        id: {$ref: '#/components/schemas/ObjectId'}
+        postId: {$ref: '#/components/schemas/ObjectId'}
+        authorId: {$ref: '#/components/schemas/ObjectId'}
+        parentId: {anyOf: [$ref: '#/components/schemas/ObjectId', type: 'null']}
+        body: {type: string, minLength: 1, maxLength: 2000}
+        status: {type: string, enum: [PUBLIC, HIDDEN]}
+        createdAt: {type: string, format: date-time}
+    ModerationLog:
+      type: object
+      additionalProperties: false
+      required: [id, targetType, targetId, action, reason, actorId, createdAt]
+      properties:
+        id: {$ref: '#/components/schemas/ObjectId'}
+        targetType: {type: string, enum: [REVIEW, POST, COMMENT]}
+        targetId: {$ref: '#/components/schemas/ObjectId'}
+        action: {type: string, enum: [HIDE, RESTORE]}
+        reason: {type: string}
+        actorId: {$ref: '#/components/schemas/ObjectId'}
+        createdAt: {type: string, format: date-time}
+    SystemSettings:
+      type: object
+      additionalProperties: false
+      minProperties: 1
+      properties:
+        standardShippingFee: {$ref: '#/components/schemas/Money'}
+        freeShippingThreshold: {$ref: '#/components/schemas/Money'}
+        lowStockThreshold: {type: integer, minimum: 0, maximum: 9999, default: 5}
+        aiDailyJobs: {type: integer, minimum: 0, maximum: 100, default: 5}
+    AiQuota:
+      type: object
+      additionalProperties: false
+      required: [dailyJobs, effectiveAt, updatedAt]
+      properties:
+        dailyJobs: {type: integer, minimum: 0, maximum: 100}
+        effectiveAt: {type: string, format: date-time}
+        updatedAt: {type: string, format: date-time}
+    SalesReport:
+      type: object
+      additionalProperties: false
+      required: [from, to, timezone, paidRevenue, refundedAmount, netRevenue, 
+          orderCount, topProducts]
+      properties:
+        from: {type: string, format: date-time}
+        to: {type: string, format: date-time}
+        timezone: {type: string, const: Asia/Ho_Chi_Minh}
+        paidRevenue: {$ref: '#/components/schemas/Money'}
+        refundedAmount: {$ref: '#/components/schemas/Money'}
+        netRevenue: {type: integer}
+        orderCount: {type: integer, minimum: 0}
+        topProducts:
+          type: array
+          items:
+            type: object
+            required: [productId, quantity]
+            properties:
+              productId: {$ref: '#/components/schemas/ObjectId'}
+              quantity: {type: integer, minimum: 0}
+    Product:
+      allOf:
+      - {$ref: '#/components/schemas/ProductWrite'}
+      - type: object
+        required: [id, variants]
+        properties:
+          id: {$ref: '#/components/schemas/ObjectId'}
+          variants:
+            type: array
+            items:
+              type: object
+              required: [id, sku, size, color, price, available]
+              properties:
+                id: {$ref: '#/components/schemas/ObjectId'}
+                sku: {type: string}
+                size: {type: string}
+                color: {type: string}
+                price: {$ref: '#/components/schemas/Money'}
+                available: {type: integer, minimum: 0}
+      unevaluatedProperties: false
+    PageMeta:
+      type: object
+      required: [page, limit, total]
+      properties:
+        page: {type: integer, minimum: 1, maximum: 1000000}
+        limit: {type: integer, minimum: 1, maximum: 50}
+        total: {type: integer, minimum: 0}
+    CheckoutQuote:
+      type: object
+      additionalProperties: false
+      required: [id, subtotal, shippingFee, voucherDiscount, payableTotal, 
+          expiresAt]
+      properties:
+        id: {type: string, format: uuid}
+        subtotal: {$ref: '#/components/schemas/Money'}
+        shippingFee: {$ref: '#/components/schemas/Money'}
+        voucherDiscount: {$ref: '#/components/schemas/Money'}
+        payableTotal: {$ref: '#/components/schemas/Money'}
+        expiresAt: {type: string, format: date-time}
+    Order:
+      type: object
+      required: [id, code, state, money, paymentDueAt, createdAt]
+      properties:
+        id: {$ref: '#/components/schemas/ObjectId'}
+        code: {type: string}
+        state:
+          type: string
+          enum: [PENDING_PAYMENT, CONFIRMED, PREPARING, SHIPPING, DELIVERED, 
+              CANCEL_PENDING_REFUND, CANCELLED]
+        money:
+          type: object
+          required: [subtotal, shippingFee, voucherDiscount, payableTotal]
+          properties:
+            subtotal: {$ref: '#/components/schemas/Money'}
+            shippingFee: {$ref: '#/components/schemas/Money'}
+            voucherDiscount: {$ref: '#/components/schemas/Money'}
+            payableTotal: {$ref: '#/components/schemas/Money'}
+        paymentDueAt: {type: string, format: date-time}
+        createdAt: {type: string, format: date-time}
+    PaymentAttempt:
+      type: object
+      required:
+        - id
+        - orderId
+        - provider
+        - state
+        - amount
+        - currency
+        - reconciliationCode
+        - expiresAt
+      properties:
+        id:
+          $ref: '#/components/schemas/ObjectId'
+        orderId:
+          $ref: '#/components/schemas/ObjectId'
+        provider:
+          type: string
+          enum:
+            - GPMPAY
+            - SEPAY
+        state:
+          type: string
+          enum:
+            - PENDING
+            - SUCCEEDED
+            - FAILED
+            - REQUIRES_REVIEW
+        amount:
+          $ref: '#/components/schemas/Money'
+        currency:
+          type: string
+          const: VND
+        reconciliationCode:
+          type: string
+          pattern: ^FC[A-Z0-9]{8,20}$
+        qrImageUrl:
+          type: string
+          format: uri
+        bank:
+          type: object
+          properties:
+            bin:
+              type: string
+            accountNumberMasked:
+              type: string
+            accountName:
+              type: string
+        expiresAt:
+          type: string
+          format: date-time
+        paidAt:
+          type:
+            - string
+            - 'null'
+          format: date-time
+        hasOpenReview:
+          type: boolean
+        canRetry:
+          type: boolean
+        reviewOutcome:
+          type:
+            - string
+            - 'null'
+          enum:
+            - REFUNDED_EXTERNALLY
+            - null
+    RefundBeneficiary:
+      type: object
+      additionalProperties: false
+      required: [bankBin, accountNumber, accountName]
+      properties:
+        bankBin: {type: string, pattern: '^[0-9]{6}$'}
+        accountNumber: {type: string, minLength: 4, maxLength: 34}
+        accountName: {type: string, minLength: 2, maxLength: 120}
+    Refund:
+      type: object
+      required:
+        - id
+        - paymentAttemptId
+        - amount
+        - state
+        - proposedBy
+      properties:
+        id:
+          $ref: '#/components/schemas/ObjectId'
+        paymentAttemptId:
+          $ref: '#/components/schemas/ObjectId'
+        amount:
+          $ref: '#/components/schemas/Money'
+        state:
+          type: string
+          enum:
+            - PENDING_APPROVAL
+            - APPROVED
+            - SUCCEEDED
+            - FAILED
+        proposedBy:
+          $ref: '#/components/schemas/ObjectId'
+        approvedBy:
+          $ref: '#/components/schemas/ObjectId'
+        confirmedBy:
+          $ref: '#/components/schemas/ObjectId'
+        bankReference:
+          type: string
+        beneficiary:
+          $ref: '#/components/schemas/RefundBeneficiary'
+        reconciliationCode:
+          type: string
+          pattern: ^RF[A-Z0-9]{8,20}$
+        transferContent:
+          type: string
+          maxLength: 50
+        qrImageUrl:
+          type: string
+          format: uri
+        approvedAt:
+          type: string
+          format: date-time
+        matchedEventId:
+          type: string
+        refundedAt:
+          type: string
+          format: date-time
+        failureReason:
+          type: string
+          maxLength: 500
+        createdAt:
+          type: string
+          format: date-time
+    AiJob:
+      type: object
+      required: [id, type, state, quotaCharged, expiresAt]
+      properties:
+        id: {$ref: '#/components/schemas/ObjectId'}
+        type: {type: string, enum: [TRY_ON, MIX_MATCH]}
+        state: {type: string, enum: [PENDING, PROCESSING, COMPLETED, FAILED, 
+              EXPIRED]}
+        phase: {type: string, enum: [QUEUED, ANALYZING, PLANNING, GENERATING, COMPLETED, FAILED]}
+        planSummary: {type: [string, 'null'], maxLength: 500}
+        detectedItems:
+          type: array
+          maxItems: 5
+          items:
+            type: object
+            properties:
+              productId: {$ref: '#/components/schemas/ObjectId'}
+              category: {type: string, enum: [top, bottom, dress, outerwear, shoes, sandals, glasses, hat, bag, belt, scarf, necklace, earrings, bracelet, watch, ring]}
+              targetRegion: {type: string, enum: [face, head, torso, legs, feet, shoulders, waist, neck, hands, ears, wrists]}
+        quotaCharged: {type: boolean}
+        resultUrls:
+          type: array
+          items: {type: string, format: uri}
+        expiresAt: {type: string, format: date-time}
+    Notification:
+      type: object
+      required: [id, type, createdAt]
+      properties:
+        id: {$ref: '#/components/schemas/ObjectId'}
+        type: {type: string}
+        title: {type: string}
+        body: {type: string}
+        reference: {type: object, additionalProperties: true}
+        readAt: {type: [string, 'null'], format: date-time}
+        createdAt: {type: string, format: date-time}
+    Error:
+      type: object
+      additionalProperties: false
+      required: [statusCode, code, message, requestId]
+      properties:
+        statusCode: {type: integer}
+        code:
+          type: string
+          enum: [VALIDATION_FAILED, WEBHOOK_SIGNATURE_INVALID, AUTH_REQUIRED, 
+              INVALID_CREDENTIALS, SESSION_REVOKED, PERMISSION_DENIED, 
+              RESOURCE_NOT_FOUND, DUPLICATE_RESOURCE, IDEMPOTENCY_CONFLICT, 
+              STATE_CONFLICT, OUT_OF_STOCK, BUSINESS_RULE_FAILED, RATE_LIMITED, 
+              QUOTA_EXCEEDED, PROVIDER_UNAVAILABLE, INTERNAL_ERROR]
+        message: {type: string}
+        requestId: {type: string, format: uuid}
+        fieldErrors:
+          type: array
+          items:
+            type: object
+            required: [field, code]
+            properties:
+              field: {type: string}
+              code: {type: string}
+              message: {type: string}
+  responses:
+    UserProfileResponse:
+      description: User profile
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/UserProfile'}
+    UserListResponse:
+      description: Users visible to Admin
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [items, page, limit, total]
+            properties:
+              items:
+                type: array
+                items: {$ref: '#/components/schemas/UserSummary'}
+              page: {type: integer, minimum: 1, maximum: 1000000}
+              limit: {type: integer, minimum: 1, maximum: 50}
+              total: {type: integer, minimum: 0}
+    AddressResponse:
+      description: Address
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/Address'}
+    AddressListResponse:
+      description: Addresses
+      content:
+        application/json:
+          schema:
+            type: array
+            items: {$ref: '#/components/schemas/Address'}
+    PresignedUploadResponse:
+      description: Signed upload data
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/PresignedUpload'}
+    MediaObjectResponse:
+      description: Validated media object
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/MediaObject'}
+    CategoryResponse:
+      description: Category
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/Category'}
+    CategoryListResponse:
+      description: Categories
+      content:
+        application/json:
+          schema:
+            type: array
+            items: {$ref: '#/components/schemas/Category'}
+    ProductVariantResponse:
+      description: Product variant
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/ProductVariant'}
+    LookbookResponse:
+      description: Lookbook
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/Lookbook'}
+    LookbookListResponse:
+      description: Lookbooks
+      content:
+        application/json:
+          schema:
+            type: array
+            items: {$ref: '#/components/schemas/Lookbook'}
+    AiJobResponse:
+      description: AI job accepted or read
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/AiJob'}
+    CartResponse:
+      description: Current cart with current-price projection; no stock 
+        reservation
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/Cart'}
+    ShipmentResponse:
+      description: Shipment
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/Shipment'}
+    InventoryItemResponse:
+      description: Inventory item after adjustment
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/InventoryItem'}
+    InventoryListResponse:
+      description: Inventory items
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [items]
+            properties:
+              items:
+                type: array
+                items: {$ref: '#/components/schemas/InventoryItem'}
+    VoucherResponse:
+      description: Voucher
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/Voucher'}
+    VoucherListResponse:
+      description: Vouchers
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [items]
+            properties:
+              items:
+                type: array
+                items: {$ref: '#/components/schemas/Voucher'}
+    ReviewResponse:
+      description: Review
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/Review'}
+    PostResponse:
+      description: Community post
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/CommunityPost'}
+    PostListResponse:
+      description: Public community posts
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [items]
+            properties:
+              items:
+                type: array
+                items: {$ref: '#/components/schemas/CommunityPost'}
+    CommentResponse:
+      description: Comment
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/Comment'}
+    CommentListResponse:
+      description: Public comments
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [items]
+            properties:
+              items:
+                type: array
+                items: {$ref: '#/components/schemas/Comment'}
+    ModerationResponse:
+      description: Append-only moderation result
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/ModerationLog'}
+    PaymentListResponse:
+      description: Payments visible to principal
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [items, page, limit, total]
+            properties:
+              items:
+                type: array
+                items: {$ref: '#/components/schemas/PaymentAttempt'}
+              page: {type: integer, minimum: 1, maximum: 1000000}
+              limit: {type: integer, minimum: 1, maximum: 50}
+              total: {type: integer, minimum: 0}
+    SalesReportResponse:
+      description: Payment-derived sales report
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/SalesReport'}
+    SettingsResponse:
+      description: Current operational settings
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/SystemSettings'}
+    AiQuotaResponse:
+      description: AI quota setting
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/AiQuota'}
+    AcceptedResource:
+      description: Resource accepted/created
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [id, message]
+            properties:
+              id: {type: string}
+              message: {type: string}
+    Message:
+      description: Generic non-sensitive result
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [message]
+            properties:
+              message: {type: string}
+    ValidationError:
+      description: Request validation failed
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/Error'}
+    Unauthorized:
+      description: Missing, invalid, expired, or revoked authentication
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/Error'}
+    Forbidden:
+      description: Authenticated principal lacks permission
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/Error'}
+    NotFound:
+      description: Missing or hidden by ownership rules
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/Error'}
+    Conflict:
+      description: State, version, uniqueness, or idempotency conflict
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/Error'}
+    BusinessRuleError:
+      description: Valid request violates a business rule
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/Error'}
+    RateLimited:
+      description: Rate or quota exceeded
+      headers:
+        Retry-After:
+          schema: {type: integer, minimum: 1}
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/Error'}
+    Unavailable:
+      description: Required provider/dependency unavailable
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/Error'}
+security:
+- bearerAuth: []
