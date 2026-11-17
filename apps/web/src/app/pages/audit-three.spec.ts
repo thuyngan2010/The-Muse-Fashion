@@ -1,5 +1,5 @@
 import { Injector, runInInjectionContext, signal, ɵEffectScheduler, ɵChangeDetectionScheduler } from '@angular/core';
-import { ActivatedRoute } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { EMPTY, Subject, of } from 'rxjs';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { ProductReview, ReviewMutationResult, UserSummary } from '@fashion/contracts';
@@ -26,6 +26,7 @@ function make<T extends object>(Type: new () => T, api: unknown, user: Partial<U
     { provide: ɵEffectScheduler, useValue: scheduler },
     { provide: ɵChangeDetectionScheduler, useValue: { notify: () => {}, runningTick: false } },
     { provide: CartService, useValue: {} }, { provide: ActivatedRoute, useValue: {} },
+    { provide: Router, useValue: { url: '/', navigate: vi.fn(), navigateByUrl: vi.fn() } },
     { provide: ToastService, useValue: { success: vi.fn(), error: vi.fn() } },
   ] });
   const page = runInInjectionContext(injector, () => new Type());
