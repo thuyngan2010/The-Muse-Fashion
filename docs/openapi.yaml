@@ -255,6 +255,30 @@ paths:
               schema: {$ref: '#/components/schemas/Product'}
         '403': {$ref: '#/components/responses/Forbidden'}
         '409': {$ref: '#/components/responses/Conflict'}
+  /products/filters:
+    get:
+      tags: [Catalog]
+      operationId: listProductFilters
+      security: []
+      x-implementation-status: implemented
+      description: Distinct sizes and colors of active variants of published products, with the lowest and highest variant price, for storefront filters.
+      responses:
+        '200':
+          description: Available filter values
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [sizes, colors, minPrice, maxPrice]
+                properties:
+                  sizes:
+                    type: array
+                    items: {type: string}
+                  colors:
+                    type: array
+                    items: {type: string}
+                  minPrice: {type: [number, 'null']}
+                  maxPrice: {type: [number, 'null']}
   /products/{slug}:
     get:
       tags: [Catalog]
