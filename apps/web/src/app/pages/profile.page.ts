@@ -1,6 +1,8 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { Router } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
+import { toSignal } from '@angular/core/rxjs-interop';
+import { map, switchMap } from 'rxjs';
 import { AccountSidebarComponent } from '../components/account-sidebar.component';
 import { ApiService } from '../services/api.service';
 import { AuthService } from '../services/auth.service';
@@ -12,15 +14,21 @@ import { STORE_PROFILE_CONTENT } from '../shared/store-content';
   imports: [FormsModule, AccountSidebarComponent],
   template: `
     <main class="profile-shell">
-      <fc-account-sidebar activeItem="profile" />
+      <fc-account-sidebar />
 
       <section class="profile-content">
         <header class="page-header">
           <span>TÀI KHOẢN CỦA TÔI</span>
-          <h1>Hồ sơ cá nhân</h1>
-          <p>Cập nhật thông tin cơ bản và bảo mật tài khoản MUSE.</p>
+          @if (isPasswordTab()) {
+            <h1>Đổi mật khẩu</h1>
+            <p>Sử dụng mật khẩu mạnh và không dùng lại mật khẩu cũ.</p>
+          } @else {
+            <h1>Hồ sơ cá nhân</h1>
+            <p>Cập nhật thông tin cơ bản của tài khoản MUSE.</p>
+          }
         </header>
 
+        @if (!isPasswordTab()) {
         @if (profileSaved()) {
           <div class="success-banner" role="status">
             <span class="success-icon" aria-hidden="true">✓</span><strong>Thông tin cá nhân đã được cập nhật thành công.</strong>
@@ -32,15 +40,20 @@ import { STORE_PROFILE_CONTENT } from '../shared/store-content';
           <div class="avatar-section">
             <h2>ẢNH ĐẠI DIỆN</h2>
             <div class="avatar-row">
-              <span class="large-avatar" aria-hidden="true">{{ userInitial }}</span>
+              <span class="large-avatar" aria-hidden="true">
+                @if (auth.currentUser()?.avatarUrl; as url) { <img [src]="url" alt="" /> } @else { {{ userInitial }} }
+              </span>
               <div class="avatar-copy">
                 <strong>{{ auth.currentUser()?.fullName || 'Tài khoản MUSE' }}</strong>
-                <p>Ảnh đại diện hiện dùng chữ cái đầu của tên tài khoản.</p>
+                <p>{{ auth.currentUser()?.avatarUrl ? 'Ảnh JPEG, PNG hoặc WebP, tối đa 10 MB.' : 'Chưa có ảnh đại diện, hệ thống dùng chữ cái đầu của tên tài khoản.' }}</p>
+                <input #avatarInput type="file" accept="image/jpeg,image/png,image/webp" hidden (change)="onAvatarSelected($event)" />
                 <div class="avatar-actions">
-                  <button type="button" class="button button-pink" data-ui-only (click)="showAvatarNotice()">THAY ĐỔI ẢNH</button>
-                  <button type="button" class="text-button" data-ui-only (click)="showAvatarNotice()">XÓA ẢNH</button>
+                  <button type="button" class="button button-pink" [disabled]="avatarBusy()" (click)="avatarInput.click()">{{ avatarBusy() ? 'ĐANG XỬ LÝ...' : 'THAY ĐỔI ẢNH' }}</button>
+                  @if (auth.currentUser()?.avatarMediaId) {
+                    <button type="button" class="text-button" [disabled]="avatarBusy()" (click)="removeAvatar()">XÓA ẢNH</button>
+                  }
                 </div>
-                @if (avatarNotice()) { <small class="inline-notice" role="status">{{ avatarNotice() }}</small> }
+                @if (avatarError()) { <small class="inline-notice avatar-error" role="alert">{{ avatarError() }}</small> }
               </div>
             </div>
           </div>
@@ -75,22 +88,12 @@ import { STORE_PROFILE_CONTENT } from '../shared/store-content';
           </form>
         </section>
 
-        <section class="session-card">
-          <header><div><span>BẢO MẬT TÀI KHOẢN</span><h2>Phiên đăng nhập</h2></div><button type="button" class="button button-outline" [disabled]="loadingAuthMe()" (click)="loadAuthMe()">{{ loadingAuthMe() ? 'ĐANG KIỂM TRA...' : 'KIỂM TRA PHIÊN' }}</button></header>
-          @if (authMeError()) { <p class="form-error" role="alert">{{ authMeError() }}</p> }
-          @if (authMe(); as me) {
-            <div class="session-grid">
-              <p><span>Email tài khoản</span><strong>{{ me.email }}</strong></p>
-              <p><span>Mã định danh</span><code>{{ me.sub || me.id }}</code></p>
-              @if (me.sid) { <p><span>Mã phiên làm việc</span><code>{{ me.sid }}</code></p> }
-              <p><span>Vai trò xác thực</span><strong>{{ me.role }}</strong></p>
-            </div>
-          }
-        </section>
+        }
 
+        @if (isPasswordTab()) {
         <section class="password-layout" id="change-password">
           <form (ngSubmit)="changePassword()" class="password-card">
-            <header><span>BẢO MẬT</span><h2>Đổi mật khẩu</h2><p>Sử dụng mật khẩu mạnh và không dùng lại mật khẩu cũ.</p></header>
+            <header><span>BẢO MẬT</span><h2>Cập nhật mật khẩu</h2></header>
             @if (passwordError()) { <p class="form-error" role="alert">{{ passwordError() }}</p> }
 
             <label class="form-field"><span>MẬT KHẨU HIỆN TẠI <b aria-hidden="true">*</b></span><input type="password" [(ngModel)]="oldPassword" name="oldPassword" required autocomplete="current-password" /></label>
@@ -115,7 +118,7 @@ import { STORE_PROFILE_CONTENT } from '../shared/store-content';
           </aside>
         </section>
 
-        <button type="button" class="logout-main" (click)="logout()">ĐĂNG XUẤT</button>
+        }
       </section>
     </main>
   `,
@@ -128,11 +131,11 @@ import { STORE_PROFILE_CONTENT } from '../shared/store-content';
     .page-header h1 { margin:6px 0 8px; font:400 40px/1.2 'Playfair Display',serif; letter-spacing:-.5px; } .page-header p { margin:0; color:#444748; font:300 16px/26px 'Outfit',sans-serif; }
     .success-banner { min-height:58px; margin:24px 0; padding:14px 20px; border-left:3px solid #000; background:#f8f6f6; display:flex; align-items:center; gap:14px; }
     .success-icon { width:22px; height:22px; border:1.5px solid #000; border-radius:50%; display:grid; place-items:center; font-size:13px; } .success-banner strong { flex:1; font-size:12px; } .success-banner button { border:0; background:none; font-size:25px; color:#444748; cursor:pointer; }
-    .profile-card,.session-card,.password-card { margin-top:24px; border:1px solid #5f5353; background:#fff; }
+    .profile-card,.password-card { margin-top:24px; border:1px solid #5f5353; background:#fff; }
     .avatar-section { padding:28px 40px; } h2 { margin:0; font-size:15px; line-height:1.4; letter-spacing:1px; }
-    .avatar-row { margin-top:24px; display:flex; align-items:center; gap:26px; } .large-avatar { width:112px; height:112px; flex:0 0 auto; border:1px solid #e3e2e2; border-radius:50%; display:grid; place-items:center; background:#ffd9e1; font:500 36px 'Outfit',sans-serif; text-transform:uppercase; }
+    .avatar-row { margin-top:24px; display:flex; align-items:center; gap:26px; } .large-avatar { overflow:hidden; width:112px; height:112px; flex:0 0 auto; border:1px solid #e3e2e2; border-radius:50%; display:grid; place-items:center; background:#ffd9e1; font:500 36px 'Outfit',sans-serif; text-transform:uppercase; }
     .avatar-copy strong { font:500 18px 'Outfit',sans-serif; } .avatar-copy p { margin:8px 0 14px; color:#444748; font:300 13px/1.55 'Outfit',sans-serif; }
-    .avatar-actions { display:flex; align-items:center; gap:18px; } .inline-notice { display:block; margin-top:10px; color:#786f6f; font-size:10px; }
+    .large-avatar img { width:100%; height:100%; object-fit:cover; display:block; } .avatar-error { color:#9b2c2c; } .button:disabled, .text-button:disabled { opacity:.5; cursor:not-allowed; } .avatar-actions { display:flex; align-items:center; gap:18px; } .inline-notice { display:block; margin-top:10px; color:#786f6f; font-size:10px; }
     .divider { height:1px; margin:0 40px; background:#e3e2e2; }
     .profile-form { padding:32px 40px 40px; } .profile-form h2 { margin-bottom:26px; }
     .form-field { display:grid; gap:8px; margin-bottom:22px; } .form-field > span:first-child,.modal-label { font-size:10px; font-weight:600; letter-spacing:1px; } .form-field b { color:#de233f; }
@@ -144,19 +147,14 @@ import { STORE_PROFILE_CONTENT } from '../shared/store-content';
     .button-black { min-width:178px; background:#000; color:#fff; } .button-pink { background:#ffd9e1; } .button-outline { background:#fff; } .button:disabled { opacity:.55; cursor:not-allowed; }
     .text-button { border:0; border-bottom:1px solid currentColor; background:none; padding:4px 0; color:#444748; font:600 10px 'Montserrat',sans-serif; letter-spacing:1px; cursor:pointer; }
     .form-error { margin:0 0 20px; padding:12px 14px; border-left:3px solid #de233f; background:#fff3f4; color:#9d2638; font-size:11px; line-height:1.5; }
-    .session-card { padding:28px 32px; } .session-card header { display:flex; align-items:center; justify-content:space-between; gap:20px; padding-bottom:20px; border-bottom:1px solid #e3e2e2; }
-    .session-card header span,.password-card header > span { color:#8f485d; font-size:9px; font-weight:600; letter-spacing:1.3px; } .session-card h2 { margin-top:5px; font:400 24px 'Playfair Display',serif; letter-spacing:0; }
-    .session-grid { padding-top:20px; display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px 24px; } .session-grid p { margin:0; padding:13px 14px; border:1px solid #e3e2e2; display:grid; gap:6px; min-width:0; }
-    .session-grid span { color:#777; font-size:9px; letter-spacing:.6px; text-transform:uppercase; } .session-grid strong,.session-grid code { overflow-wrap:anywhere; font-size:11px; }
     .password-layout { display:grid; grid-template-columns:minmax(0,1fr) 250px; gap:24px; align-items:start; scroll-margin-top:24px; } .password-card { padding:32px 40px 40px; }
     .password-card header { margin-bottom:26px; padding-bottom:20px; border-bottom:1px solid #e3e2e2; } .password-card header h2 { margin:6px 0 7px; font:400 30px 'Playfair Display',serif; letter-spacing:0; } .password-card header p { margin:0; color:#555; font:300 13px 'Outfit',sans-serif; }
     .password-strength { margin:-6px 0 22px; padding:16px; background:#f8f6f6; border:1px solid #e3e2e2; } .strength-label { display:flex; justify-content:space-between; font-size:9px; letter-spacing:.8px; } .strength-label strong { font-weight:600; }
     .strength-bars { display:grid; grid-template-columns:repeat(4,1fr); gap:6px; margin:10px 0 13px; } .strength-bars span { height:3px; background:#d9d5d5; } .strength-bars span.active { background:#000; }
     .password-strength ul { margin:0; padding:0; display:grid; grid-template-columns:repeat(2,1fr); gap:7px 18px; list-style:none; } .password-strength li { color:#777; font-size:10px; } .password-strength li::before { content:'○'; margin-right:7px; } .password-strength li.met { color:#266246; } .password-strength li.met::before { content:'✓'; }
     .security-note { margin-top:24px; padding:24px; border:1px solid #e3e2e2; background:#f5f3f3; } .security-note > span { font-size:10px; font-weight:600; letter-spacing:1.2px; } .security-note ul { margin:16px 0 0; padding-left:18px; color:#555; font:300 12px/1.7 'Outfit',sans-serif; } .security-note li + li { margin-top:8px; }
-    .logout-main { margin-top:24px; border:0; background:none; padding:10px 0; color:#de233f; font:600 10px 'Montserrat',sans-serif; letter-spacing:1px; text-decoration:underline; text-underline-offset:4px; cursor:pointer; }
     @media (max-width:980px) { .profile-shell { width:min(100% - 32px,760px); grid-template-columns:1fr; } .password-layout { grid-template-columns:1fr; } }
-    @media (max-width:640px) { .profile-shell { width:100%; padding:20px 16px 64px; } .page-header h1 { font-size:34px; } .avatar-section,.profile-form,.password-card { padding:24px 20px; } .divider { margin:0 20px; } .avatar-row { align-items:flex-start; flex-direction:column; } .large-avatar { width:88px; height:88px; } .form-actions { flex-direction:column; } .form-actions .button { width:100%; } .session-card { padding:24px 20px; } .session-card header { align-items:flex-start; flex-direction:column; } .session-grid { grid-template-columns:1fr; } .password-strength ul { grid-template-columns:1fr; } }
+    @media (max-width:640px) { .profile-shell { width:100%; padding:20px 16px 64px; } .page-header h1 { font-size:34px; } .avatar-section,.profile-form,.password-card { padding:24px 20px; } .divider { margin:0 20px; } .avatar-row { align-items:flex-start; flex-direction:column; } .large-avatar { width:88px; height:88px; } .form-actions { flex-direction:column; } .form-actions .button { width:100%; } .password-strength ul { grid-template-columns:1fr; } }
   `],
 })
 export class ProfilePage implements OnInit {
@@ -164,6 +162,8 @@ export class ProfilePage implements OnInit {
   private readonly api = inject(ApiService);
   private readonly toast = inject(ToastService);
   private readonly router = inject(Router);
+  private readonly route = inject(ActivatedRoute);
+  readonly isPasswordTab = toSignal(this.route.queryParamMap.pipe(map(p => p.get('tab') === 'password')), { initialValue: false });
 
   fullName = '';
   phone = '';
@@ -172,11 +172,8 @@ export class ProfilePage implements OnInit {
   readonly savingProfile = signal(false);
   readonly profileSaved = signal(false);
   readonly profileError = signal('');
-  readonly avatarNotice = signal('');
-
-  readonly authMe = signal<any>(null);
-  readonly loadingAuthMe = signal(false);
-  readonly authMeError = signal('');
+  readonly avatarBusy = signal(false);
+  readonly avatarError = signal('');
 
   oldPassword = '';
   newPassword = '';
@@ -196,14 +193,41 @@ export class ProfilePage implements OnInit {
   ngOnInit(): void {
     const user = this.auth.currentUser();
     if (user) { this.fullName = user.fullName; this.phone = user.phone || ''; this.loadedFullName = this.fullName; this.loadedPhone = this.phone; }
-    this.loadAuthMe();
   }
-  showAvatarNotice(): void { this.avatarNotice.set('Ảnh đại diện hiện chưa kết nối lưu trữ.'); }
+  onAvatarSelected(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    input.value = '';
+    if (!file || this.avatarBusy()) return;
+    this.avatarBusy.set(true); this.avatarError.set('');
+    this.api.uploadImage(file, 'avatar').pipe(switchMap(media => this.api.updateProfile({ avatarMediaId: media.id }))).subscribe({
+      next: updated => this.applyAvatar(updated, 'Đã cập nhật ảnh đại diện.'),
+      error: err => this.failAvatar(err, 'Không thể cập nhật ảnh đại diện.'),
+    });
+  }
+
+  removeAvatar(): void {
+    if (this.avatarBusy()) return;
+    this.avatarBusy.set(true); this.avatarError.set('');
+    this.api.updateProfile({ avatarMediaId: null }).subscribe({
+      next: updated => this.applyAvatar(updated, 'Đã xóa ảnh đại diện.'),
+      error: err => this.failAvatar(err, 'Không thể xóa ảnh đại diện.'),
+    });
+  }
+
+  private applyAvatar(updated: { avatarMediaId?: string | null; avatarUrl?: string | null }, message: string): void {
+    this.avatarBusy.set(false);
+    this.auth.setCurrentUser({ ...this.auth.currentUser()!, avatarMediaId: updated.avatarMediaId ?? null, avatarUrl: updated.avatarUrl ?? null });
+    this.toast.success(message);
+  }
+
+  private failAvatar(err: { error?: { message?: string }; message?: string }, fallback: string): void {
+    this.avatarBusy.set(false);
+    const message = err.error?.message || err.message || fallback;
+    this.avatarError.set(message);
+    this.toast.error(message);
+  }
   cancelProfileEdits(): void { this.fullName = this.loadedFullName; this.phone = this.loadedPhone; this.profileError.set(''); this.profileSaved.set(false); }
-  loadAuthMe(): void {
-    this.loadingAuthMe.set(true); this.authMeError.set('');
-    this.api.getMe().subscribe({ next: me => { this.authMe.set(me); this.loadingAuthMe.set(false); }, error: () => { this.loadingAuthMe.set(false); this.authMeError.set('Không thể kiểm tra phiên đăng nhập.'); } });
-  }
   saveProfile(): void {
     this.savingProfile.set(true); this.profileError.set(''); this.profileSaved.set(false);
     this.api.updateProfile({ fullName:this.fullName, phone:this.phone || undefined }).subscribe({
@@ -225,5 +249,4 @@ export class ProfilePage implements OnInit {
       error: err => { this.savingPassword.set(false); const message = err.error?.message || 'Không thể đổi mật khẩu.'; this.passwordError.set(message); this.toast.error(message); },
     });
   }
-  logout(): void { this.auth.logout(); }
 }

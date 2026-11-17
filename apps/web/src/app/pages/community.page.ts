@@ -1,5 +1,5 @@
 import { PaginationComponent, PaginationState } from '../components/pagination.component';
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import type { CommunityPost, CommunityComment } from '@fashion/contracts';
@@ -7,80 +7,97 @@ import { ApiService } from '../services/api.service';
 import { AuthService } from '../services/auth.service';
 import { ToastService } from '../services/toast.service';
 import { ModalComponent } from '../components/modal.component';
+import { PageStateComponent } from '../components/page-state.component';
 
 @Component({
   standalone: true,
-  imports: [PaginationComponent, DatePipe, FormsModule, ModalComponent],
+  imports: [PageStateComponent, PaginationComponent, DatePipe, FormsModule, ModalComponent],
   template: `
-    <main class="community-page-container">
-      <header class="page-header">
-        <div class="header-left">
-          <span class="eyebrow">FASHION COMMUNITY</span>
-          <h1 class="page-title">Cộng đồng phong cách</h1>
-          <p class="page-desc">Chia sẻ bản phối, gợi ý thời trang và kết nối cùng cộng đồng yêu cái đẹp.</p>
-        </div>
-
-        <div class="header-right">
+    <main class="blog">
+      <header class="banner">
+        <span class="eyebrow">MUSE JOURNAL</span>
+        <h1>JOURNAL &amp; EDITORIAL - CẢM HỨNG MẶC ĐẸP MỖI NGÀY</h1>
+        <p class="banner-desc">Chia sẻ bản phối, gợi ý thời trang và kết nối cùng cộng đồng yêu cái đẹp của MUSE.</p>
+        <div class="banner-action">
           @if (auth.isAuthenticated()) {
-            <button class="btn-primary" (click)="createModalOpen.set(true)">
-              ✍ Đăng bài viết mới
-            </button>
+            <button type="button" class="btn-dark" (click)="createModalOpen.set(true)">ĐĂNG BÀI VIẾT MỚI</button>
           } @else {
             <p class="login-prompt">Đăng nhập để chia sẻ phong cách của bạn.</p>
           }
         </div>
       </header>
 
-      @if (loading()) {
-        <p class="notice">Đang tải bảng tin cộng đồng...</p>
-      } @else if (error()) {
-        <p class="notice error">{{ error() }}</p>
-      } @else {
-        <div class="posts-feed">
-          @for (post of posts(); track post.id) {
-            <article class="post-card">
-              <div class="post-header">
-                <div class="author-circle">
-                  {{ post.authorName?.[0] || 'U' }}
-                </div>
-                <div class="header-meta">
-                  <strong class="author-name">{{ post.authorName || 'Thành viên' }}</strong>
-                  <span class="post-time">{{ post.createdAt | date:'dd/MM/yyyy HH:mm' }}</span>
-                </div>
+      <section class="filter-bar">
+        <form class="search" (ngSubmit)="submitSearch()">
+          <input type="search" name="q" [(ngModel)]="searchTerm" placeholder="Tìm kiếm bài viết..." aria-label="Tìm kiếm bài viết" />
+          <button type="submit" aria-label="Tìm kiếm">
+            <svg viewBox="0 0 15 15" width="15" height="15" aria-hidden="true"><circle cx="6.2" cy="6.2" r="4.7" fill="none" stroke="#171717" stroke-width="1.3"/><path d="m10 10 3.8 3.8" stroke="#171717" stroke-width="1.3" stroke-linecap="round"/></svg>
+          </button>
+        </form>
+      </section>
 
-                @if (isAuthor(post)) {
-                  <div class="post-actions-menu">
-                    <button type="button" class="btn-ghost-sm" (click)="openEditPost(post)" title="Chỉnh sửa bài viết">✏ Sửa</button>
-                    <button type="button" class="btn-ghost-sm text-danger" (click)="deletePost(post)" title="Xóa bài viết">🗑 Xóa</button>
-                  </div>
+      @if (loading()) {
+        <fc-page-state kind="loading" title="Đang tải bảng tin cộng đồng" />
+      } @else if (error()) {
+        <fc-page-state kind="error" title="Không thể tải bảng tin" [message]="error()" actionLabel="THỬ LẠI" (action)="loadPosts()" />
+      } @else {
+        @if (featuredPost(); as fp) {
+          <article class="cover">
+            <div class="cover-img" (click)="viewPostDetail(fp.id)">
+              @if (fp.mediaUrls && fp.mediaUrls.length > 0) { <img [src]="fp.mediaUrls[0]" [alt]="titleOf(fp)" /> }
+              <span class="cover-badge">COVER STORY</span>
+            </div>
+            <div class="cover-text">
+              <div class="meta">
+                <strong>{{ fp.authorName || 'Thành viên' }}</strong>
+                @if (fp.createdAt) { <span>{{ fp.createdAt | date:'dd/MM/yyyy' }}</span> }
+              </div>
+              <h2>{{ titleOf(fp) }}</h2>
+              <p class="cover-excerpt">{{ excerptOf(fp) }}</p>
+              <div class="cover-actions">
+                <button type="button" class="btn-pink" (click)="viewPostDetail(fp.id)">ĐỌC BÀI VIẾT →</button>
+                <button type="button" class="link-btn" (click)="openComments(fp)">BÌNH LUẬN</button>
+                @if (isAuthor(fp)) {
+                  <button type="button" class="link-btn" (click)="openEditPost(fp)" title="Chỉnh sửa bài viết">SỬA</button>
+                  <button type="button" class="link-btn danger" (click)="deletePost(fp)" title="Xóa bài viết">XÓA</button>
                 }
               </div>
-
-              @if (post.mediaUrls && post.mediaUrls.length > 0) {
-                <div class="post-image-wrap" (click)="viewPostDetail(post.id)">
-                  <img [src]="post.mediaUrls[0]" alt="Ảnh bài viết" loading="lazy" />
-                </div>
-              }
-
-              <div class="post-body">
-                <p class="post-caption">{{ post.caption }}</p>
-              </div>
-
-              <div class="post-footer">
-                <button class="comment-trigger-btn" (click)="openComments(post)">
-                  💬 Bình luận
-                </button>
-                <button class="detail-link-btn" (click)="viewPostDetail(post.id)">
-                  🔍 Xem chi tiết
-                </button>
-              </div>
-            </article>
-          } @empty {
-            <div class="empty-state">
-              <p>Chưa có bài viết nào trên bảng tin cộng đồng. Hãy là người đầu tiên chia sẻ!</p>
             </div>
-          }
-        </div>
+          </article>
+        }
+
+        @if (posts().length > 0) {
+          <section class="latest">
+            <div class="latest-head">
+              <h3>CÁC BÀI VIẾT MỚI NHẤT</h3>
+              <span class="page-of">TRANG {{ pagination.page() }} / {{ totalPages() }}</span>
+            </div>
+            <div class="grid">
+              @for (post of gridPosts(); track post.id) {
+                <article class="card">
+                  <div class="card-img" (click)="viewPostDetail(post.id)">
+                    @if (post.mediaUrls && post.mediaUrls.length > 0) { <img [src]="post.mediaUrls[0]" [alt]="titleOf(post)" loading="lazy" /> }
+                  </div>
+                  <div class="card-body">
+                    <span class="card-meta">{{ post.authorName || 'Thành viên' }}@if (post.createdAt) { • {{ post.createdAt | date:'dd/MM/yyyy' }} }</span>
+                    <h4>{{ titleOf(post) }}</h4>
+                    <p class="excerpt">{{ excerptOf(post) }}</p>
+                    <div class="card-actions">
+                      <button type="button" class="read-link" (click)="viewPostDetail(post.id)">ĐỌC BÀI VIẾT →</button>
+                      <button type="button" class="link-btn" (click)="openComments(post)">BÌNH LUẬN</button>
+                      @if (isAuthor(post)) {
+                        <button type="button" class="link-btn" (click)="openEditPost(post)" title="Chỉnh sửa bài viết">SỬA</button>
+                        <button type="button" class="link-btn danger" (click)="deletePost(post)" title="Xóa bài viết">XÓA</button>
+                      }
+                    </div>
+                  </div>
+                </article>
+              }
+            </div>
+          </section>
+        } @else {
+          <fc-page-state kind="empty" title="Chưa có bài viết nào" message="Hãy là người đầu tiên chia sẻ trên bảng tin cộng đồng." />
+        }
       }
     </main>
 
@@ -256,50 +273,60 @@ import { ModalComponent } from '../components/modal.component';
     <fc-pagination label="Phân trang" [page]="pagination.page()" [total]="pagination.total()" [limit]="pagination.limit" [loading]="loading()" (pageChange)="paginationChanged($event)" />
 `,
   styles: [`
-    .community-page-container {
-      max-width: 900px;
-      margin: 0 auto;
-      padding: 50px 5vw 100px;
+    :host { display: block; font-family: 'Montserrat', sans-serif; color: #000; }
+    .blog { background: #fff; }
+    .banner { padding: 32px 48px; border-bottom: 1px solid #c4c7c7; max-width: 1280px; margin: 0 auto; box-sizing: border-box; }
+    .eyebrow { font-size: 13px; font-weight: 600; letter-spacing: .1em; color: #8f485d; }
+    .banner h1 { font-family: 'Playfair Display', serif; font-weight: 400; font-size: 40px; line-height: 48px; letter-spacing: -.025em; margin: 12px 0 16px; max-width: 900px; }
+    .banner-desc { margin: 0; max-width: 672px; font-weight: 300; font-size: 16px; line-height: 26px; color: #444748; }
+    .banner-action { margin-top: 20px; }
+    .btn-dark { height: 40px; padding: 0 24px; background: #171717; color: #fff; border: 1px solid #000; border-radius: 15px; font: inherit; font-size: 12px; font-weight: 700; letter-spacing: .1em; cursor: pointer; }
+    .btn-dark:hover { background: #000; }
+    .filter-bar { max-width: 1280px; margin: 0 auto; padding: 32px 48px; border-bottom: 1px solid #c4c7c7; display: flex; justify-content: flex-end; align-items: center; gap: 24px; flex-wrap: wrap; box-sizing: border-box; }
+    .search { display: flex; width: 420px; max-width: 100%; height: 44px; border: 1px solid #c4c7c7; background: #fff; box-sizing: border-box; }
+    .search input { flex: 1; min-width: 0; border: 0; outline: 0; padding: 0 16px; font: inherit; font-size: 14px; background: transparent; border-radius: 0; }
+    .search button { width: 44px; border: 0; background: transparent; cursor: pointer; display: grid; place-items: center; padding: 0; }
+
+    .cover { max-width: 1184px; margin: 64px auto 0; display: grid; grid-template-columns: 7fr 5fr; border: 1px solid #000; background: #fff; }
+    .cover-img { position: relative; min-height: 475px; background: #efeded; border-right: 1px solid #000; overflow: hidden; cursor: pointer; }
+    .cover-img img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+    .cover-badge { position: absolute; left: 16px; top: 16px; padding: 4px 12px; background: #fff; border: 1px solid #000; font-size: 11px; font-weight: 600; letter-spacing: .05em; }
+    .cover-text { padding: 56px; display: flex; flex-direction: column; gap: 16px; justify-content: center; }
+    .meta { display: flex; gap: 12px; font-size: 11px; font-weight: 600; letter-spacing: .16em; color: #444748; text-transform: uppercase; }
+    .cover-text h2 { margin: 0; font-family: 'Playfair Display', serif; font-weight: 400; font-size: 28px; line-height: 34px; letter-spacing: -.04em; }
+    .cover-excerpt { margin: 0; font-weight: 300; font-size: 16px; line-height: 26px; color: #444748; display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; white-space: pre-line; }
+    .cover-actions { display: flex; align-items: center; gap: 20px; flex-wrap: wrap; margin-top: 8px; }
+    .btn-pink { height: 48px; padding: 0 24px; background: #ffd9e1; border: 2px solid #000; font: inherit; font-size: 13px; font-weight: 600; letter-spacing: .1em; cursor: pointer; }
+    .btn-pink:hover { background: #f4b8c1; }
+    .link-btn { padding: 0; background: none; border: 0; font: inherit; font-size: 11px; font-weight: 600; letter-spacing: .1em; color: #444748; cursor: pointer; }
+    .link-btn:hover { color: #8f485d; }
+    .link-btn.danger { color: #c62828; }
+
+    .latest { max-width: 1280px; margin: 64px auto 0; padding: 32px 48px 0; border-top: 1px solid #c4c7c7; box-sizing: border-box; }
+    .latest-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 40px; }
+    .latest-head h3 { margin: 0; font-family: 'Playfair Display', serif; font-weight: 500; font-size: 22px; letter-spacing: .05em; }
+    .page-of { font-size: 11px; font-weight: 600; letter-spacing: .1em; color: #444748; }
+    .grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 48px 32px; }
+    .card { border: 1px solid #c4c7c7; display: flex; flex-direction: column; background: #fff; }
+    .card-img { aspect-ratio: 371 / 494; background: #efeded; border-bottom: 1px solid #c4c7c7; overflow: hidden; cursor: pointer; }
+    .card-img img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .card-body { padding: 24px; display: flex; flex-direction: column; gap: 8px; flex: 1; }
+    .card-meta { font-size: 11px; font-weight: 600; letter-spacing: .16em; color: #444748; text-transform: uppercase; }
+    .card h4 { margin: 0; font-family: 'Playfair Display', serif; font-weight: 500; font-size: 22px; line-height: 30px; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+    .excerpt { margin: 0; font-size: 14px; line-height: 22px; color: #444748; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; white-space: pre-line; }
+    .card-actions { margin-top: auto; padding-top: 12px; display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+    .read-link { padding: 0 0 4px; background: none; border: 0; border-bottom: 1px solid #000; font: inherit; font-size: 11px; font-weight: 600; letter-spacing: .1em; cursor: pointer; }
+    .read-link:hover { color: #8f485d; border-color: #8f485d; }
+    @media (max-width: 900px) {
+      .banner, .filter-bar { padding: 24px 20px; }
+      .banner h1 { font-size: 28px; line-height: 36px; }
+      .cover { grid-template-columns: 1fr; margin: 32px 20px 0; }
+      .cover-img { min-height: 320px; border-right: 0; border-bottom: 1px solid #000; }
+      .cover-text { padding: 24px; }
+      .latest { padding: 24px 20px 0; }
+      .grid { grid-template-columns: 1fr; }
     }
-    .page-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: flex-end;
-      gap: 20px;
-      margin-bottom: 50px;
-      border-bottom: 1px solid var(--color-divider);
-      padding-bottom: 30px;
-      flex-wrap: wrap;
-    }
-    .eyebrow {
-      font-size: 0.74rem;
-      letter-spacing: 0.25em;
-      color: var(--color-accent);
-      font-weight: 700;
-    }
-    .page-title {
-      font-family: Georgia, serif;
-      font-size: 2.5rem;
-      margin: 8px 0 10px;
-      font-weight: 500;
-    }
-    .page-desc {
-      color: var(--color-muted);
-      margin: 0;
-      line-height: 1.6;
-    }
-    .posts-feed {
-      display: flex;
-      flex-direction: column;
-      gap: 36px;
-    }
-    .post-card {
-      background: var(--color-surface);
-      border: 1px solid var(--color-divider);
-      border-radius: var(--radius-card);
-      overflow: hidden;
-      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04);
-    }
+
     .post-header {
       display: flex;
       align-items: center;
@@ -330,71 +357,12 @@ import { ModalComponent } from '../components/modal.component';
       font-size: 0.78rem;
       color: var(--color-muted);
     }
-    .post-actions-menu {
-      display: flex;
-      gap: 8px;
-    }
-    .btn-ghost-sm {
-      background: none;
-      border: 1px solid var(--color-divider);
-      border-radius: var(--radius-control);
-      padding: 4px 8px;
-      font-size: 0.75rem;
-      color: #555;
-      cursor: pointer;
-      transition: background 0.15s;
-    }
-    .btn-ghost-sm:hover {
-      background: var(--color-canvas);
-      color: var(--color-text);
-    }
     .text-danger {
       color: #c62828 !important;
     }
     .text-danger:hover {
       border-color: #ef9a9a;
       background: #ffebee !important;
-    }
-    .post-image-wrap {
-      max-height: 520px;
-      background: #eae5de;
-      overflow: hidden;
-      cursor: pointer;
-    }
-    .post-image-wrap img {
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-      display: block;
-    }
-    .post-body {
-      padding: 20px;
-    }
-    .post-caption {
-      margin: 0;
-      line-height: 1.7;
-      color: #2b2824;
-      font-size: 0.98rem;
-      white-space: pre-line;
-    }
-    .post-footer {
-      padding: 12px 20px;
-      border-top: 1px solid var(--color-divider);
-      background: var(--color-canvas);
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-    .comment-trigger-btn, .detail-link-btn {
-      background: none;
-      border: 0;
-      color: #555;
-      font-size: 0.88rem;
-      cursor: pointer;
-      font-weight: 500;
-    }
-    .comment-trigger-btn:hover, .detail-link-btn:hover {
-      color: var(--color-text);
     }
     .create-post-form {
       display: flex;
@@ -561,21 +529,14 @@ import { ModalComponent } from '../components/modal.component';
       text-align: center;
       padding: 40px 0;
     }
-    .empty-state {
-      text-align: center;
-      padding: 60px 0;
-      color: var(--color-muted);
-    }
 
-    .header-left { min-width:0; } .header-right { display:flex; flex-wrap:wrap; gap:12px; }
     .field-label { display:block; font-weight:500; font-size:.875rem; margin-bottom:8px; }
     .no-comments { padding:28px 16px; color:var(--color-muted); background:var(--color-canvas); text-align:center; border-radius:var(--radius-control); }
-
 
   `],
 })
 export class CommunityPage implements OnInit {
-  readonly pagination = new PaginationState(20);
+  readonly pagination = new PaginationState(10);
   paginationChanged(page: number): void { this.pagination.page.set(page); this.loadPosts(); }
 
   private readonly api = inject(ApiService);
@@ -583,6 +544,11 @@ export class CommunityPage implements OnInit {
   private readonly toast = inject(ToastService);
 
   readonly posts = signal<CommunityPost[]>([]);
+  searchTerm = '';
+  private query = '';
+  readonly featuredPost = computed(() => (this.pagination.page() === 1 ? this.posts()[0] ?? null : null));
+  readonly gridPosts = computed(() => (this.pagination.page() === 1 ? this.posts().slice(1) : this.posts()));
+  readonly totalPages = computed(() => Math.max(1, Math.ceil(this.pagination.total() / this.pagination.limit)));
   readonly loading = signal<boolean>(true);
   readonly error = signal<string>('');
 
@@ -621,7 +587,7 @@ export class CommunityPage implements OnInit {
   loadPosts(): void {
     this.loading.set(true);
     this.error.set('');
-    this.pagination.load(() => this.api.listPosts(undefined, this.pagination.page(), this.pagination.limit), {
+    this.pagination.load(() => this.api.listPosts(this.query || undefined, this.pagination.page(), this.pagination.limit), {
       next: (res) => {
         this.posts.set(res.items);
         this.loading.set(false);
@@ -632,6 +598,23 @@ export class CommunityPage implements OnInit {
         this.loading.set(false);
       },
     });
+  }
+
+  submitSearch(): void {
+    this.query = this.searchTerm.trim();
+    this.pagination.page.set(1);
+    this.loadPosts();
+  }
+
+  titleOf(post: CommunityPost): string {
+    const first = (post.caption || '').split(/\r?\n/)[0].trim();
+    return first.length > 80 ? first.slice(0, 77).trimEnd() + '…' : first;
+  }
+
+  excerptOf(post: CommunityPost): string {
+    const lines = (post.caption || '').split(/\r?\n/);
+    const rest = lines.slice(1).join('\n').trim();
+    return rest || (lines[0] || '').trim();
   }
 
   isAuthor(post: CommunityPost): boolean {

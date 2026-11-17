@@ -1,4 +1,4 @@
-import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { Component, OnInit, computed, effect, inject, signal, untracked } from '@angular/core';
 import { RouterLink, Router } from '@angular/router';
 import { CurrencyPipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
@@ -7,6 +7,7 @@ import { CartService } from '../services/cart.service';
 import { AuthService } from '../services/auth.service';
 import { ApiService } from '../services/api.service';
 import { STORE_CART_CONTENT } from '../shared/store-content';
+import { PageStateComponent } from '../components/page-state.component';
 
 type CartRecommendation = ProductSummary & {
   createdAt?: string;
@@ -16,7 +17,7 @@ type CartRecommendation = ProductSummary & {
 
 @Component({
   standalone: true,
-  imports: [RouterLink, CurrencyPipe, FormsModule],
+  imports: [PageStateComponent, RouterLink, CurrencyPipe, FormsModule],
   template: `
     <main class="cart-container">
       <header class="page-header">
@@ -24,45 +25,31 @@ type CartRecommendation = ProductSummary & {
       </header>
 
       @if (cart.loading() && !cart.cart()) {
-        <section class="state-card" aria-live="polite">
-          <span class="state-mark" aria-hidden="true">MUSE</span>
-          <h2>Đang tải giỏ hàng</h2>
-          <p>Vui lòng chờ trong giây lát.</p>
-        </section>
+        <fc-page-state kind="loading" title="Đang tải giỏ hàng" message="Vui lòng chờ trong giây lát." />
       } @else if (!cart.cart()) {
-        <section class="state-card state-card--error" role="alert">
-          <span class="state-mark" aria-hidden="true">!</span>
-          <h2>Không thể tải giỏ hàng</h2>
-          <p>Đã có lỗi xảy ra khi tải dữ liệu giỏ hàng.</p>
-          <button type="button" class="state-action" (click)="reloadCart()">THỬ LẠI</button>
-        </section>
+        <fc-page-state kind="error" title="Không thể tải giỏ hàng" message="Đã có lỗi xảy ra khi tải dữ liệu giỏ hàng." actionLabel="THỬ LẠI" (action)="reloadCart()" />
       } @else {
         <div class="cart-layout">
           <section class="cart-items-col" aria-label="Sản phẩm trong giỏ hàng">
             <div class="batch-controls">
               <label class="select-all-control">
-                <input type="checkbox" [checked]="allSelected()" [disabled]="cart.cart()!.items.length === 0" (change)="toggleAll($any($event.target).checked)" aria-label="Chọn tất cả sản phẩm để xóa" />
+                <input type="checkbox" [checked]="allSelected()" [disabled]="cart.cart()!.items.length === 0 || removing()" (change)="toggleAll($any($event.target).checked)" aria-label="Chọn tất cả sản phẩm để xóa" />
                 <span>CHỌN TẤT CẢ</span>
               </label>
               <div class="batch-actions">
-                <button type="button" class="batch-remove" [disabled]="cart.loading() || selectedVariantIds().size === 0" (click)="removeSelected()">Xóa đã chọn</button>
-                <button type="button" class="clear-cart" [disabled]="cart.loading()" (click)="cart.clearCart()">Xóa toàn bộ</button>
+                <button type="button" class="batch-remove" [disabled]="cart.loading() || removing() || selectedVariantIds().size === 0" (click)="removeSelected()">Xóa đã chọn</button>
+                <button type="button" class="clear-cart" [disabled]="cart.loading() || removing()" (click)="cart.clearCart()">Xóa toàn bộ</button>
               </div>
             </div>
 
             <div class="cart-items-list">
               @if (cart.cart()!.items.length === 0) {
-                <section class="empty-cart-panel">
-                  <span class="empty-cart-symbol" aria-hidden="true">MUSE</span>
-                  <h2>Giỏ hàng của bạn đang trống</h2>
-                  <p>Khám phá các sản phẩm của MUSE và chọn thiết kế phù hợp với bạn.</p>
-                  <a routerLink="/" class="state-action">KHÁM PHÁ SẢN PHẨM</a>
-                </section>
+                <fc-page-state kind="empty" title="Giỏ hàng của bạn đang trống" message="Khám phá các sản phẩm của MUSE và chọn thiết kế phù hợp với bạn." actionLabel="KHÁM PHÁ SẢN PHẨM" actionLink="/products" />
               } @else {
                 @for (item of cart.cart()!.items; track item.variantId) {
                   <article class="cart-item">
                   <label class="item-select">
-                    <input type="checkbox" [checked]="selectedVariantIds().has(item.variantId)" (change)="toggleItem(item.variantId, $any($event.target).checked)" [attr.aria-label]="'Chọn ' + item.productName + ' để xóa'" />
+                    <input type="checkbox" [checked]="selectedVariantIds().has(item.variantId)" [disabled]="removing()" (change)="toggleItem(item.variantId, $any($event.target).checked)" [attr.aria-label]="'Chọn ' + item.productName + ' để xóa'" />
                   </label>
 
                   <div class="item-image">
@@ -96,11 +83,11 @@ type CartRecommendation = ProductSummary & {
                     <strong>{{ (item.unitPrice * item.quantity) | currency:'VND':'symbol':'1.0-0' }}</strong>
                     <div class="qty-and-remove">
                       <div class="qty-stepper" aria-label="Số lượng sản phẩm">
-                        <button type="button" (click)="cart.updateQuantity(item.variantId, item.quantity - 1)" [disabled]="cart.loading() || item.quantity <= 1" aria-label="Giảm số lượng">−</button>
+                        <button type="button" (click)="cart.updateQuantity(item.variantId, item.quantity - 1)" [disabled]="cart.loading() || removing() || item.quantity <= 1" aria-label="Giảm số lượng">−</button>
                         <span>{{ item.quantity }}</span>
-                        <button type="button" (click)="cart.updateQuantity(item.variantId, item.quantity + 1)" [disabled]="cart.loading() || item.quantity >= item.available" aria-label="Tăng số lượng">+</button>
+                        <button type="button" (click)="cart.updateQuantity(item.variantId, item.quantity + 1)" [disabled]="cart.loading() || removing() || item.quantity >= item.available" aria-label="Tăng số lượng">+</button>
                       </div>
-                      <button type="button" class="item-remove" (click)="cart.removeItem(item.variantId)" [disabled]="cart.loading()" [attr.aria-label]="'Xóa ' + item.productName">Xóa</button>
+                      <button type="button" class="item-remove" (click)="cart.removeItem(item.variantId)" [disabled]="cart.loading() || removing()" [attr.aria-label]="'Xóa ' + item.productName">Xóa</button>
                     </div>
                   </div>
                   </article>
@@ -212,10 +199,6 @@ type CartRecommendation = ProductSummary & {
     .clear-cart { color: #9b2c2c; }
     .batch-remove:disabled, .clear-cart:disabled { opacity: .4; cursor: not-allowed; }
     .cart-items-list { border-bottom: 1px solid #c4c7c7; }
-    .empty-cart-panel { display: flex; min-height: 450px; align-items: center; justify-content: center; flex-direction: column; padding: 56px 24px; background: #fff; text-align: center; }
-    .empty-cart-symbol { display: inline-flex; width: 72px; height: 72px; align-items: center; justify-content: center; margin-bottom: 24px; border: 1px solid #171717; color: #8f485d; font-family: "Playfair Display", Georgia, serif; font-size: 13px; letter-spacing: .16em; }
-    .empty-cart-panel h2 { margin: 0 0 12px; font-family: "Playfair Display", Georgia, serif; font-size: 28px; font-weight: 400; line-height: 36px; }
-    .empty-cart-panel p { max-width: 430px; margin: 0 0 26px; color: #444748; font-size: 13px; line-height: 1.65; }
     .cart-item { display: grid; grid-template-columns: 18px 112px minmax(0, 1fr) 148px; gap: 20px; align-items: center; min-height: 208px; padding: 32px 0; border-bottom: 1px solid #e3e2e2; }
     .cart-item:last-child { border-bottom: 0; }
     .item-select { align-self: center; }
@@ -281,12 +264,6 @@ type CartRecommendation = ProductSummary & {
     .buy-link:hover { background: #f4b8c1; color: #171717; }
     .recommendations-state { padding: 36px; border: 1px solid #e3e2e2; color: #444748; text-align: center; }
     .recommendations-state--error { color: #9b2c2c; }
-    .state-card { max-width: 620px; margin: 64px auto; padding: 64px 28px; border: 1px solid #c4c7c7; text-align: center; }
-    .state-mark { display: inline-flex; min-width: 60px; min-height: 60px; align-items: center; justify-content: center; margin-bottom: 20px; border: 1px solid #171717; font-family: "Playfair Display", Georgia, serif; font-size: 13px; letter-spacing: .15em; }
-    .state-card h2 { margin: 0 0 10px; font-family: "Playfair Display", Georgia, serif; font-size: 28px; font-weight: 400; line-height: 36px; }
-    .state-card p { margin: 0 0 24px; color: #444748; }
-    .state-action { display: inline-flex; min-height: 44px; align-items: center; justify-content: center; padding: 0 22px; border: 1px solid #171717; background: #f4b8c1; color: #171717; font-size: 12px; font-weight: 700; letter-spacing: .8px; cursor: pointer; }
-    .state-card--error .state-mark { color: #9b2c2c; }
     :is(button, a, input):focus-visible { outline: 2px solid #8f485d; outline-offset: 3px; }
     @media (max-width: 1000px) {
       .cart-container { padding-inline: 28px; }
@@ -321,6 +298,18 @@ export class CartPage implements OnInit {
   readonly recommendations = signal<CartRecommendation[]>([]);
   readonly recommendationsLoading = signal(true);
   readonly recommendationsError = signal('');
+  /** Hàng đợi xóa lần lượt: món tiếp theo chỉ được xóa khi lần xóa trước đã xong. */
+  private readonly removeQueue = signal<string[]>([]);
+  readonly removing = computed(() => this.removeQueue().length > 0);
+  private readonly removeQueueRunner = effect(() => {
+    const queue = this.removeQueue();
+    if (queue.length === 0 || this.cart.loading()) return;
+    const [next, ...rest] = queue;
+    untracked(() => {
+      this.removeQueue.set(rest);
+      this.cart.removeItem(next);
+    });
+  });
   readonly allSelected = computed(() => {
     const items = this.cart.cart()?.items ?? [];
     const selected = this.selectedVariantIds();
@@ -352,10 +341,11 @@ export class CartPage implements OnInit {
   }
 
   removeSelected(): void {
-    for (const variantId of this.selectedVariantIds()) {
-      this.cart.removeItem(variantId);
-    }
+    if (this.removing() || this.cart.loading()) return;
+    const inCart = new Set((this.cart.cart()?.items ?? []).map((item) => item.variantId));
+    const queue = [...this.selectedVariantIds()].filter((variantId) => inCart.has(variantId));
     this.selectedVariantIds.set(new Set());
+    this.removeQueue.set(queue);
   }
 
   isNewProduct(product: CartRecommendation): boolean {

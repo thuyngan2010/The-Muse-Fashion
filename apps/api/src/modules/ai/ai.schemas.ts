@@ -17,6 +17,8 @@ export class AiJob {
   @Prop({ type: String, sparse: true, unique: true }) idempotencyKey?: string;
   @Prop({ type: String, required: true }) consentPolicyVersion!: string;
   @Prop({ type: String, enum: ['office', 'streetwear', 'evening', 'minimalist'] }) style?: 'office' | 'streetwear' | 'evening' | 'minimalist';
+  @Prop({ type: Number, min: 120, max: 220 }) heightCm?: number;
+  @Prop({ type: Number, min: 30, max: 200 }) weightKg?: number;
   @Prop({ type: Date, required: true }) quotaWindowStart!: Date;
   @Prop({ type: String }) providerJobId?: string;
   @Prop({ type: Date }) providerSubmitStartedAt?: Date;

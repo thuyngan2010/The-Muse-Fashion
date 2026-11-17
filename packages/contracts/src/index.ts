@@ -17,6 +17,7 @@ export type UserSummary = {
   status: 'ACTIVE' | 'PENDING_VERIFICATION' | 'SUSPENDED';
   phone?: string | null;
   avatarMediaId?: string | null;
+  avatarUrl?: string | null;
   createdAt?: string;
 };
 

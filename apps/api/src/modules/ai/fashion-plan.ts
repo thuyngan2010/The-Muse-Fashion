@@ -30,7 +30,7 @@ export type FashionStyling = { compatible: boolean; explanation: string; summary
 export type FashionRenderPlan = { version: 'fashion-plan-v1'; prompt: string; summary: string;
   detectedItems: Array<{ productId: string; category: FashionCategory; targetRegion: BodyRegion }> };
 export type FashionProduct = { id: string; name: string; description: string; material: string; imageUrl: string };
-export type FashionPipelineInput = { type: 'TRY_ON' | 'MIX_MATCH'; inputUrl: string; products: FashionProduct[]; style?: 'office' | 'streetwear' | 'evening' | 'minimalist' };
+export type FashionPipelineInput = { type: 'TRY_ON' | 'MIX_MATCH'; inputUrl: string; products: FashionProduct[]; style?: 'office' | 'streetwear' | 'evening' | 'minimalist'; body?: BodyMeasurements };
 
 export class FashionInputError extends Error {}
 function obj(value: unknown): Record<string, unknown> {
@@ -86,10 +86,24 @@ export function validateStyling(value: unknown, analysis: FashionAnalysis): Fash
   if (new Set(items.map(p => p.productId)).size !== items.length) throw new Error('Duplicate styling items');
   return { compatible: true, explanation, summary: text(body.summary, 500), items };
 }
-export function buildFashionPrompt(type: FashionPipelineInput['type'], analysis: FashionAnalysis, styling: FashionStyling): FashionRenderPlan {
+export type BodyMeasurements = { heightCm?: number; weightKg?: number };
+
+// CHỖ CHỈNH PROMPT SỐ ĐO: câu mô tả số đo người dùng nhập, chèn vào prompt khi có số đo.
+export function describeBody(body?: BodyMeasurements | null): string | null {
+  const height = Number.isFinite(body?.heightCm) ? body!.heightCm : undefined;
+  const weight = Number.isFinite(body?.weightKg) ? body!.weightKg : undefined;
+  if (height === undefined && weight === undefined) return null;
+  const stated = height !== undefined && weight !== undefined ? `height is ${height} cm and weight is ${weight} kg`
+    : height !== undefined ? `height is ${height} cm` : `weight is ${weight} kg`;
+  return `The person's stated ${stated}. Use these only to fit garment length and proportions realistically; do not change the person's body shape.`;
+}
+
+export function buildFashionPrompt(type: FashionPipelineInput['type'], analysis: FashionAnalysis, styling: FashionStyling, body?: BodyMeasurements): FashionRenderPlan {
+  const bodyLine = describeBody(body);
   const lines = [
     'Create one photorealistic fashion try-on image. Image 1 is the person. Each subsequent image is a product reference in the exact order below.',
     'Preserve the person\'s identity, face, body proportions, skin tone, pose, camera, background and lighting. Do not identify the person or infer sensitive traits.',
+    ...(bodyLine ? [bodyLine] : []),
     'Edit only the requested clothing/accessory regions. Do not invent products, logos, text, limbs or body parts. Preserve every selected product\'s shape, material, colors, pattern and branding from its reference.',
     type === 'MIX_MATCH' ? 'Compose all selected products into one coordinated outfit, with physically plausible layering and occlusion.' : 'Apply only the selected product; keep all other clothing unchanged.',
     'For each product follow these mandatory placement rules:',

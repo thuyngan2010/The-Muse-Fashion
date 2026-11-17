@@ -5,6 +5,8 @@ import { CurrencyPipe } from '@angular/common';
 import type { PaymentAttempt } from '@fashion/contracts';
 import { ApiService } from '../services/api.service';
 import { ToastService } from '../services/toast.service';
+import { STORE_CHECKOUT_CONTENT, STORE_PAYMENT_CONTENT } from '../shared/store-content';
+import { ORDER_STATUS_LABELS } from '../shared/labels';
 
 function generateUUID(): string {
   if (typeof crypto !== 'undefined' && crypto.randomUUID) {
@@ -23,65 +25,72 @@ function generateUUID(): string {
   template: `
     <main class="payment-page-container">
       <header class="page-header">
-        <span class="eyebrow">VIETQR INSTANT PAYMENT</span>
-        <h1 class="page-title">Thanh toán chuyển khoản VietQR</h1>
-        <p class="page-desc">Quét mã QR bằng ứng dụng ngân hàng bất kỳ để hoàn tất thanh toán tự động trong giây lát.</p>
+        <div>
+          <h1 class="page-title">{{ content.title }}</h1>
+          <p class="page-desc">Đơn hàng <strong>#{{ orderCode() }}</strong></p>
+        </div>
+        <ol class="steps" aria-label="Các bước thanh toán">
+          <li><a routerLink="/cart">{{ checkout.steps[0] }}</a></li>
+          <li>{{ checkout.steps[1] }}</li>
+          <li class="current" aria-current="step">{{ checkout.steps[2] }}</li>
+        </ol>
       </header>
 
       @if (loading()) {
-        <div class="state-card loading-card">
-          <div class="spinner"></div>
+        <div class="state-card" role="status">
+          <div class="spinner" aria-hidden="true"></div>
           <p>Đang chuẩn bị mã thanh toán VietQR...</p>
         </div>
       } @else if (error()) {
-        <div class="state-card error-card">
-          <h3>Có lỗi xảy ra</h3>
+        <div class="state-card error-card" role="alert">
+          <h2>Có lỗi xảy ra</h2>
           <p>{{ error() }}</p>
-          <a routerLink="/orders" class="btn-primary">Quản lý đơn hàng</a>
+          <div class="actions">
+            <button type="button" class="btn-primary" (click)="createOrFetchAttempt()">THỬ LẠI</button>
+            <a routerLink="/orders" class="btn-outline">{{ content.viewOrder }}</a>
+          </div>
         </div>
       } @else if (attempt(); as p) {
-        @if (p.reviewOutcome === 'REFUNDED_EXTERNALLY') { <p role="status">Khoản chuyển cần đối soát đã được ghi nhận hoàn thủ công sau kiểm tra chứng từ.</p> }
-        @if (p.state === 'SUCCEEDED' && p.hasOpenReview) { <p role="status">Đơn hàng đã thanh toán; một khoản chuyển khác đang cần đối soát. Vui lòng không chuyển thêm tiền.</p> }
+        @if (p.reviewOutcome === 'REFUNDED_EXTERNALLY') { <p class="inline-note" role="status">Khoản chuyển cần đối soát đã được ghi nhận hoàn thủ công sau kiểm tra chứng từ.</p> }
+        @if (p.state === 'SUCCEEDED' && p.hasOpenReview) { <p class="inline-note" role="status">Đơn hàng đã thanh toán; một khoản chuyển khác đang cần đối soát. Vui lòng không chuyển thêm tiền.</p> }
         @if (p.state === 'SUCCEEDED') {
           <div class="state-card success-card">
-            <div class="icon-circle">✓</div>
+            <div class="icon-circle" aria-hidden="true">✓</div>
             <h2>Thanh toán thành công!</h2>
             <p>Hệ thống đã nhận được số tiền thanh toán <strong>{{ p.amount | currency:'VND':'symbol':'1.0-0' }}</strong> cho đơn hàng.</p>
-            <p class="sub">Đơn hàng của bạn đã chuyển sang trạng thái CONFIRMED và đang được chuẩn bị đóng gói.</p>
+            <p class="sub">Đơn hàng của bạn đã chuyển sang trạng thái {{ confirmedLabel }} và đang được chuẩn bị đóng gói.</p>
             <div class="actions">
-              <a [routerLink]="['/orders', orderId]" class="btn-primary">Xem chi tiết đơn hàng →</a>
+              <a [routerLink]="['/orders', orderId]" class="btn-primary">XEM ĐƠN HÀNG</a>
             </div>
           </div>
         } @else if (p.hasOpenReview || p.state === 'REQUIRES_REVIEW') {
-          <div class="state-card review-card">
-            <div class="icon-circle review-icon">⏳</div>
+          <div class="state-card" role="status">
+            <div class="spinner" aria-hidden="true"></div>
             <h2>Đang đối soát giao dịch</h2>
             <p>Đã ghi nhận một khoản chuyển cần kiểm tra. Vui lòng không chuyển thêm tiền.</p>
-            <p class="sub">Nhân sự sẽ đối soát chứng từ và xác minh phương án xử lý. Tiền đến muộn không tự khôi phục đơn đã hủy; hết hạn không có nghĩa đã hoàn tiền.</p>
+            <p class="sub">Nhân sự sẽ đối soát chứng từ và xác minh phương án xử lý. Tiền đến muộn không tự khôi phục đơn đã hủy; hết hạn không có nghĩa đã hoàn tiền. {{ content.watching }}</p>
             <div class="actions">
-              <a [routerLink]="['/orders', orderId]" class="btn-primary">Xem chi tiết đơn hàng</a>
+              <a [routerLink]="['/orders', orderId]" class="btn-primary">XEM ĐƠN HÀNG</a>
             </div>
           </div>
         } @else if (p.state === 'FAILED' || isExpired()) {
-          <div class="state-card failed-card">
-            <div class="icon-circle fail-icon">✕</div>
+          <div class="state-card">
+            <div class="icon-circle fail-icon" aria-hidden="true">✕</div>
             <h2>Phiên thanh toán không còn hiệu lực</h2>
-            @if (p.canRetry) { <button type="button" class="btn-primary" (click)="createFreshAttempt()">Tạo lại phiên thanh toán</button> }
             <p>Không tiếp tục chuyển khoản vào phiên này. Nếu đã chuyển, hãy giữ chứng từ và liên hệ hỗ trợ đối soát. Hết hạn không đồng nghĩa tiền đã được hoàn.</p>
             <div class="actions">
-              <a [routerLink]="['/orders', orderId]" class="btn-primary">Quay lại đơn hàng</a>
+              @if (p.canRetry) { <button type="button" class="btn-primary" (click)="createFreshAttempt()">TẠO MÃ MỚI</button> }
+              <a [routerLink]="['/orders', orderId]" [class]="p.canRetry ? 'btn-outline' : 'btn-primary'">{{ content.viewOrder }}</a>
             </div>
           </div>
         } @else {
-          <!-- Active PENDING state: Show QR & Transfer Details -->
           <div class="payment-layout">
-            <!-- QR Image Box -->
             <div class="qr-col">
               <div class="qr-card">
                 <div class="qr-header">
-                  <span class="vietqr-badge">VietQR PRO</span>
+                  <span class="vietqr-badge">VietQR</span>
                   <div class="timer-box" [class.urgent]="timeRemainingSeconds() < 300">
-                    ⏱️ Còn lại: <strong>{{ formattedCountdown() }}</strong>
+                    Còn lại: <strong>{{ formattedCountdown() }}</strong>
                   </div>
                 </div>
 
@@ -90,356 +99,153 @@ function generateUUID(): string {
                     <img [src]="p.qrImageUrl" alt="Mã thanh toán VietQR" class="qr-image" (error)="qrLoadError.set(true)" />
                   } @else {
                     <div class="qr-placeholder">
-                      <p role="alert">Không tải được mã QR. Không chuyển khoản dựa trên thông tin chưa xác thực.</p><button type="button" class="btn-outline" (click)="retryQr()">Thử tải lại mã QR</button>
+                      <p role="alert">Không tải được mã QR. Không chuyển khoản dựa trên thông tin chưa xác thực.</p>
+                      <button type="button" class="btn-outline" (click)="retryQr()">THỬ LẠI</button>
                     </div>
                   }
                 </div>
 
-                <div class="qr-footer-hint">
-                  <p>Mở ứng dụng Ngân hàng (Vietcombank, MB, Techcombank, VPBank...) chọn <strong>Quét mã QR</strong> để thanh toán.</p>
-                </div>
+                <p class="qr-footer-hint">{{ content.qrHint }}</p>
               </div>
             </div>
 
-            <!-- Manual Transfer Info Details -->
             <div class="details-col">
               <div class="details-card">
-                <h3>Thông tin trên mã QR</h3>
-                <p class="guide-text">Thanh toán bằng quét QR. Tài khoản dưới đây được che để đối chiếu, không dùng để nhập chuyển khoản thủ công. Nếu QR lỗi, hãy tải lại hoặc liên hệ hỗ trợ từ thông tin đơn hàng.</p>
+                <h2>{{ content.detailsTitle }}</h2>
+                <p class="guide-text">{{ content.detailsNote }}</p>
 
                 <div class="info-table">
                   <div class="info-row">
-                    <span class="row-label">Ngân hàng:</span>
+                    <span class="row-label">NGÂN HÀNG</span>
                     <strong class="row-value">{{ p.bank?.bin || 'Chưa có thông tin xác thực' }}</strong>
                   </div>
-
                   <div class="info-row">
-                    <span class="row-label">Chủ tài khoản:</span>
+                    <span class="row-label">TÀI KHOẢN ĐỐI CHIẾU</span>
+                    <strong class="row-value">{{ p.bank?.accountNumberMasked || 'Không có thông tin đối chiếu' }}</strong>
+                  </div>
+                  <div class="info-row">
+                    <span class="row-label">CHỦ TÀI KHOẢN</span>
                     <strong class="row-value">{{ p.bank?.accountName || 'Chưa có thông tin xác thực' }}</strong>
                   </div>
-
                   <div class="info-row">
-                    <span class="row-label">Tài khoản đối chiếu:</span>
-                    <strong class="row-value highlight-num">{{ p.bank?.accountNumberMasked || 'Không có thông tin đối chiếu' }}</strong>
-                  </div>
-
-                  <div class="info-row">
-                    <span class="row-label">Số tiền:</span>
+                    <span class="row-label">SỐ TIỀN</span>
                     <div class="value-with-copy">
                       <strong class="row-value price-num">{{ p.amount | currency:'VND':'symbol':'1.0-0' }}</strong>
-                      <button class="copy-btn" (click)="copyText(p.amount.toString())">Copy</button>
+                      <button type="button" class="copy-btn" (click)="copyText(p.amount.toString())">SAO CHÉP</button>
                     </div>
                   </div>
-
-                  <div class="info-row alert-row">
-                    <span class="row-label">Nội dung CK:</span>
+                  <div class="info-row">
+                    <span class="row-label">NỘI DUNG CHUYỂN KHOẢN</span>
                     <div class="value-with-copy">
                       <strong class="row-value code-num">{{ p.reconciliationCode }}</strong>
-                      <button class="copy-btn copy-btn-primary" (click)="copyText(p.reconciliationCode)">Copy mã</button>
+                      <button type="button" class="copy-btn" (click)="copyText(p.reconciliationCode)">SAO CHÉP</button>
                     </div>
                   </div>
                 </div>
 
-                <div class="note-box">
-                  <strong>⚠️ Lưu ý đặc biệt:</strong>
-                  <p>
-                    Kiểm tra tên người nhận và <strong>mã nội dung chuyển khoản</strong> trong ứng dụng ngân hàng trước khi xác nhận.
-                  </p>
-                </div>
+                <p class="match-warning" role="note">{{ content.matchWarning }}</p>
 
-                <div class="polling-status">
-                  <span class="pulse-dot"></span>
-                  <span>Hệ thống đang tự động lắng nghe giao dịch chuyển khoản...</span>
+                <div class="polling-status" role="status">
+                  <span class="pulse-dot" aria-hidden="true"></span>
+                  <span>{{ content.watching }}</span>
                 </div>
               </div>
             </div>
           </div>
+
+          <section class="guide" aria-labelledby="guide-heading">
+            <h2 id="guide-heading">{{ content.guideTitle }}</h2>
+            <ol>
+              @for (step of content.guideSteps; track step.title; let i = $index) {
+                <li><span class="guide-no">{{ i + 1 }}</span><div><strong>{{ step.title }}</strong><p>{{ step.description }}</p></div></li>
+              }
+            </ol>
+          </section>
+
+          <nav class="secondary-links" aria-label="Liên kết phụ">
+            <a [routerLink]="['/orders', orderId]">{{ content.viewOrder }}</a>
+            <a routerLink="/orders">{{ content.payLater }}</a>
+          </nav>
         }
       }
     </main>
   `,
   styles: [`
-    .payment-page-container {
-      max-width: 1100px;
-      margin: 0 auto;
-      padding: 40px 6vw 90px;
+    :host { display: block; background: var(--ui-bg, #fff); color: var(--ui-ink, #171717); font-family: var(--font-sans, "Montserrat", Arial, sans-serif); }
+    button { font-family: inherit; }
+    .payment-page-container { width: min(100%, var(--ui-page-max, 1280px)); margin: 0 auto; padding: 64px var(--ui-page-pad, 48px); }
+    .page-header { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; margin-bottom: 34px; padding-bottom: 16px; border-bottom: 1px solid var(--ui-ink, #171717); }
+    .page-title { margin: 0; font-family: var(--font-serif, "Playfair Display", Georgia, serif); font-size: 40px; font-weight: 400; line-height: 48px; letter-spacing: -1px; }
+    .page-desc { margin: 6px 0 0; color: var(--ui-ink-soft, #444748); font-size: 13px; }
+    .steps { display: flex; flex-wrap: wrap; gap: 8px 0; margin: 0; padding: 0; list-style: none; color: var(--ui-subtle, #747878); font-size: 11px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; }
+    .steps li + li::before { content: '→'; margin: 0 12px; color: var(--ui-line, #c4c7c7); }
+    .steps a { color: var(--ui-ink, #171717); text-decoration: underline; text-underline-offset: 5px; }
+    .steps .current { color: var(--ui-accent, #8f485d); }
+    .payment-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 48px; align-items: start; }
+    .qr-card, .details-card { padding: 32px; border: 1px solid var(--ui-line, #c4c7c7); background: #fff; }
+    .qr-card { border-color: var(--ui-ink, #171717); text-align: center; }
+    .qr-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 20px; }
+    .vietqr-badge { padding: 4px 10px; background: var(--ui-ink, #171717); color: #fff; font-size: 11px; font-weight: 700; letter-spacing: 1px; }
+    .timer-box { font-size: 12px; color: var(--ui-ink-soft, #444748); }
+    .timer-box strong { font-variant-numeric: tabular-nums; }
+    .timer-box.urgent, .timer-box.urgent strong { color: var(--ui-price, #c52929); }
+    .qr-image-wrapper { display: flex; min-height: 280px; align-items: center; justify-content: center; padding: 16px; border: 1px solid var(--ui-line-soft, #e3e2e2); background: #fff; }
+    .qr-image { display: block; width: 100%; max-width: 320px; height: auto; }
+    .qr-placeholder { display: grid; justify-items: center; gap: 14px; color: var(--ui-danger, #9b2c2c); font-size: 13px; }
+    .qr-placeholder p { margin: 0; }
+    .qr-footer-hint { margin: 18px 0 0; color: var(--ui-ink-soft, #444748); font-size: 13px; }
+    .details-card h2, .guide h2, .state-card h2 { margin: 0; font-family: var(--font-serif, "Playfair Display", Georgia, serif); font-size: 22px; font-weight: 500; line-height: 30px; letter-spacing: -.3px; }
+    .details-card h2 { padding-bottom: 12px; border-bottom: 1px solid rgba(0,0,0,.2); }
+    .guide-text { margin: 16px 0; color: var(--ui-ink-soft, #444748); font-size: 12px; line-height: 1.6; }
+    .info-row { display: grid; gap: 6px; padding: 14px 0; border-bottom: 1px solid var(--ui-line-soft, #e3e2e2); }
+    .row-label { color: var(--ui-subtle, #747878); font-size: 11px; font-weight: 700; letter-spacing: 1.1px; }
+    .row-value { font-size: 14px; word-break: break-word; }
+    .price-num { color: var(--ui-price, #c52929); font-family: var(--font-serif, "Playfair Display", Georgia, serif); font-size: 24px; font-weight: 600; }
+    .code-num { font-size: 15px; letter-spacing: .5px; }
+    .value-with-copy { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+    .copy-btn { min-height: 34px; padding: 0 14px; border: 1px solid var(--ui-ink, #171717); border-radius: 0; background: #fff; color: var(--ui-ink, #171717); font-size: 11px; font-weight: 700; letter-spacing: .8px; cursor: pointer; white-space: nowrap; }
+    .copy-btn:hover { background: var(--ui-pink, #f4b8c1); }
+    .match-warning { margin: 18px 0 0; color: var(--ui-price, #c52929); font-size: 13px; font-weight: 600; line-height: 1.5; }
+    .polling-status { display: flex; align-items: center; gap: 10px; margin-top: 18px; color: var(--ui-ink-soft, #444748); font-size: 12px; }
+    .pulse-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--ui-success, #276749); animation: pulse 1.4s ease-in-out infinite; }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: .3; } }
+    .guide { margin-top: 48px; padding: 28px 32px; border: 1px solid var(--ui-line, #c4c7c7); }
+    .guide ol { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; margin: 20px 0 0; padding: 0; list-style: none; }
+    .guide li { display: flex; gap: 14px; align-items: flex-start; }
+    .guide-no { display: inline-flex; width: 28px; height: 28px; flex: none; align-items: center; justify-content: center; background: var(--ui-pink, #f4b8c1); font-size: 12px; font-weight: 700; }
+    .guide strong { display: block; font-size: 13px; }
+    .guide p { margin: 4px 0 0; color: var(--ui-ink-soft, #444748); font-size: 12px; line-height: 1.55; }
+    .secondary-links { display: flex; justify-content: center; gap: 28px; margin-top: 28px; }
+    .secondary-links a { color: var(--ui-ink, #171717); font-size: 12px; font-weight: 700; letter-spacing: .6px; text-decoration: underline; text-underline-offset: 5px; }
+    .inline-note { margin: 0 0 20px; padding: 12px 16px; border: 1px solid var(--ui-info, #3f5f7e); background: var(--ui-info-bg, #eff5fa); color: var(--ui-info, #3f5f7e); font-size: 13px; }
+    .state-card { display: grid; justify-items: center; gap: 14px; max-width: 620px; margin: 40px auto; padding: 56px 28px; border: 1px solid var(--ui-line, #c4c7c7); text-align: center; }
+    .state-card p { margin: 0; color: var(--ui-ink-soft, #444748); font-size: 13px; line-height: 1.6; }
+    .state-card .sub { font-size: 12px; }
+    .icon-circle { display: flex; width: 72px; height: 72px; align-items: center; justify-content: center; border-radius: 50%; background: var(--ui-success-bg, #edf8f1); color: var(--ui-success, #276749); font-size: 36px; }
+    .fail-icon { background: var(--ui-danger-bg, #fff1f1); color: var(--ui-danger, #9b2c2c); }
+    .spinner { width: 28px; height: 28px; border: 2px solid var(--ui-line, #c4c7c7); border-top-color: var(--ui-ink, #171717); border-radius: 50%; animation: spin .9s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px; margin-top: 8px; }
+    .btn-primary, .btn-outline { display: inline-flex; min-height: 44px; align-items: center; justify-content: center; padding: 0 22px; border: 1px solid var(--ui-ink, #171717); border-radius: 0; font-size: 12px; font-weight: 700; letter-spacing: .8px; text-decoration: none; cursor: pointer; }
+    .btn-primary { background: var(--ui-ink, #171717); color: #fff; }
+    .btn-primary:hover { background: var(--ui-pink, #f4b8c1); color: var(--ui-ink, #171717); }
+    .btn-outline { background: #fff; color: var(--ui-ink, #171717); }
+    .btn-outline:hover { background: var(--ui-pink, #f4b8c1); }
+    :is(button, a):focus-visible { outline: 2px solid var(--ui-accent, #8f485d); outline-offset: 3px; }
+    @media (prefers-reduced-motion: reduce) { .spinner, .pulse-dot { animation: none; } }
+    @media (max-width: 980px) {
+      .payment-page-container { padding-inline: 28px; }
+      .payment-layout { grid-template-columns: 1fr; gap: 28px; }
+      .guide ol { grid-template-columns: 1fr; }
     }
-    .page-header {
-      text-align: center;
-      max-width: 650px;
-      margin: 0 auto 40px;
+    @media (max-width: 640px) {
+      .payment-page-container { padding: 36px 18px 56px; }
+      .page-header { align-items: flex-start; flex-direction: column; }
+      .page-title { font-size: 32px; line-height: 40px; }
+      .qr-card, .details-card, .guide { padding: 22px 18px; }
+      .actions { width: 100%; flex-direction: column; }
+      .btn-primary, .btn-outline { width: 100%; }
     }
-    .eyebrow {
-      font-size: 0.74rem;
-      letter-spacing: 0.25em;
-      color: var(--color-accent);
-      font-weight: 700;
-    }
-    .page-title {
-      font-family: Georgia, serif;
-      font-size: clamp(2rem, 3.5vw, 2.7rem);
-      margin: 8px 0 12px;
-      font-weight: 500;
-    }
-    .page-desc {
-      color: var(--color-muted);
-      line-height: 1.6;
-      font-size: 0.95rem;
-    }
-    .payment-layout {
-      display: grid;
-      grid-template-columns: 1fr 1.2fr;
-      gap: 36px;
-      align-items: start;
-    }
-    .qr-card, .details-card {
-      background: var(--color-surface);
-      border: 1px solid var(--color-divider);
-      border-radius: var(--radius-card);
-      padding: 28px;
-      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04);
-    }
-    .qr-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 20px;
-    }
-    .vietqr-badge {
-      font-size: 0.78rem;
-      background: #0052cc;
-      color: white;
-      font-weight: 700;
-      padding: 4px 10px;
-      border-radius: var(--radius-control);
-      letter-spacing: 0.05em;
-    }
-    .timer-box {
-      font-size: 0.85rem;
-      color: #555;
-      background: var(--color-canvas);
-      border: 1px solid var(--color-divider);
-      padding: 4px 10px;
-      border-radius: var(--radius-control);
-    }
-    .timer-box.urgent {
-      color: #c62828;
-      border-color: #ef9a9a;
-      background: #ffebee;
-      animation: pulse 1.5s infinite;
-    }
-    .qr-image-wrapper {
-      background: var(--color-canvas);
-      border: 1px solid var(--color-divider);
-      border-radius: 6px;
-      padding: 16px;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      margin-bottom: 20px;
-    }
-    .qr-image {
-      max-width: 100%;
-      height: auto;
-      aspect-ratio: 1;
-      object-fit: contain;
-    }
-    .qr-placeholder {
-      aspect-ratio: 1;
-      width: 100%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      color: var(--color-muted);
-    }
-    .qr-footer-hint {
-      text-align: center;
-      font-size: 0.84rem;
-      color: var(--color-muted);
-      line-height: 1.5;
-    }
-    .details-card h3 {
-      font-family: Georgia, serif;
-      font-size: 1.35rem;
-      font-weight: 500;
-      margin: 0 0 8px;
-    }
-    .guide-text {
-      color: var(--color-muted);
-      font-size: 0.88rem;
-      margin: 0 0 20px;
-    }
-    .info-table {
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-      margin-bottom: 24px;
-    }
-    .info-row {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 12px 14px;
-      background: var(--color-canvas);
-      border-radius: 6px;
-      border: 1px solid var(--color-divider);
-    }
-    .alert-row {
-      background: #fff8e1;
-      border-color: #ffe082;
-    }
-    .row-label {
-      font-size: 0.85rem;
-      color: var(--color-muted);
-    }
-    .row-value {
-      font-size: 0.95rem;
-      color: var(--color-text);
-    }
-    .highlight-num {
-      font-family: monospace;
-      font-size: 1.05rem;
-    }
-    .price-num {
-      color: var(--color-accent);
-      font-size: 1.15rem;
-    }
-    .code-num {
-      color: #c62828;
-      font-family: monospace;
-      font-size: 1.15rem;
-      letter-spacing: 0.05em;
-    }
-    .value-with-copy {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-    }
-    .copy-btn {
-      background: var(--color-divider);
-      border: 0;
-      padding: 4px 10px;
-      border-radius: var(--radius-control);
-      font-size: 0.78rem;
-      cursor: pointer;
-      font-weight: 600;
-      color: #444;
-      transition: all 0.15s;
-    }
-    .copy-btn:hover {
-      background: var(--color-border);
-      color: var(--color-text);
-    }
-    .copy-btn-primary {
-      background: var(--color-primary);
-      color: var(--color-surface);
-    }
-    .copy-btn-primary:hover {
-      background: #3e3b37;
-      color: var(--color-surface);
-    }
-    .note-box {
-      background: #fff3e0;
-      border-left: 4px solid #ff9800;
-      padding: 14px 16px;
-      border-radius: var(--radius-control);
-      font-size: 0.84rem;
-      color: #e65100;
-      line-height: 1.5;
-      margin-bottom: 20px;
-    }
-    .note-box strong {
-      display: block;
-      margin-bottom: 4px;
-    }
-    .note-box p {
-      margin: 0;
-    }
-    .polling-status {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      font-size: 0.82rem;
-      color: var(--color-muted);
-    }
-    .pulse-dot {
-      width: 10px;
-      height: 10px;
-      border-radius: 50%;
-      background: #2e7d32;
-      animation: pulse 1.5s infinite;
-    }
-    .state-card {
-      background: var(--color-surface);
-      border-radius: var(--radius-card);
-      padding: 60px 30px;
-      text-align: center;
-      max-width: 600px;
-      margin: 40px auto;
-      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.05);
-    }
-    .icon-circle {
-      width: 70px;
-      height: 70px;
-      border-radius: 50%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      margin: 0 auto 20px;
-      font-size: 2rem;
-    }
-    .success-card .icon-circle { background: #e8f5e9; color: #2e7d32; }
-    .review-card .icon-circle { background: #fff8e1; color: var(--color-warning); }
-    .failed-card .icon-circle { background: #ffebee; color: #c62828; }
-    .state-card h2 {
-      font-family: Georgia, serif;
-      font-size: 1.8rem;
-      margin: 0 0 10px;
-    }
-    .state-card p {
-      color: #444;
-      line-height: 1.6;
-      margin: 0 0 8px;
-    }
-    .state-card .sub {
-      color: var(--color-muted);
-      font-size: 0.9rem;
-      margin-bottom: 25px;
-    }
-    .spinner {
-      width: 40px;
-      height: 40px;
-      border: 3px solid var(--color-divider);
-      border-top-color: var(--color-text);
-      border-radius: 50%;
-      animation: spin 0.8s linear infinite;
-      margin: 0 auto 20px;
-    }
-    @keyframes spin {
-      to { transform: rotate(360deg); }
-    }
-    @keyframes pulse {
-      0%, 100% { opacity: 1; transform: scale(1); }
-      50% { opacity: 0.4; transform: scale(0.9); }
-    }
-    @media (max-width: 860px) {
-      .payment-layout {
-        grid-template-columns: 1fr;
-      }
-    }
-
-    .qr-col,.details-col { min-width:0; }
-    .loading-card,.error-card { padding:48px 24px; text-align:center; background:var(--color-canvas); border:1px solid var(--color-divider); border-radius:var(--radius-card); }
-    .loading-card { color:var(--color-muted); }
-    .error-card { color:var(--color-danger); background:#fbeceb; border-color:#edc6c3; }
-    .actions { display:flex; justify-content:center; flex-wrap:wrap; gap:12px; margin-top:24px; }
-    .review-icon { color:var(--color-warning); background:#faf0da; }
-    .fail-icon { color:var(--color-danger); background:#fbeceb; }
-    .row-value { overflow-wrap:anywhere; min-width:0; }
-    .value-with-copy { flex-wrap:wrap; }
-    .timer-box { font-variant-numeric:tabular-nums; }
-
-
   `],
 })
 export class PaymentPage implements OnInit, OnDestroy {
@@ -448,7 +254,11 @@ export class PaymentPage implements OnInit, OnDestroy {
   private readonly api = inject(ApiService);
   private readonly toast = inject(ToastService);
 
+  readonly content = STORE_PAYMENT_CONTENT;
+  readonly checkout = STORE_CHECKOUT_CONTENT;
+  readonly confirmedLabel = ORDER_STATUS_LABELS.CONFIRMED;
   orderId = '';
+  orderCode(): string { return this.orderId.slice(-8).toUpperCase(); }
   readonly attempt = signal<PaymentAttempt | null>(null);
   readonly loading = signal<boolean>(true);
   readonly error = signal<string>('');

@@ -30,6 +30,12 @@ export class CatalogController {
     });
   }
 
+  /** Phải đứng trước ':slug' để 'filters' không bị nhận nhầm là slug. */
+  @Public() @Get('filters')
+  filters() {
+    return this.catalog.getPublicFilters();
+  }
+
   @Public() @Post(':slug/size-suggestion')
   suggestSize(@Param('slug') slug: string, @Body() dto: SizeSuggestionDto) {
     return this.catalog.suggestSize(slug, dto);

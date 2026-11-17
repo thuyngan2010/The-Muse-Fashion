@@ -99,6 +99,7 @@ export class AiService {
         const [created] = await this.jobs.create([{
           ownerId, type, productIds: dto.productIds, inputMediaId: dto.inputMediaId,
           style: dto.style,
+          heightCm: dto.heightCm, weightKg: dto.weightKg,
           inputKeys: [input.key], outputKeys: [], state: 'PENDING', quotaCharged: true,
           quotaRefunded: false, quotaEventKey, idempotencyKey: idempotencyKey.trim(),
           consentPolicyVersion: dto.consentPolicyVersion.trim(), quotaWindowStart: windowStart,
@@ -129,6 +130,8 @@ export class AiService {
     if (job.type !== type || String(job.inputMediaId) !== dto.inputMediaId
       || job.consentPolicyVersion !== dto.consentPolicyVersion.trim()
       || job.style !== dto.style
+      || (job.heightCm ?? undefined) !== dto.heightCm
+      || (job.weightKg ?? undefined) !== dto.weightKg
       || job.productIds.length !== dto.productIds.length
       || job.productIds.some((id, index) => String(id) !== dto.productIds[index])) {
       throw new ConflictException('Idempotency key was used with a different AI request');

@@ -122,6 +122,17 @@ describe('OpenAI-compatible image edits', () => {
     expect(JSON.parse(String(fetchMock.mock.calls[0][1].body)).prompt).toBe('Fit the referenced glasses to the face; preserve the person.');
   });
 
+  it('appends the body measurement line to the default prompt only when measurements exist', async () => {
+    const fetchMock = vi.fn().mockImplementation(async () => new Response(JSON.stringify({ data: [{ b64_json: png.toString('base64') }] }), {
+      headers: { 'content-type': 'application/json' },
+    }));
+    vi.stubGlobal('fetch', fetchMock);
+    await new AiProviderService().runJob({ ...input, body: { heightCm: 165, weightKg: 52 } });
+    expect(JSON.parse(String(fetchMock.mock.calls[0][1].body)).prompt).toContain('height is 165 cm and weight is 52 kg');
+    await new AiProviderService().runJob({ ...input });
+    expect(JSON.parse(String(fetchMock.mock.calls[1][1].body)).prompt).not.toContain('stated');
+  });
+
   it('does not retry a failed POST inside the SDK', async () => {
     const fetch = vi.fn().mockResolvedValue(new Response('{"error":{"message":"unavailable"}}', {
       status: 502, headers: { 'content-type': 'application/json' },

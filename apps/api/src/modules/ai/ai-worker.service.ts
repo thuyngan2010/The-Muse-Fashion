@@ -120,7 +120,7 @@ export class AiWorkerService implements OnModuleInit, OnModuleDestroy {
         };
         let renderPlan = claimed.renderPlan;
         if (!claimed.providerJobId && !renderPlan && this.planner.isEnabled()) {
-          renderPlan = await this.planner.plan({ type: claimed.type as 'TRY_ON' | 'MIX_MATCH', style: claimed.style, inputUrl, products: references }, setPhase);
+          renderPlan = await this.planner.plan({ type: claimed.type as 'TRY_ON' | 'MIX_MATCH', style: claimed.style, body: { heightCm: claimed.heightCm, weightKg: claimed.weightKg }, inputUrl, products: references }, setPhase);
           const saved = await this.jobs.updateOne({ _id: claimed._id, leaseId, state: 'PROCESSING' }, { $set: { renderPlan } }).exec();
           if (saved.matchedCount !== 1) throw new Error('AI job lease was lost');
         }
@@ -138,6 +138,7 @@ export class AiWorkerService implements OnModuleInit, OnModuleDestroy {
           productImageUrls,
           providerJobId: claimed.providerJobId,
           prompt: renderPlan?.prompt,
+          body: { heightCm: claimed.heightCm, weightKg: claimed.weightKg },
         });
 
         if (result.status === 'PROCESSING') {

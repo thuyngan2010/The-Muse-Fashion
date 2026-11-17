@@ -7,171 +7,103 @@ import { ApiService } from '../services/api.service';
   standalone: true,
   imports: [RouterLink, FormsModule],
   template: `
-    <main class="verify-page-container">
-      <div class="verify-card">
-        <span class="eyebrow">XÁC MINH TÀI KHOẢN</span>
-        <h1 class="verify-title">Xác thực địa chỉ Email</h1>
+    <main class="auth-page-container">
+      <section class="auth-visual" aria-label="Bộ sưu tập MUSE">
+        <img src="/assets/auth/muse-auth-model.png" alt="Người mẫu MUSE trong trang phục trắng">
+      </section>
+
+      <div class="auth-card">
+        <header class="auth-header">
+          <img class="auth-logo" src="/assets/brand/muse-logo-black.png" alt="MUSE">
+          <span class="eyebrow">XÁC MINH TÀI KHOẢN</span>
+          <h1 class="auth-title">Xác thực địa chỉ email</h1>
+        </header>
 
         @if (busy()) {
-          <div class="state-box">
-            <div class="spinner"></div>
-            <p>Đang tiến hành xác minh liên kết của bạn...</p>
+          <div class="state-box" role="status" aria-live="polite">
+            <div class="spinner" aria-hidden="true"></div>
+            <p class="message-text">Đang tiến hành xác minh liên kết của bạn...</p>
           </div>
         } @else if (success()) {
-          <div class="state-box success">
-            <div class="icon-circle">✓</div>
+          <div class="state-box" role="status">
+            <div class="icon-circle" aria-hidden="true">✓</div>
             <p class="message-text">{{ message() }}</p>
-            <a routerLink="/auth" class="btn-primary">Đăng nhập ngay →</a>
+            <a routerLink="/auth" class="btn-primary">ĐĂNG NHẬP</a>
           </div>
         } @else {
-          <div class="state-box error">
-            <div class="icon-circle fail">✕</div>
-            <p class="message-text">{{ message() }}</p>
+          <div class="state-box">
+            <div class="icon-circle fail" aria-hidden="true">✕</div>
+            <p class="message-text" role="alert">{{ message() }}</p>
 
-            <div class="resend-section">
-              <p class="resend-prompt">Chưa nhận được email hoặc liên kết đã hết hạn?</p>
-              <form (ngSubmit)="handleResend()" class="resend-form">
-                <input
-                  type="email"
-                  [(ngModel)]="resendEmail"
-                  name="email"
-                  placeholder="Nhập email của bạn"
-                  required
-                />
-                <button type="submit" class="btn-resend" [disabled]="resending() || !resendEmail">
-                  {{ resending() ? 'Đang gửi...' : 'Gửi lại email xác thực' }}
-                </button>
-              </form>
-              @if (resendFeedback()) {
-                <p class="feedback-text" [class.success]="resendFeedbackSuccess()">{{ resendFeedback() }}</p>
-              }
-            </div>
-
-            <a routerLink="/auth" class="btn-outline">Quay lại đăng nhập</a>
+            @if (resendFeedbackSuccess()) {
+              <div class="resend-section sent" role="status">
+                <strong>Đã gửi lại thư</strong>
+                <p class="feedback-text success">{{ resendFeedback() }}</p>
+              </div>
+            } @else {
+              <div class="resend-section">
+                <p class="resend-prompt">Chưa nhận được email hoặc liên kết đã hết hạn?</p>
+                <form (ngSubmit)="handleResend()" class="resend-form">
+                  <input type="email" [(ngModel)]="resendEmail" name="email" placeholder="Nhập email của bạn" aria-label="Email nhận liên kết xác thực" required />
+                  <button type="submit" class="btn-resend" [disabled]="resending() || !resendEmail">
+                    {{ resending() ? 'ĐANG GỬI...' : 'GỬI LẠI EMAIL XÁC THỰC' }}
+                  </button>
+                </form>
+                @if (resendFeedback()) {
+                  <p class="feedback-text" role="alert">{{ resendFeedback() }}</p>
+                }
+              </div>
+            }
           </div>
         }
+
+        <a routerLink="/auth" class="back-link">Quay lại đăng nhập</a>
       </div>
     </main>
   `,
   styles: [`
-    .verify-page-container {
-      min-height: calc(100vh - 200px);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: 60px 5vw;
-      background: var(--color-canvas);
-    }
-    .verify-card {
-      background: var(--color-surface);
-      border: 1px solid var(--color-divider);
-      border-radius: var(--radius-card);
-      padding: 40px;
-      max-width: 480px;
-      width: 100%;
-      text-align: center;
-      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.05);
-    }
-    .eyebrow {
-      font-size: 0.72rem;
-      letter-spacing: 0.25em;
-      color: var(--color-accent);
-      font-weight: 700;
-    }
-    .verify-title {
-      font-family: Georgia, serif;
-      font-size: 1.8rem;
-      margin: 8px 0 24px;
-      font-weight: 500;
-    }
-    .state-box {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 16px;
-    }
-    .icon-circle {
-      width: 60px;
-      height: 60px;
-      border-radius: 50%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 1.8rem;
-      background: #e8f5e9;
-      color: #2e7d32;
-    }
-    .icon-circle.fail {
-      background: #ffebee;
-      color: #c62828;
-    }
-    .message-text {
-      color: #444;
-      line-height: 1.5;
-      font-size: 0.95rem;
-      margin: 0;
-    }
-    .resend-section {
-      width: 100%;
-      margin: 16px 0;
-      padding: 16px;
-      background: var(--color-canvas);
-      border-radius: 6px;
-      border: 1px solid var(--color-divider);
-    }
-    .resend-prompt {
-      font-size: 0.85rem;
-      color: var(--color-muted);
-      margin: 0 0 10px;
-    }
-    .resend-form {
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-    }
-    .resend-form input {
-      padding: 10px 12px;
-      border: 1px solid var(--color-border);
-      border-radius: var(--radius-control);
-      font-size: 0.9rem;
-      outline: none;
-    }
-    .resend-form input:focus {
-      border-color: var(--color-text);
-    }
-    .btn-resend {
-      padding: 10px;
-      background: var(--color-primary);
-      color: #fff;
-      border: 0;
-      border-radius: var(--radius-control);
-      font-size: 0.85rem;
-      font-weight: 600;
-      cursor: pointer;
-    }
-    .btn-resend:disabled {
-      background: #ccc;
-      cursor: not-allowed;
-    }
-    .feedback-text {
-      font-size: 0.8rem;
-      margin: 8px 0 0;
-      color: #c62828;
-    }
-    .feedback-text.success {
-      color: #2e7d32;
-    }
-
-
-    .spinner {
-      width: 40px;
-      height: 40px;
-      border: 3px solid var(--color-divider);
-      border-top-color: var(--color-text);
-      border-radius: 50%;
-      animation: spin 0.8s linear infinite;
-    }
+    :host { display: block; background: var(--ui-bg, #fff); color: var(--ui-ink, #171717); font-family: var(--font-sans, "Montserrat", Arial, sans-serif); }
+    button, input { font-family: inherit; }
+    .auth-page-container { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); min-height: calc(100dvh - 80px); background: #fff; }
+    .auth-visual { position: relative; min-height: 640px; overflow: hidden; background: #d7d3c9; }
+    .auth-visual img { position: absolute; inset: 0; display: block; width: 100%; height: 100%; object-fit: cover; object-position: center; }
+    .auth-card { display: flex; min-width: 0; flex-direction: column; justify-content: center; padding: 56px clamp(48px, 7vw, 90px); background: #fff; }
+    .auth-header { margin-bottom: 26px; padding-bottom: 28px; border-bottom: 1px solid var(--ui-line-soft, #e3e2e2); text-align: center; }
+    .auth-logo { display: block; width: min(235px, 58%); height: auto; margin: 0 auto 28px; }
+    .eyebrow { color: var(--ui-accent, #8f485d); font-size: 11px; font-weight: 700; letter-spacing: 1.1px; }
+    .auth-title { margin: 8px 0 0; font-family: var(--font-serif, "Playfair Display", Georgia, serif); font-size: clamp(1.9rem, 2.6vw, 2.5rem); font-weight: 400; line-height: 1.15; letter-spacing: -.5px; }
+    .state-box { display: flex; flex-direction: column; align-items: center; gap: 16px; text-align: center; }
+    .spinner { width: 34px; height: 34px; border: 2px solid var(--ui-line-soft, #e3e2e2); border-top-color: var(--ui-ink, #171717); border-radius: 50%; animation: spin .8s linear infinite; }
     @keyframes spin { to { transform: rotate(360deg); } }
+    @media (prefers-reduced-motion: reduce) { .spinner { animation: none; } }
+    .icon-circle { display: inline-flex; width: 60px; height: 60px; align-items: center; justify-content: center; border: 1px solid var(--ui-success, #276749); background: var(--ui-success-bg, #edf8f1); color: var(--ui-success, #276749); font-size: 24px; }
+    .icon-circle.fail { border-color: var(--ui-danger, #9b2c2c); background: var(--ui-danger-bg, #fff1f1); color: var(--ui-danger, #9b2c2c); }
+    .message-text { margin: 0; color: var(--ui-ink-soft, #444748); font-size: 13px; line-height: 1.65; }
+    .resend-section { width: 100%; padding: 18px; border: 1px solid var(--ui-line-soft, #e3e2e2); background: var(--ui-bg-soft, #f5f3f3); text-align: left; }
+    .resend-section.sent { border-color: var(--ui-success, #276749); background: var(--ui-success-bg, #edf8f1); }
+    .resend-prompt { margin: 0 0 10px; color: var(--ui-ink-soft, #444748); font-size: 12px; }
+    .resend-form { display: flex; flex-direction: column; gap: 10px; }
+    .resend-form input { height: 44px; padding: 0 12px; border: 1px solid var(--ui-line, #c4c7c7); border-radius: 0; background: #fff; font-size: 13px; outline: 0; }
+    .resend-form input:focus-visible { border-color: var(--ui-ink, #171717); box-shadow: 0 0 0 1px var(--ui-ink, #171717); }
+    .btn-resend { min-height: 44px; border: 1px solid var(--ui-ink, #171717); border-radius: 0; background: var(--ui-pink, #f4b8c1); color: var(--ui-ink, #171717); font-size: 12px; font-weight: 800; letter-spacing: .8px; cursor: pointer; }
+    .btn-resend:hover:not(:disabled) { background: var(--ui-ink, #171717); color: #fff; }
+    .btn-resend:disabled { border-color: var(--ui-line, #c4c7c7); background: var(--ui-bg-image, #efeded); color: var(--ui-subtle, #747878); cursor: not-allowed; }
+    .feedback-text { margin: 10px 0 0; color: var(--ui-danger, #9b2c2c); font-size: 12px; }
+    .feedback-text.success { margin: 6px 0 0; color: var(--ui-success, #276749); }
+    .btn-primary { display: inline-flex; min-height: 44px; align-items: center; justify-content: center; padding: 0 28px; border: 1px solid var(--ui-ink, #171717); border-radius: 0; background: var(--ui-ink, #171717); color: #fff; font-size: 12px; font-weight: 700; letter-spacing: .8px; text-decoration: none; }
+    .btn-primary:hover { background: var(--ui-pink, #f4b8c1); color: var(--ui-ink, #171717); }
+    .back-link { align-self: center; margin-top: 28px; color: var(--ui-ink, #171717); font-size: 12px; font-weight: 700; letter-spacing: .6px; text-decoration: underline; text-underline-offset: 5px; }
+    :is(button, a, input):focus-visible { outline: 2px solid var(--ui-accent, #8f485d); outline-offset: 3px; }
+    @media (max-width: 980px) {
+      .auth-page-container { grid-template-columns: 1fr; min-height: calc(100dvh - 72px); }
+      .auth-visual { display: none; }
+      .auth-card { width: 100%; max-width: 640px; margin: 0 auto; padding: 48px 40px; }
+    }
+    @media (max-width: 640px) {
+      .auth-card { padding: 36px 20px; }
+      .auth-logo { width: 170px; margin-bottom: 24px; }
+      .btn-primary { width: 100%; }
+    }
   `],
 })
 export class VerifyPage implements OnInit {

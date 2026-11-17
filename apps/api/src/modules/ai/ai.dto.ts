@@ -1,4 +1,4 @@
-import { ArrayMaxSize, ArrayMinSize, ArrayUnique, IsArray, IsIn, IsMongoId, IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
+import { ArrayMaxSize, ArrayMinSize, ArrayUnique, IsArray, IsIn, IsInt, IsMongoId, IsNumber, IsOptional, IsString, Max, MaxLength, Min, MinLength } from 'class-validator';
 
 export class AiJobWriteDto {
   @IsMongoId() inputMediaId!: string;
@@ -12,4 +12,6 @@ export class AiJobWriteDto {
 
   @IsString() @MinLength(1) @MaxLength(50) consentPolicyVersion!: string;
   @IsOptional() @IsIn(['office', 'streetwear', 'evening', 'minimalist']) style?: 'office' | 'streetwear' | 'evening' | 'minimalist';
+  @IsOptional() @IsInt() @Min(120) @Max(220) heightCm?: number;
+  @IsOptional() @IsNumber({ maxDecimalPlaces: 1 }) @Min(30) @Max(200) weightKg?: number;
 }

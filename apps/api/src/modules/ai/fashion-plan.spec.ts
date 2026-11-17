@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { BODY_REGIONS, FASHION_CATEGORIES, FASHION_RULES, buildFashionPrompt, validateAnalysis, validateStyling } from './fashion-plan.js';
+import { BODY_REGIONS, describeBody, FASHION_CATEGORIES, FASHION_RULES, buildFashionPrompt, validateAnalysis, validateStyling } from './fashion-plan.js';
 
 function detection(category = 'shoes', region = 'feet') {
   return { person: { count: 1, pose: 'standing', visibleRegions: [...BODY_REGIONS] },
@@ -65,5 +65,16 @@ describe('Fashion analysis and category-specific prompts', () => {
     expect(() => validateStyling({ compatible: true, explanation: 'ok', summary: 'ok', items: [] }, analysis)).toThrow('Missing styling');
     expect(() => validateStyling({ compatible: true, explanation: 'ok', summary: 'ok',
       items: [{ productId: 'p1', action: 'add', notes: 'wrong' }] }, analysis)).toThrow('Invalid styling action');
+  });
+  it('adds a body measurement line only when measurements exist', () => {
+    const analysis = validateAnalysis(detection(), ['p1']);
+    const styling = validateStyling({ compatible: true, explanation: 'ok', summary: 'ok',
+      items: [{ productId: 'p1', action: FASHION_RULES.shoes.action, notes: 'n' }] }, analysis);
+    const withBody = buildFashionPrompt('TRY_ON', analysis, styling, { heightCm: 165, weightKg: 52 }).prompt;
+    expect(withBody).toContain('height is 165 cm and weight is 52 kg');
+    expect(withBody.indexOf('Preserve the person')).toBeLessThan(withBody.indexOf('height is 165 cm'));
+    expect(buildFashionPrompt('TRY_ON', analysis, styling).prompt).not.toContain('stated');
+    expect(buildFashionPrompt('TRY_ON', analysis, styling, {}).prompt).not.toContain('stated');
+    expect(describeBody({ heightCm: 170 })).toContain('height is 170 cm.');
   });
 });

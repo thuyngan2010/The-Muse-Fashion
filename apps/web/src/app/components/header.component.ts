@@ -1,5 +1,7 @@
-import { Component, HostListener, inject, signal } from '@angular/core';
-import { RouterLink, RouterLinkActive } from '@angular/router';
+import { Component, ElementRef, HostListener, ViewChild, OnDestroy, effect, inject, signal } from '@angular/core';
+import { NavigationEnd, Router, RouterLink, RouterLinkActive } from '@angular/router';
+import { Subscription, filter } from 'rxjs';
+import { ApiService } from '../services/api.service';
 import { AuthService } from '../services/auth.service';
 import { CartService } from '../services/cart.service';
 
@@ -17,16 +19,19 @@ import { CartService } from '../services/cart.service';
 
         <!-- Desktop Navigation -->
         <nav class="desktop-nav" aria-label="Điều hướng chính">
-          <a routerLink="/" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">SẢN PHẨM</a>
+          <a routerLink="/" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">TRANG CHỦ</a>
+          <a routerLink="/products" routerLinkActive="active">SẢN PHẨM</a>
           <a routerLink="/lookbooks" routerLinkActive="active">BỘ SƯU TẬP</a>
           <div class="nav-dropdown-trigger">
             <button type="button" id="ai-nav-trigger" class="ai-nav-button" (click)="toggleAiMenu($event)" [attr.aria-expanded]="aiMenuOpen()" aria-controls="ai-navigation">AI STUDIO <span aria-hidden="true">⌄</span></button>
             @if (aiMenuOpen()) {<div class="nav-dropdown-menu" id="ai-navigation">
               <a routerLink="/ai/try-on" routerLinkActive="active">Thử đồ trực tuyến (Try-on)</a>
               <a routerLink="/ai/mix-match" routerLinkActive="active">Gợi ý phối đồ (Mix & Match)</a>
+              <a routerLink="/ai/history" routerLinkActive="active">Lịch sử thử đồ</a>
             </div>}
           </div>
-          <a routerLink="/community" routerLinkActive="active">CỘNG ĐỒNG</a>
+          <a routerLink="/community" routerLinkActive="active">BLOG</a>
+          @if (hasAboutRoute) { <a routerLink="/about" routerLinkActive="active">VỀ CHÚNG TÔI</a> }
           @if (auth.isStaff() || auth.isAdmin()) {
             <a routerLink="/admin" class="badge-link">
               <span class="admin-badge">TRANG QUẢN TRỊ</span>
@@ -36,16 +41,29 @@ import { CartService } from '../services/cart.service';
 
         <!-- Right action icons -->
         <div class="header-actions">
+          <!-- Tìm kiếm -->
+          <div class="search-wrap" (click)="$event.stopPropagation()">
+            @if (searchOpen()) {
+              <form class="header-search" role="search" (submit)="submitSearch($event)">
+                <input #searchInput type="search" name="q" [value]="searchTerm()" (input)="searchTerm.set($any($event.target).value)" placeholder="Tìm sản phẩm..." aria-label="Tìm kiếm sản phẩm" autocomplete="off">
+              </form>
+            }
+            <button type="button" class="icon-btn search-btn" (click)="toggleSearch($event)" aria-label="Tìm kiếm" [attr.aria-expanded]="searchOpen()">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="10" cy="10" r="6.5"></circle><line x1="15" y1="15" x2="21" y2="21"></line></svg>
+            </button>
+          </div>
+
+          @if (auth.isAuthenticated()) {
+            <a routerLink="/notifications" class="icon-btn bell-btn" aria-label="Thông báo">
+              <svg width="22" height="24" viewBox="0 0 22 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 3v1.5"></path><path d="M4.5 17.5c1.2-1.2 1.8-3 1.8-5.2V10a4.7 4.7 0 0 1 9.4 0v2.3c0 2.2.6 4 1.8 5.2z"></path><path d="M3 17.5h16"></path><path d="M9.2 20.5a2 2 0 0 0 3.6 0"></path></svg>
+              @if (unread() > 0) { <span class="badge bell-badge">{{ unread() > 99 ? '99+' : unread() }}</span> }
+            </a>
+          }
+
           <!-- Cart button with counter -->
           <a routerLink="/cart" class="icon-btn cart-btn" aria-label="Giỏ hàng">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"></path>
-              <line x1="3" y1="6" x2="21" y2="6"></line>
-              <path d="M16 10a4 4 0 0 1-8 0"></path>
-            </svg>
-            @if (cart.itemCount() > 0) {
-              <span class="badge">{{ cart.itemCount() }}</span>
-            }
+            <svg width="20" height="24" viewBox="0 0 20 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="8" width="14" height="14" rx="3"></rect><path d="M6 8V6.5a3.5 3.5 0 0 1 7 0V8"></path></svg>
+            <span class="badge cart-badge">{{ cart.itemCount() }}</span>
           </a>
 
           <!-- User menu / Account -->
@@ -53,7 +71,7 @@ import { CartService } from '../services/cart.service';
             <div class="user-menu-wrapper">
               <button class="user-avatar-btn" (click)="toggleUserMenu($event)" aria-haspopup="true" [attr.aria-expanded]="userMenuOpen()">
                 <div class="avatar-circle">
-                  {{ auth.currentUser()?.fullName?.[0] || 'U' }}
+                  @if (auth.currentUser()?.avatarUrl; as url) { <img class="avatar-img" [src]="url" alt="" /> } @else { {{ auth.currentUser()?.fullName?.[0] || 'U' }} }
                 </div>
                 <span class="user-name">{{ auth.currentUser()?.fullName?.split(' ')?.[0] || 'Tài khoản' }}</span>
                 <span class="arrow-down">▾</span>
@@ -67,6 +85,7 @@ import { CartService } from '../services/cart.service';
                     <span class="user-role-tag">{{ auth.currentUser()?.role }}</span>
                   </div>
                   <hr class="dropdown-divider">
+                  <a routerLink="/account" (click)="userMenuOpen.set(false)">Tổng quan</a>
                   <a routerLink="/orders" (click)="userMenuOpen.set(false)">Đơn mua của tôi</a>
                   <a routerLink="/profile" (click)="userMenuOpen.set(false)">Hồ sơ cá nhân</a>
                   <a routerLink="/addresses" (click)="userMenuOpen.set(false)">Sổ địa chỉ</a>
@@ -100,30 +119,54 @@ import { CartService } from '../services/cart.service';
         </div>
       </div>
 
-      <!-- Mobile navigation drawer -->
+      <!-- Menu di động: ngăn kéo mở từ bên phải -->
       @if (mobileMenuOpen()) {
-        <div class="mobile-drawer">
-          <nav class="mobile-nav" id="mobile-navigation" aria-label="Điều hướng di động">
-            <a routerLink="/" routerLinkActive="active" ariaCurrentWhenActive="page" [routerLinkActiveOptions]="{ exact: true }" (click)="mobileMenuOpen.set(false)">SẢN PHẨM</a>
-            <a routerLink="/lookbooks" routerLinkActive="active" ariaCurrentWhenActive="page" [routerLinkActiveOptions]="{ exact: true }" (click)="mobileMenuOpen.set(false)">BỘ SƯU TẬP</a>
-            <a routerLink="/community" routerLinkActive="active" ariaCurrentWhenActive="page" [routerLinkActiveOptions]="{ exact: true }" (click)="mobileMenuOpen.set(false)">CỘNG ĐỒNG</a>
-            <a routerLink="/ai/try-on" routerLinkActive="active" ariaCurrentWhenActive="page" [routerLinkActiveOptions]="{ exact: true }" (click)="mobileMenuOpen.set(false)">Thử đồ AI (Try-on)</a>
-            <a routerLink="/ai/mix-match" routerLinkActive="active" ariaCurrentWhenActive="page" [routerLinkActiveOptions]="{ exact: true }" (click)="mobileMenuOpen.set(false)">Gợi ý phối đồ AI</a>
-            <hr class="drawer-divider">
-            @if (auth.isAuthenticated()) {
-              <a routerLink="/orders" routerLinkActive="active" ariaCurrentWhenActive="page" [routerLinkActiveOptions]="{ exact: true }" (click)="mobileMenuOpen.set(false)">Đơn mua của tôi</a>
-              <a routerLink="/profile" routerLinkActive="active" ariaCurrentWhenActive="page" [routerLinkActiveOptions]="{ exact: true }" (click)="mobileMenuOpen.set(false)">Hồ sơ cá nhân</a>
-              <a routerLink="/addresses" routerLinkActive="active" ariaCurrentWhenActive="page" [routerLinkActiveOptions]="{ exact: true }" (click)="mobileMenuOpen.set(false)">Sổ địa chỉ</a>
-              <a routerLink="/notifications" routerLinkActive="active" ariaCurrentWhenActive="page" [routerLinkActiveOptions]="{ exact: true }" (click)="mobileMenuOpen.set(false)">Thông báo</a>
-              @if (auth.isStaff() || auth.isAdmin()) {
-                <a routerLink="/admin" class="highlight-link" (click)="mobileMenuOpen.set(false)">Trang quản trị</a>
-              }
-              <button class="drawer-logout" (click)="onLogout()">Đăng xuất</button>
-            } @else {
-              <a routerLink="/auth" routerLinkActive="active" ariaCurrentWhenActive="page" [routerLinkActiveOptions]="{ exact: true }" (click)="mobileMenuOpen.set(false)">Đăng nhập / Đăng ký</a>
+        <div class="m-overlay" (click)="closeMobile()" aria-hidden="true"></div>
+        <aside class="m-drawer" id="mobile-navigation" role="dialog" aria-modal="true" aria-label="Menu di động">
+          <div class="m-head">
+            <img src="/assets/brand/muse-logo-black.png" alt="MUSE" class="m-logo">
+            <button type="button" class="m-close" (click)="closeMobile()" aria-label="Đóng menu">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+            </button>
+          </div>
+
+          <form class="m-search" role="search" (submit)="submitSearch($event)">
+            <input type="search" name="mq" [value]="searchTerm()" (input)="searchTerm.set($any($event.target).value)" placeholder="Tìm sản phẩm..." aria-label="Tìm kiếm sản phẩm" autocomplete="off">
+          </form>
+
+          <nav class="m-nav" aria-label="Điều hướng di động">
+            <a routerLink="/" routerLinkActive="active" ariaCurrentWhenActive="page" [routerLinkActiveOptions]="{ exact: true }" (click)="closeMobile()">TRANG CHỦ</a>
+            <a routerLink="/products" routerLinkActive="active" ariaCurrentWhenActive="page" (click)="closeMobile()">SẢN PHẨM</a>
+            <a routerLink="/lookbooks" routerLinkActive="active" ariaCurrentWhenActive="page" (click)="closeMobile()">BỘ SƯU TẬP</a>
+            <button type="button" class="m-group" [attr.aria-expanded]="mobileAiOpen()" aria-controls="m-ai-list" (click)="mobileAiOpen.set(!mobileAiOpen())">
+              <span>AI STUDIO</span><span aria-hidden="true">{{ mobileAiOpen() ? '−' : '+' }}</span>
+            </button>
+            @if (mobileAiOpen()) {
+              <div class="m-sub" id="m-ai-list">
+                <a routerLink="/ai/try-on" routerLinkActive="active" ariaCurrentWhenActive="page" (click)="closeMobile()">Thử đồ trực tuyến</a>
+                <a routerLink="/ai/mix-match" routerLinkActive="active" ariaCurrentWhenActive="page" (click)="closeMobile()">Gợi ý phối đồ</a>
+                <a routerLink="/ai/history" routerLinkActive="active" ariaCurrentWhenActive="page" (click)="closeMobile()">Lịch sử thử đồ</a>
+              </div>
             }
+            <a routerLink="/community" routerLinkActive="active" ariaCurrentWhenActive="page" (click)="closeMobile()">BLOG</a>
+            @if (hasAboutRoute) { <a routerLink="/about" routerLinkActive="active" ariaCurrentWhenActive="page" (click)="closeMobile()">VỀ CHÚNG TÔI</a> }
+            @if (auth.isStaff() || auth.isAdmin()) { <a routerLink="/admin" class="highlight-link" (click)="closeMobile()">TRANG QUẢN TRỊ</a> }
           </nav>
-        </div>
+
+          <div class="m-account">
+            @if (auth.isAuthenticated()) {
+              <div class="m-user"><strong>{{ auth.currentUser()?.fullName }}</strong><span>{{ auth.currentUser()?.email }}</span></div>
+              <a routerLink="/account" routerLinkActive="active" ariaCurrentWhenActive="page" (click)="closeMobile()">Tổng quan</a>
+              <a routerLink="/orders" routerLinkActive="active" ariaCurrentWhenActive="page" (click)="closeMobile()">Đơn mua của tôi</a>
+              <a routerLink="/profile" routerLinkActive="active" ariaCurrentWhenActive="page" (click)="closeMobile()">Hồ sơ cá nhân</a>
+              <a routerLink="/addresses" routerLinkActive="active" ariaCurrentWhenActive="page" (click)="closeMobile()">Sổ địa chỉ</a>
+              <a routerLink="/notifications" routerLinkActive="active" ariaCurrentWhenActive="page" (click)="closeMobile()">Thông báo</a>
+              <button type="button" class="drawer-logout" (click)="onLogout()">Đăng xuất</button>
+            } @else {
+              <a routerLink="/auth" class="m-login" (click)="closeMobile()">ĐĂNG NHẬP</a>
+            }
+          </div>
+        </aside>
       }
     </header>
   `,
@@ -645,21 +688,117 @@ import { CartService } from '../services/cart.service';
 
 
 
+    .search-wrap { display:flex; align-items:center; gap:6px; }
+    .header-search input { width:220px; height:36px; padding:0 12px; border:1px solid #171717; border-radius:0; background:#fff; color:#171717; font:inherit; font-size:13px; }
+    .header-search input:focus-visible { outline:2px solid #171717; outline-offset:2px; }
+    .bell-badge { background:#f4b8c1; color:#171717; border:1px solid #000; }
+    .login-btn { background:#f4b8c1; }
+    .login-btn:hover { background:#efa5b2; }
+    @media (max-width:560px) { .header-search input { width:140px; } }
+    /* Cụm icon theo Figma: kính lúp, chuông, túi, avatar viền hồng */
+    .header-actions { gap: 20px; }
+    .header-actions .icon-btn { min-width: 32px; min-height: 32px; padding: 4px; background: transparent; }
+    .header-actions .icon-btn:hover { background: transparent; opacity: .7; }
+    .header-actions .badge { top: -4px; right: -10px; min-width: 15px; height: 15px; padding: 0 3px; border-radius: 0; font-size: 9px; font-weight: 700; line-height: 15px; }
+    .header-actions .cart-badge { background: #000; color: #fff; border: 0; min-width: 13px; height: 13px; line-height: 13px; right: -8px; }
+    .header-actions .bell-badge { background: #f4b8c1; color: #171717; border: 1px solid #000; line-height: 13px; }
+    .header-actions .avatar-circle { width: 40px; height: 40px; border: 2px solid #fff; box-shadow: 0 0 0 3px #f8dfe2, 0 1px 2px rgba(0,0,0,.05); }
+    .header-actions .user-avatar-btn { margin-left: 12px; padding: 3px; }
+    .header-actions .search-btn { border: 0; outline: 0; box-shadow: none; background: transparent; appearance: none; cursor: pointer; }
+    .header-actions .search-btn:focus:not(:focus-visible) { outline: 0; }
+
+    /* Ngăn kéo menu di động */
+    .m-overlay { position: fixed; inset: 0; z-index: 1000; background: rgba(23, 23, 23, .5); }
+    .m-drawer { position: fixed; top: 0; right: 0; bottom: 0; z-index: 1001; display: flex; width: min(86vw, 360px); flex-direction: column; gap: 16px; padding: 20px 20px 28px; overflow-y: auto; background: #fff; box-shadow: -12px 0 32px rgba(0, 0, 0, .18); animation: m-slide 200ms ease-out; }
+    @keyframes m-slide { from { transform: translateX(100%); } to { transform: translateX(0); } }
+    @media (prefers-reduced-motion: reduce) { .m-drawer { animation: none; } }
+    .m-head { display: flex; align-items: center; justify-content: space-between; }
+    .m-logo { display: block; width: 112px; height: auto; }
+    .m-close { display: inline-flex; min-width: 44px; min-height: 44px; align-items: center; justify-content: center; border: 0; background: none; color: #171717; cursor: pointer; }
+    .m-search input { width: 100%; height: 44px; padding: 0 12px; border: 1px solid #171717; border-radius: 0; background: #fff; color: #171717; font: inherit; font-size: 14px; }
+    .m-nav, .m-account { display: flex; flex-direction: column; }
+    .m-nav a, .m-group, .m-account a, .drawer-logout { display: flex; min-height: 48px; align-items: center; justify-content: space-between; padding: 12px 4px; border: 0; border-bottom: 1px solid #e3e2e2; border-radius: 0; background: none; color: #171717; font: inherit; font-size: 13px; font-weight: 600; letter-spacing: .65px; text-align: left; text-decoration: none; cursor: pointer; }
+    .m-nav a.active, .m-account a.active { color: #8f485d; }
+    .m-sub { display: flex; flex-direction: column; padding-left: 16px; background: #f5f3f3; }
+    .m-sub a { font-weight: 500; letter-spacing: .2px; }
+    .m-account { margin-top: auto; padding-top: 8px; }
+    .m-user { display: grid; gap: 2px; padding: 8px 4px 12px; }
+    .m-user strong { font-size: 14px; }
+    .m-user span { color: #747878; font-size: 12px; overflow-wrap: anywhere; }
+    .drawer-logout { color: #9b2c2c; }
+    .m-login { justify-content: center !important; border: 1px solid #171717 !important; background: #f4b8c1 !important; font-weight: 700 !important; letter-spacing: 1.3px !important; }
+    @media (min-width: 1101px) { .m-overlay, .m-drawer { display: none; } }
+    @media (max-width: 1100px) { .mobile-drawer { display: none !important; } }
+    .avatar-circle { overflow: hidden; }
+    .avatar-img { display: block; width: 100%; height: 100%; object-fit: cover; }
   `],
 })
-export class HeaderComponent {
+export class HeaderComponent implements OnDestroy {
   readonly auth = inject(AuthService);
   readonly cart = inject(CartService);
+  private readonly router = inject(Router);
+  private readonly api = inject(ApiService);
+
+  readonly hasAboutRoute = this.router.config.some(r => r.path === 'about');
+  readonly searchOpen = signal(false);
+  readonly searchTerm = signal('');
+  @ViewChild('searchInput') searchInput?: ElementRef<HTMLInputElement>;
+  readonly unread = signal(0);
+  private unreadRequest?: Subscription;
+  private readonly navSub: Subscription;
+
+  constructor() {
+    effect(() => {
+      if (this.auth.isAuthenticated()) this.loadUnread();
+      else { this.unreadRequest?.unsubscribe(); this.unread.set(0); }
+    });
+    effect(() => {
+      if (typeof document === 'undefined') return;
+      document.body.style.overflow = this.mobileMenuOpen() ? 'hidden' : '';
+    });
+    this.navSub = this.router.events.pipe(filter(e => e instanceof NavigationEnd)).subscribe(() => {
+      this.searchOpen.set(false);
+      this.mobileMenuOpen.set(false);
+      if (this.auth.isAuthenticated()) this.loadUnread();
+    });
+  }
+  ngOnDestroy(): void { if (typeof document !== 'undefined') document.body.style.overflow = ''; this.navSub.unsubscribe(); this.unreadRequest?.unsubscribe(); }
+
+  private loadUnread(): void {
+    this.unreadRequest?.unsubscribe();
+    this.unreadRequest = this.api.listNotifications(1, 1).subscribe({
+      next: res => this.unread.set(res.unreadCount ?? 0),
+      error: () => this.unread.set(0),
+    });
+  }
+
+  toggleSearch(event: MouseEvent): void {
+    event.stopPropagation();
+    const open = !this.searchOpen();
+    this.searchOpen.set(open);
+    this.aiMenuOpen.set(false); this.userMenuOpen.set(false);
+    if (open) setTimeout(() => this.searchInput?.nativeElement.focus());
+  }
+  submitSearch(event: Event): void {
+    event.preventDefault();
+    const q = this.searchTerm().trim();
+    this.router.navigate(['/products'], { queryParams: q ? { q } : {} });
+    this.searchOpen.set(false);
+    this.mobileMenuOpen.set(false);
+  }
 
   readonly aiMenuOpen = signal(false);
   toggleAiMenu(event: MouseEvent): void { event.stopPropagation(); this.aiMenuOpen.update(open => !open); this.userMenuOpen.set(false); }
   @HostListener('document:keydown.escape')
   onEscape(): void {
+    this.searchOpen.set(false);
     if (this.aiMenuOpen()) { this.aiMenuOpen.set(false); document.getElementById('ai-nav-trigger')?.focus(); }
     this.userMenuOpen.set(false); this.mobileMenuOpen.set(false);
   }
   readonly userMenuOpen = signal(false);
   readonly mobileMenuOpen = signal(false);
+  readonly mobileAiOpen = signal(false);
+  closeMobile(): void { this.mobileMenuOpen.set(false); }
 
   toggleUserMenu(e: MouseEvent): void {
     e.stopPropagation();
@@ -668,6 +807,7 @@ export class HeaderComponent {
 
   @HostListener('document:click')
   onDocumentClick(): void {
+    this.searchOpen.set(false);
     this.aiMenuOpen.set(false);
     this.userMenuOpen.set(false);
   }
