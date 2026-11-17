@@ -7,6 +7,7 @@ import { ApiService } from '../services/api.service';
 import { AuthService } from '../services/auth.service';
 import { CartService } from '../services/cart.service';
 import { ToastService } from '../services/toast.service';
+import { STORE_CART_CONTENT, STORE_CHECKOUT_CONTENT } from '../shared/store-content';
 import { catchError, map, Subscription, throwError } from 'rxjs';
 
 const VOUCHER_ERRORS: Record<string, string> = {
@@ -34,99 +35,79 @@ function generateUUID(): string {
   template: `
     <main class="checkout-container">
       <header class="page-header">
-        <span class="eyebrow">THANH TOÁN</span>
-        <h1 class="page-title">Xác nhận đơn hàng</h1>
+        <h1 class="page-title">{{ content.title }}</h1>
+        <ol class="steps" aria-label="Các bước thanh toán">
+          <li><a routerLink="/cart">{{ content.steps[0] }}</a></li>
+          <li class="current" aria-current="step">{{ content.steps[1] }}</li>
+          <li>{{ content.steps[2] }}</li>
+        </ol>
       </header>
 
       @if (pendingOrder()) {
-        <section class="checkout-card" role="status" aria-live="polite">
+        <section class="state-card" role="status" aria-live="polite">
           <h2>Đang xác minh kết quả đặt hàng</h2>
           <p>Yêu cầu có thể đã được ghi nhận. Vui lòng kiểm tra lại; không cần tạo đơn khác.</p>
           <button type="button" class="btn-primary" [disabled]="placingOrder()" (click)="recoverPendingOrder()">{{ placingOrder() ? 'Đang kiểm tra…' : 'Kiểm tra đơn hàng' }}</button>
-          <a routerLink="/orders">Xem lịch sử đơn hàng</a>
+          <a routerLink="/orders" class="link-text">Xem lịch sử đơn hàng</a>
         </section>
       } @else if (cart.itemCount() === 0) {
-        <div class="empty-notice">
-          <p>Giỏ hàng của bạn đang trống.</p>
-          <a routerLink="/" class="btn-primary">Quay lại cửa hàng</a>
-        </div>
+        <section class="state-card">
+          <p>{{ content.emptyTitle }}</p>
+          <a routerLink="/products" class="btn-primary">{{ content.emptyAction }}</a>
+        </section>
       } @else {
         <div class="checkout-layout">
-          <!-- Left Column: Address & Details -->
           <div class="form-col">
-            <!-- Step 1: Delivery Address -->
-            <section class="checkout-card">
+            <section class="checkout-card" aria-labelledby="address-heading">
               <div class="card-title-row">
-                <h3>1. Địa chỉ giao hàng</h3>
-                <button type="button" class="btn-text" (click)="toggleNewAddress()">
-                  {{ showNewAddressForm() ? 'Hủy thêm địa chỉ' : '+ Thêm địa chỉ mới' }}
-                </button>
+                <h2 id="address-heading">{{ content.addressTitle }}</h2>
+                @if (addresses().length > 0) {
+                  <button type="button" class="btn-text" [attr.aria-expanded]="showNewAddressForm()" (click)="toggleNewAddress()">
+                    {{ showNewAddressForm() ? content.cancelAddAddress : content.addAddress }}
+                  </button>
+                }
               </div>
 
-              @if (addressLoadError()) {
-                <p role="alert">{{ addressLoadError() }}</p>
-                <button type="button" class="btn-outline" (click)="loadAddresses()">Tải lại địa chỉ</button>
-              }
               @if (loadingAddresses()) {
-                <p class="notice">Đang tải danh sách địa chỉ...</p>
+                <p class="notice" role="status">Đang tải danh sách địa chỉ...</p>
+              }
+              @if (addressLoadError()) {
+                <div class="alert-error" role="alert">
+                  <p>{{ addressLoadError() }}</p>
+                  <button type="button" class="btn-outline" (click)="loadAddresses()">Tải lại địa chỉ</button>
+                </div>
               }
 
-              <!-- Existing addresses radio list -->
-              @if (!showNewAddressForm() && addresses().length > 0) {
-                <div class="address-options">
+              @if (addresses().length > 0) {
+                <div class="address-options" role="radiogroup" aria-labelledby="address-heading">
                   @for (addr of addresses(); track addr.id) {
                     <label class="address-radio-card" [class.selected]="selectedAddressId() === addr.id">
-                      <input
-                        type="radio"
-                        name="addressRadio"
-                        [value]="addr.id"
-                        [checked]="selectedAddressId() === addr.id"
-                        (change)="selectAddress(addr.id)"
-                      />
+                      <input type="radio" name="addressRadio" [value]="addr.id" [checked]="selectedAddressId() === addr.id" (change)="selectAddress(addr.id)" />
                       <div class="addr-info">
+                        @if (addr.isDefault) { <span class="default-badge">MẶC ĐỊNH</span> }
                         <strong>{{ addr.receiver }} · {{ addr.phone }}</strong>
                         <p>{{ addr.line1 }}, {{ addr.ward }}, {{ addr.district }}, {{ addr.province }}</p>
-                        @if (addr.isDefault) {
-                          <span class="default-badge">Mặc định</span>
-                        }
                       </div>
                     </label>
                   }
                 </div>
+              } @else if (!loadingAddresses() && !addressLoadError()) {
+                <p class="notice">{{ content.noAddressHint }}</p>
               }
 
-              <!-- Inline New Address Form -->
-              @if (showNewAddressForm() || addresses().length === 0) {
+              @if (showNewAddressForm() && !loadingAddresses()) {
                 <form (ngSubmit)="saveNewAddress()" class="new-address-form">
                   <div class="form-row">
-                    <label>
-                      Họ tên người nhận *
-                      <input type="text" [(ngModel)]="newReceiver" name="receiver" required />
-                    </label>
-                    <label>
-                      Số điện thoại *
-                      <input type="tel" [(ngModel)]="newPhone" name="phone" required />
-                    </label>
+                    <label>Họ tên người nhận *<input type="text" [(ngModel)]="newReceiver" name="receiver" required /></label>
+                    <label>Số điện thoại *<input type="tel" [(ngModel)]="newPhone" name="phone" required /></label>
                   </div>
                   <div class="form-row">
-                    <label>
-                      Địa chỉ nhà / số đường *
-                      <input type="text" [(ngModel)]="newLine1" name="line1" required />
-                    </label>
-                    <label>
-                      Phường / Xã *
-                      <input type="text" [(ngModel)]="newWard" name="ward" required />
-                    </label>
+                    <label>Địa chỉ nhà / số đường *<input type="text" [(ngModel)]="newLine1" name="line1" required /></label>
+                    <label>Phường / Xã *<input type="text" [(ngModel)]="newWard" name="ward" required /></label>
                   </div>
                   <div class="form-row">
-                    <label>
-                      Quận / Huyện *
-                      <input type="text" [(ngModel)]="newDistrict" name="district" required />
-                    </label>
-                    <label>
-                      Tỉnh / Thành phố *
-                      <input type="text" [(ngModel)]="newProvince" name="province" required />
-                    </label>
+                    <label>Quận / Huyện *<input type="text" [(ngModel)]="newDistrict" name="district" required /></label>
+                    <label>Tỉnh / Thành phố *<input type="text" [(ngModel)]="newProvince" name="province" required /></label>
                   </div>
                   <button type="submit" class="btn-primary" [disabled]="savingAddress()">
                     {{ savingAddress() ? 'Đang lưu...' : 'Lưu và dùng địa chỉ này' }}
@@ -135,79 +116,75 @@ function generateUUID(): string {
               }
             </section>
 
-            <!-- Step 2: Voucher / Mã giảm giá -->
-            <section class="checkout-card">
-              <h3 id="voucher-heading">2. Mã ưu đãi / Voucher</h3>
-              <div class="voucher-input-row">
-                <input
-                  type="text"
-                  placeholder="Nhập mã ưu đãi của bạn"
-                  [(ngModel)]="voucherCode"
-                  (ngModelChange)="voucherError.set('')"
-                  aria-labelledby="voucher-heading"
-                  [attr.aria-invalid]="voucherError() ? 'true' : null"
-                  [attr.aria-describedby]="voucherError() ? 'voucher-feedback' : null"
-                  name="voucher"
-                  (keyup.enter)="applyQuote()"
-                />
-                <button type="button" class="btn-outline" (click)="applyQuote()" [disabled]="quoting()">
-                  {{ quoting() ? 'Đang kiểm tra...' : 'Áp dụng' }}
-                </button>
+            <section class="checkout-card" aria-labelledby="items-heading">
+              <div class="card-title-row">
+                <h2 id="items-heading">{{ content.itemsTitle }}</h2>
+                <a routerLink="/cart" class="btn-text">{{ content.editCart }}</a>
               </div>
-              @if (voucherError()) {
-                <p id="voucher-feedback" class="voucher-error" role="status">{{ voucherError() }}</p>
-              }
-              @if (appliedVoucherCode(); as code) {
-                <p class="voucher-success">✓ Đã áp dụng mã: {{ code }}</p>
-              }
+              <ul class="order-items">
+                @for (item of cart.cart()?.items ?? []; track item.variantId) {
+                  <li>
+                    <div class="oi-main">
+                      <strong>{{ item.productName }}</strong>
+                      <span>SKU: {{ item.sku }} · SL: {{ item.quantity }}</span>
+                    </div>
+                    <span class="oi-price">{{ item.unitPrice * item.quantity | currency:'VND':'symbol':'1.0-0' }}</span>
+                  </li>
+                }
+              </ul>
             </section>
           </div>
 
-          <!-- Right Column: Order Summary & Pay -->
           <aside class="summary-col">
             <div class="summary-card">
-              <h3>Chi tiết thanh toán</h3>
+              <h2>{{ content.summaryTitle }}</h2>
+
+              <div class="voucher-block">
+                <span class="field-label" id="voucher-heading">{{ content.voucherLabel }}</span>
+                <div class="voucher-input-row">
+                  <input
+                    type="text"
+                    [placeholder]="content.voucherPlaceholder"
+                    [(ngModel)]="voucherCode"
+                    (ngModelChange)="voucherError.set('')"
+                    aria-labelledby="voucher-heading"
+                    [attr.aria-invalid]="voucherError() ? 'true' : null"
+                    [attr.aria-describedby]="voucherError() ? 'voucher-feedback' : null"
+                    name="voucher"
+                    (keyup.enter)="applyQuote()"
+                  />
+                  <button type="button" class="btn-outline" (click)="applyQuote()" [disabled]="quoting() || !selectedAddressId()">
+                    {{ quoting() ? 'Đang kiểm tra...' : 'ÁP DỤNG' }}
+                  </button>
+                </div>
+                @if (voucherError()) {
+                  <p id="voucher-feedback" class="voucher-error" role="status">{{ voucherError() }}</p>
+                }
+                @if (appliedVoucherCode(); as code) {
+                  <p class="voucher-success">✓ Đã áp dụng mã: {{ code }}</p>
+                }
+              </div>
 
               @if (quote(); as q) {
-                <div class="summary-line">
-                  <span>Tạm tính hàng</span>
-                  <strong>{{ q.subtotal | currency:'VND':'symbol':'1.0-0' }}</strong>
-                </div>
-
-                <div class="summary-line">
-                  <span>Phí vận chuyển</span>
-                  <span>{{ q.shippingFee | currency:'VND':'symbol':'1.0-0' }}</span>
-                </div>
-
+                <div class="summary-line"><span>Tạm tính</span><strong>{{ q.subtotal | currency:'VND':'symbol':'1.0-0' }}</strong></div>
+                <div class="summary-line"><span>Phí vận chuyển</span><span>{{ q.shippingFee | currency:'VND':'symbol':'1.0-0' }}</span></div>
                 @if (q.voucherDiscount > 0) {
-                  <div class="summary-line discount-line">
-                    <span>Giảm giá voucher</span>
-                    <span>-{{ q.voucherDiscount | currency:'VND':'symbol':'1.0-0' }}</span>
-                  </div>
+                  <div class="summary-line discount-line"><span>Giảm giá</span><span>-{{ q.voucherDiscount | currency:'VND':'symbol':'1.0-0' }}</span></div>
                 }
-
                 <hr class="summary-divider" />
-
-                <div class="summary-line total-line">
-                  <span>Tổng thanh toán</span>
-                  <span class="total-amount">{{ q.payableTotal | currency:'VND':'symbol':'1.0-0' }}</span>
-                </div>
+                <div class="summary-line total-line"><span>TỔNG THANH TOÁN</span><span class="total-amount">{{ q.payableTotal | currency:'VND':'symbol':'1.0-0' }}</span></div>
               } @else {
                 <p class="notice" role="status">{{ quoting() ? 'Đang cập nhật báo giá...' : quoteError() || 'Vui lòng chọn hoặc thêm địa chỉ nhận hàng để tính cước phí.' }}</p>
               }
 
-              <button
-                type="button"
-                class="btn-place-order"
-                [disabled]="placingOrder() || quoting() || !quote() || !selectedAddressId()"
-                (click)="placeOrder()"
-              >
-                {{ placingOrder() ? 'Đang khởi tạo đơn hàng...' : 'Xác nhận đặt hàng & Thanh toán VietQR' }}
+              <button type="button" class="btn-place-order" [disabled]="placingOrder() || quoting() || !quote() || !selectedAddressId()" (click)="placeOrder()">
+                {{ placingOrder() ? 'Đang khởi tạo đơn hàng...' : content.placeOrder }}
               </button>
+              <p class="terms-text">{{ content.placeOrderNote }}</p>
 
-              <p class="terms-text">
-                Bằng việc xác nhận, bạn đồng ý với các điều khoản mua sắm và chính sách giao hàng của Fashion Commerce.
-              </p>
+              <ul class="assurances">
+                @for (text of assurances; track text) { <li>{{ text }}</li> }
+              </ul>
             </div>
           </aside>
         </div>
@@ -215,222 +192,88 @@ function generateUUID(): string {
     </main>
   `,
   styles: [`
-    .checkout-container {
-      max-width: 1200px;
-      margin: 0 auto;
-      padding: 40px 6vw 100px;
+    :host { display: block; background: var(--ui-bg, #fff); color: var(--ui-ink, #171717); font-family: var(--font-sans, "Montserrat", Arial, sans-serif); }
+    button, input { font-family: inherit; }
+    .checkout-container { width: min(100%, var(--ui-page-max, 1280px)); margin: 0 auto; padding: 64px var(--ui-page-pad, 48px); }
+    .page-header { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; margin-bottom: 34px; padding-bottom: 16px; border-bottom: 1px solid var(--ui-ink, #171717); }
+    .page-title { margin: 0; font-family: var(--font-serif, "Playfair Display", Georgia, serif); font-size: 40px; font-weight: 400; line-height: 48px; letter-spacing: -1px; }
+    .steps { display: flex; flex-wrap: wrap; gap: 8px 0; margin: 0; padding: 0; list-style: none; color: var(--ui-subtle, #747878); font-size: 11px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; }
+    .steps li + li::before { content: '→'; margin: 0 12px; color: var(--ui-line, #c4c7c7); }
+    .steps a { color: var(--ui-ink, #171717); text-decoration: underline; text-underline-offset: 5px; }
+    .steps .current { color: var(--ui-accent, #8f485d); }
+    .checkout-layout { display: grid; grid-template-columns: minmax(0, 2.16fr) minmax(330px, 1fr); gap: 48px; align-items: start; }
+    .form-col, .summary-col { min-width: 0; }
+    .summary-col { position: sticky; top: 24px; }
+    .checkout-card { margin-bottom: 24px; padding: 28px 32px; border: 1px solid var(--ui-line, #c4c7c7); background: #fff; }
+    .card-title-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 20px; padding-bottom: 12px; border-bottom: 1px solid rgba(0,0,0,.2); }
+    .card-title-row h2, .summary-card h2 { margin: 0; font-family: var(--font-serif, "Playfair Display", Georgia, serif); font-size: 22px; font-weight: 500; line-height: 30px; letter-spacing: -.3px; }
+    .notice { margin: 0; color: var(--ui-ink-soft, #444748); font-size: 13px; line-height: 1.6; }
+    .btn-text { padding: 0; border: 0; border-bottom: 1px solid var(--ui-accent, #8f485d); background: none; color: var(--ui-accent, #8f485d); font-size: 12px; font-weight: 700; letter-spacing: .5px; text-decoration: none; cursor: pointer; }
+    .link-text { color: var(--ui-ink, #171717); font-size: 12px; }
+    .btn-primary, .btn-outline { display: inline-flex; min-height: 44px; align-items: center; justify-content: center; padding: 0 22px; border: 1px solid var(--ui-ink, #171717); border-radius: 0; font-size: 12px; font-weight: 700; letter-spacing: .8px; text-decoration: none; cursor: pointer; }
+    .btn-primary { background: var(--ui-ink, #171717); color: #fff; }
+    .btn-primary:hover:not(:disabled) { background: var(--ui-pink, #f4b8c1); color: var(--ui-ink, #171717); }
+    .btn-outline { background: #fff; color: var(--ui-ink, #171717); }
+    .btn-outline:hover:not(:disabled) { background: var(--ui-pink, #f4b8c1); }
+    .btn-primary:disabled, .btn-outline:disabled { opacity: .45; cursor: not-allowed; }
+    .alert-error { padding: 14px 16px; border: 1px solid var(--ui-danger, #9b2c2c); background: var(--ui-danger-bg, #fff1f1); color: var(--ui-danger, #9b2c2c); font-size: 13px; }
+    .alert-error p { margin: 0 0 12px; }
+    .address-options { display: flex; flex-direction: column; gap: 12px; }
+    .address-radio-card { display: flex; align-items: flex-start; gap: 14px; padding: 16px; border: 1px solid var(--ui-line, #c4c7c7); background: #fff; cursor: pointer; }
+    .address-radio-card input { margin-top: 3px; accent-color: var(--ui-ink, #171717); }
+    .address-radio-card.selected { border-color: var(--ui-ink, #171717); background: var(--ui-bg-soft, #f5f3f3); }
+    .addr-info strong { display: block; margin-bottom: 4px; font-size: 14px; }
+    .addr-info p { margin: 0; color: var(--ui-ink-soft, #444748); font-size: 13px; line-height: 1.55; }
+    .default-badge { display: inline-block; margin-bottom: 8px; padding: 2px 8px; background: var(--ui-pink, #f4b8c1); color: var(--ui-ink, #171717); font-size: 10px; font-weight: 700; letter-spacing: 1px; }
+    .new-address-form { display: flex; flex-direction: column; gap: 16px; margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--ui-line-soft, #e3e2e2); }
+    .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    .new-address-form label { display: flex; flex-direction: column; gap: 6px; font-size: 11px; font-weight: 700; letter-spacing: .55px; text-transform: uppercase; }
+    .new-address-form input, .voucher-input-row input { height: 44px; padding: 0 12px; border: 1px solid var(--ui-line, #c4c7c7); border-radius: 0; background: #fff; color: var(--ui-ink, #171717); font-size: 13px; outline: 0; }
+    .new-address-form input:focus-visible, .voucher-input-row input:focus-visible { border-color: var(--ui-ink, #171717); box-shadow: 0 0 0 1px var(--ui-ink, #171717); }
+    .field-label { display: block; margin-bottom: 8px; color: var(--ui-subtle, #747878); font-size: 11px; font-weight: 700; letter-spacing: 1.1px; }
+    .voucher-block { margin-bottom: 20px; padding-bottom: 20px; border-bottom: 1px solid var(--ui-line-soft, #e3e2e2); }
+    .voucher-input-row { display: flex; gap: 10px; }
+    .voucher-input-row input { flex: 1; min-width: 0; text-transform: uppercase; }
+    .voucher-success { margin: 12px 0 0; color: var(--ui-success, #276749); font-size: 13px; font-weight: 600; }
+    .voucher-error { margin: 12px 0 0; color: var(--ui-danger, #9b2c2c); font-size: 13px; }
+    .order-items { margin: 0; padding: 0; list-style: none; }
+    .order-items li { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; padding: 14px 0; border-bottom: 1px solid var(--ui-line-soft, #e3e2e2); }
+    .order-items li:last-child { border-bottom: 0; padding-bottom: 0; }
+    .oi-main { display: grid; gap: 4px; min-width: 0; }
+    .oi-main strong { font-family: var(--font-serif, "Playfair Display", Georgia, serif); font-size: 16px; font-weight: 400; line-height: 1.4; }
+    .oi-main span { color: var(--ui-ink-soft, #444748); font-size: 12px; }
+    .oi-price { font-size: 14px; font-weight: 600; white-space: nowrap; }
+    .summary-card { padding: 32px; border: 1px solid var(--ui-ink, #171717); background: #fff; }
+    .summary-card h2 { margin-bottom: 24px; padding-bottom: 12px; border-bottom: 1px solid rgba(0,0,0,.2); }
+    .summary-line { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; margin: 14px 0; color: var(--ui-ink-soft, #444748); font-size: 13px; line-height: 1.45; }
+    .summary-line > :last-child { color: var(--ui-ink, #171717); text-align: right; }
+    .discount-line > :last-child { color: var(--ui-success, #276749); }
+    .summary-divider { margin: 16px 0; border: 0; border-top: 1px solid rgba(0,0,0,.2); }
+    .total-line { align-items: baseline; font-size: 12px; font-weight: 700; letter-spacing: .7px; }
+    .total-amount { color: var(--ui-price, #c52929); font-family: var(--font-serif, "Playfair Display", Georgia, serif); font-size: 28px; font-weight: 600; line-height: 1.15; }
+    .btn-place-order { width: 100%; min-height: 50px; margin-top: 24px; padding: 0 16px; border: 1px solid var(--ui-ink, #171717); background: var(--ui-pink, #f4b8c1); color: var(--ui-ink, #171717); font-size: 12px; font-weight: 800; letter-spacing: 1.2px; cursor: pointer; }
+    .btn-place-order:hover:not(:disabled) { background: var(--ui-ink, #171717); color: #fff; }
+    .btn-place-order:disabled { border-color: var(--ui-line, #c4c7c7); background: var(--ui-bg-image, #efeded); color: var(--ui-subtle, #747878); cursor: not-allowed; }
+    .terms-text { margin: 14px 0 0; color: var(--ui-ink-soft, #444748); font-size: 12px; line-height: 1.55; text-align: center; }
+    .assurances { margin: 20px 0 0; padding: 16px 0 0; border-top: 1px solid var(--ui-line-soft, #e3e2e2); list-style: none; display: grid; gap: 8px; color: var(--ui-ink-soft, #444748); font-size: 12px; line-height: 1.5; }
+    .state-card { display: grid; justify-items: center; gap: 14px; max-width: 620px; margin: 40px auto; padding: 56px 28px; border: 1px solid var(--ui-line, #c4c7c7); text-align: center; }
+    .state-card h2 { margin: 0; font-family: var(--font-serif, "Playfair Display", Georgia, serif); font-size: 24px; font-weight: 500; }
+    .state-card p { margin: 0; color: var(--ui-ink-soft, #444748); }
+    :is(button, a, input):focus-visible { outline: 2px solid var(--ui-accent, #8f485d); outline-offset: 3px; }
+    @media (max-width: 980px) {
+      .checkout-container { padding-inline: 28px; }
+      .checkout-layout { grid-template-columns: 1fr; }
+      .summary-col { position: static; }
     }
-    .page-header {
-      margin-bottom: 30px;
+    @media (max-width: 640px) {
+      .checkout-container { padding: 36px 18px 56px; }
+      .page-header { align-items: flex-start; flex-direction: column; }
+      .page-title { font-size: 32px; line-height: 40px; }
+      .form-row { grid-template-columns: 1fr; }
+      .checkout-card, .summary-card { padding: 22px 18px; }
+      .voucher-input-row { flex-direction: column; }
+      .btn-primary, .btn-outline { width: 100%; }
     }
-    .eyebrow {
-      font-size: 0.74rem;
-      letter-spacing: 0.25em;
-      color: var(--color-accent);
-      font-weight: 700;
-    }
-    .page-title {
-      font-family: Georgia, serif;
-      font-size: 2.4rem;
-      font-weight: 500;
-      margin: 8px 0 0;
-    }
-    .checkout-layout {
-      display: grid;
-      grid-template-columns: 1fr 400px;
-      gap: 40px;
-      align-items: start;
-    }
-    .checkout-card {
-      background: var(--color-surface);
-      border: 1px solid var(--color-divider);
-      border-radius: var(--radius-card);
-      padding: 26px;
-      margin-bottom: 24px;
-    }
-    .card-title-row {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 20px;
-    }
-    .card-title-row h3, .checkout-card h3 {
-      font-family: Georgia, serif;
-      font-size: 1.25rem;
-      font-weight: 500;
-      margin: 0;
-    }
-    .btn-text {
-      background: none;
-      border: 0;
-      color: var(--color-accent);
-      font-size: 0.85rem;
-      font-weight: 600;
-      cursor: pointer;
-    }
-    .address-options {
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-    }
-    .address-radio-card {
-      display: flex;
-      align-items: flex-start;
-      gap: 14px;
-      border: 1px solid var(--color-divider);
-      border-radius: 6px;
-      padding: 16px;
-      cursor: pointer;
-      transition: all 0.15s;
-    }
-    .address-radio-card.selected {
-      border-color: var(--color-text);
-      background: var(--color-canvas);
-    }
-    .addr-info strong {
-      display: block;
-      font-size: 0.95rem;
-      color: var(--color-text);
-      margin-bottom: 4px;
-    }
-    .addr-info p {
-      font-size: 0.88rem;
-      color: var(--color-muted);
-      margin: 0 0 6px;
-      line-height: 1.5;
-    }
-    .default-badge {
-      font-size: 0.72rem;
-      background: #e8e4dc;
-      color: #555;
-      padding: 2px 8px;
-      border-radius: 10px;
-      font-weight: 600;
-    }
-    .new-address-form {
-      display: flex;
-      flex-direction: column;
-      gap: 14px;
-      margin-top: 14px;
-    }
-    .form-row {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 14px;
-    }
-    .new-address-form label {
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-      font-size: 0.85rem;
-      color: #444;
-    }
-    .new-address-form input {
-      border: 1px solid var(--color-border);
-      border-radius: var(--radius-control);
-      padding: 10px 12px;
-      font-size: 0.9rem;
-    }
-    .voucher-input-row {
-      display: flex;
-      gap: 10px;
-      margin-top: 14px;
-    }
-    .voucher-input-row input {
-      flex: 1;
-      min-width: 0;
-      border: 1px solid var(--color-border);
-      border-radius: var(--radius-control);
-      padding: 10px 14px;
-      font-size: 0.9rem;
-      text-transform: uppercase;
-    }
-    .voucher-success {
-      font-size: 0.85rem;
-      color: #2e7d32;
-      font-weight: 500;
-      margin: 10px 0 0;
-    }
-    .voucher-error {
-      color: #a12424;
-      font-size: 0.85rem;
-      margin: 10px 0 0;
-    }
-    .summary-card {
-      background: var(--color-surface);
-      border: 1px solid var(--color-divider);
-      border-radius: var(--radius-card);
-      padding: 28px;
-    }
-    .summary-card h3 {
-      font-family: Georgia, serif;
-      font-size: 1.35rem;
-      font-weight: 500;
-      margin: 0 0 20px;
-      padding-bottom: 14px;
-      border-bottom: 1px solid var(--color-divider);
-    }
-    .summary-line {
-      display: flex;
-      justify-content: space-between;
-      margin-bottom: 14px;
-      font-size: 0.92rem;
-      color: #555;
-    }
-    .discount-line {
-      color: #2e7d32;
-    }
-    .summary-divider {
-      border: 0;
-      border-top: 1px solid var(--color-divider);
-      margin: 16px 0;
-    }
-    .total-line {
-      font-size: 1.15rem;
-      color: var(--color-text);
-      font-weight: 600;
-    }
-    .total-amount {
-      color: var(--color-accent);
-      font-size: 1.4rem;
-    }
-    .btn-place-order {
-      width: 100%;
-      background: var(--color-primary);
-      color: var(--color-surface);
-      border: 0;
-      border-radius: var(--radius-control);
-      padding: 16px;
-      font-size: 0.95rem;
-      font-weight: 600;
-      cursor: pointer;
-      margin-top: 20px;
-      transition: background 0.15s;
-    }
-    .btn-place-order:hover:not(:disabled) {
-      background: #3e3b37;
-    }
-    .btn-place-order:disabled {
-      background: #ccc;
-      cursor: not-allowed;
-    }
-    .terms-text {
-      font-size: 0.76rem;
-      color: var(--color-muted);
-      line-height: 1.5;
-      margin-top: 14px;
-      text-align: center;
-    }
-    @media (max-width: 860px) {
-      .checkout-layout {
-        grid-template-columns: 1fr;
-      }
-      .form-row {
-        grid-template-columns: 1fr;
-      }
-    }
-    .form-col,.summary-col { min-width:0; } .empty-notice { padding:48px 24px; text-align:center; background:var(--color-canvas); border-radius:var(--radius-card); border:1px dashed var(--color-border); }
-
   `],
 })
 export class CheckoutPage implements OnInit, OnDestroy {
@@ -438,6 +281,9 @@ export class CheckoutPage implements OnInit, OnDestroy {
   readonly cart = inject(CartService);
   private readonly toast = inject(ToastService);
   private readonly router = inject(Router);
+
+  readonly content = STORE_CHECKOUT_CONTENT;
+  readonly assurances = STORE_CART_CONTENT.assurances;
 
   readonly addresses = signal<UserAddress[]>([]);
   readonly selectedAddressId = signal<string>('');

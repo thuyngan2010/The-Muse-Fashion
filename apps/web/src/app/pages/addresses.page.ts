@@ -6,10 +6,11 @@ import { ModalComponent } from '../components/modal.component';
 import { ApiService } from '../services/api.service';
 import { ToastService } from '../services/toast.service';
 import { STORE_ADDRESSES_CONTENT } from '../shared/store-content';
+import { PageStateComponent } from '../components/page-state.component';
 
 @Component({
   standalone: true,
-  imports: [FormsModule, ModalComponent, AccountSidebarComponent],
+  imports: [PageStateComponent, FormsModule, ModalComponent, AccountSidebarComponent],
   template: `
     <main class="account-shell">
       <fc-account-sidebar activeItem="addresses" />
@@ -21,9 +22,9 @@ import { STORE_ADDRESSES_CONTENT } from '../shared/store-content';
         </header>
 
         @if (loading()) {
-          <div class="state-panel" aria-live="polite"><span class="spinner" aria-hidden="true"></span><h2>Đang tải địa chỉ</h2><p>Danh sách địa chỉ nhận hàng đang được cập nhật.</p></div>
+          <fc-page-state kind="loading" title="Đang tải địa chỉ" message="Danh sách địa chỉ nhận hàng đang được cập nhật." />
         } @else if (error()) {
-          <div class="state-panel error-panel" role="alert"><span class="state-icon">!</span><h2>Không thể tải địa chỉ</h2><p>{{ error() }}</p><button type="button" class="button button-pink" (click)="loadAddresses()">THỬ LẠI</button></div>
+          <fc-page-state kind="error" title="Không thể tải địa chỉ" [message]="error()" actionLabel="THỬ LẠI" (action)="loadAddresses()" />
         } @else {
           @if (addresses().length === 0) {
             <div class="empty-intro"><span>CHƯA CÓ ĐỊA CHỈ</span><h2>Bạn chưa lưu địa chỉ nhận hàng</h2><p>Thêm địa chỉ để sử dụng khi thực hiện thanh toán.</p></div>
@@ -109,9 +110,7 @@ import { STORE_ADDRESSES_CONTENT } from '../shared/store-content';
     .add-card:hover,.add-card:focus-visible { border-color:#000; background:#fff7f8; } .add-circle { width:48px; height:48px; border:1px solid #000; border-radius:50%; display:grid; place-items:center; font-size:22px; }
     .add-card strong { margin-top:16px; font:400 22px/30px 'Playfair Display',serif; } .add-card small { max-width:320px; margin-top:7px; color:#444748; text-align:center; font:400 12px/18px 'Outfit',sans-serif; }
     .helper-strip { min-height:78px; margin-top:32px; padding:24px; border:1px solid #e3e2e2; background:#f5f3f3; display:flex; align-items:center; gap:16px; } .helper-strip p { margin:0; color:#444748; font:400 14px/22px 'Outfit',sans-serif; } .info-icon { width:15px; height:15px; border:1px solid #8f485d; border-radius:50%; display:grid; place-items:center; color:#8f485d; font:500 10px serif; flex:0 0 auto; }
-    .empty-intro { margin-top:32px; padding:32px; border:1px solid #e3e2e2; text-align:center; } .empty-intro > span { color:#8f485d; font-size:9px; font-weight:600; letter-spacing:1.3px; } .empty-intro h2 { margin:8px 0; font:400 27px 'Playfair Display',serif; } .empty-intro p { margin:0; color:#555; font:400 13px 'Outfit',sans-serif; }
-    .state-panel { min-height:420px; margin-top:32px; border:1px solid #e3e2e2; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; padding:40px; } .state-panel h2 { margin:14px 0 8px; font:400 28px 'Playfair Display',serif; } .state-panel p { margin:0 0 22px; color:#555; font:400 13px 'Outfit',sans-serif; }
-    .spinner { width:34px; height:34px; border:2px solid #e3e2e2; border-top-color:#000; border-radius:50%; animation:spin .8s linear infinite; } .state-icon,.warning-icon { width:40px; height:40px; border:1px solid #de233f; border-radius:50%; display:grid; place-items:center; color:#de233f; font:500 22px 'Playfair Display',serif; }
+    .empty-intro { margin-top:32px; padding:32px; border:1px solid #e3e2e2; text-align:center; } .empty-intro > span { color:#8f485d; font-size:9px; font-weight:600; letter-spacing:1.3px; } .empty-intro h2 { margin:8px 0; font:400 27px 'Playfair Display',serif; } .empty-intro p { margin:0; color:#555; font:400 13px 'Outfit',sans-serif; }.warning-icon{ width:40px; height:40px; border:1px solid #de233f; border-radius:50%; display:grid; place-items:center; color:#de233f; font:500 22px 'Playfair Display',serif; }
     .address-form,.delete-dialog { font-family:'Montserrat',sans-serif; } .modal-description { margin:-4px 0 20px; color:#444748; font:400 12px/20px 'Outfit',sans-serif; } .form-grid.two-columns { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:16px; }
     .address-form label { display:grid; gap:7px; margin-bottom:16px; } .address-form label > span { font-size:10px; font-weight:600; letter-spacing:1px; } .address-form b { color:#de233f; }
     .address-form input[type='text'],.address-form input[type='tel'],.address-form textarea { width:100%; border:1px solid #5f5353; border-radius:0; background:#fff; padding:0 14px; color:#171414; outline:none; font:400 12px 'Montserrat',sans-serif; } .address-form input[type='text'],.address-form input[type='tel'] { height:46px; } .address-form textarea { padding-block:12px; resize:vertical; }
@@ -123,7 +122,7 @@ import { STORE_ADDRESSES_CONTENT } from '../shared/store-content';
     @keyframes spin { to { transform:rotate(360deg); } }
     @media (max-width:980px) { .account-shell { width:min(100% - 32px,760px); grid-template-columns:1fr; } }
     @media (max-width:640px) { .account-shell { width:100%; padding:20px 16px 64px; } .page-header { align-items:flex-start; flex-direction:column; } .page-header h1 { font-size:34px; } .page-header .button { width:100%; } .address-grid { grid-template-columns:1fr; } .address-card { min-height:330px; padding:22px; } .form-grid.two-columns { grid-template-columns:1fr; gap:0; } .modal-actions { flex-direction:column-reverse; } .modal-actions .button { width:100%; } }
-    @media (prefers-reduced-motion:reduce) { .spinner { animation-duration:.01ms; } }
+    
   `],
 })
 export class AddressesPage implements OnInit {

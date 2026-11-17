@@ -46,7 +46,7 @@ function make<T>(Type: new (...args: any[]) => T, api: any = {}, auth: any = {},
   const injector = Injector.create({ providers: [
     { provide: ApiService, useValue: api }, { provide: AuthService, useValue: auth },
     { provide: ToastService, useValue: toast }, { provide: Router, useValue: { url: '/', navigate: vi.fn() } },
-    { provide: ActivatedRoute, useValue: { snapshot: { paramMap: { get: () => id } } } },
+    { provide: ActivatedRoute, useValue: { snapshot: { paramMap: { get: () => id }, queryParamMap: { get: () => null } } } },
     { provide: CartService, useValue: {} }, ...extra,
   ] });
   return runInInjectionContext(injector, () => new Type());
@@ -171,7 +171,7 @@ describe('Audit: auth, request ordering and AI polling', () => {
   it('ignores stale product responses after navigating to a new route', () => {
     const older = new Subject<any>();
     const newer = new Subject<any>();
-    const page = make(ProductPage, { product: (slug: string) => slug === 'older' ? older : newer, listReviews: () => of({ items: [] }) });
+    const page = make(ProductPage, { product: (slug: string) => slug === 'older' ? older : newer, listReviews: () => of({ items: [] }), products: () => of({ items: [], total: 0 }) });
     page.loadProduct('older');
     page.loadProduct('newer');
     newer.next({ id: 'newer', name: 'New', images: [], variants: [] });

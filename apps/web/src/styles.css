@@ -1,3 +1,4 @@
+@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&family=Playfair+Display:wght@400;500;600;700&display=swap');
 :root {
   --color-text: #24211e;
   --color-muted: #6e665e;
@@ -143,4 +144,46 @@ body :is(.btn-primary,.btn-outline,.btn-danger,.btn-submit,.btn-place-order,.btn
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
+}
+
+/* MUSE UI tokens (docs/ui-style-guide.md). Added alongside the legacy --color-* variables,
+   which keep their values; new storefront pages use these. */
+:root {
+  --font-serif: "Playfair Display", Georgia, serif;
+  --font-sans: "Montserrat", Arial, sans-serif;
+  --ui-ink: #171717;
+  --ui-ink-soft: #444748;
+  --ui-subtle: #747878;
+  --ui-line: #c4c7c7;
+  --ui-line-soft: #e3e2e2;
+  --ui-bg: #ffffff;
+  --ui-bg-soft: #f5f3f3;
+  --ui-bg-image: #efeded;
+  --ui-pink: #f4b8c1;
+  --ui-pink-soft: #ffd9e1;
+  --ui-accent: #8f485d;
+  --ui-price: #c52929;
+  --ui-danger: #9b2c2c;
+  --ui-danger-bg: #fff1f1;
+  --ui-success: #276749;
+  --ui-success-bg: #edf8f1;
+  --ui-warning: #8c641a;
+  --ui-warning-bg: #fff8e8;
+  --ui-info: #3f5f7e;
+  --ui-info-bg: #eff5fa;
+  --ui-page-max: 1280px;
+  --ui-page-pad: 48px;
+}
+
+/* Admin UI tokens (docs/ui-style-guide.md, mục "Admin"). */
+:root {
+  --admin-sidebar-w: 250px;
+  --admin-topbar-h: 72px;
+  --admin-line: #e5e5e5;
+  --admin-line-soft: #e9e8e7;
+  --admin-nav-active-bg: #f4b8c1;
+  --admin-nav-active-edge: #805159;
+  --admin-nav-hover-bg: #f5f3f3;
+  --admin-canvas: #faf9f9;
+  --admin-drawer-w: 520px;
 }

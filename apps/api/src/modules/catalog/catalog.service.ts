@@ -114,6 +114,28 @@ export class CatalogService {
     };
   }
 
+  /** Giá trị lọc công khai: kích cỡ, màu và khoảng giá của biến thể ACTIVE thuộc sản phẩm đang bán. */
+  async getPublicFilters(): Promise<{ sizes: string[]; colors: string[]; minPrice: number | null; maxPrice: number | null }> {
+    const published = await this.products.find({ status: 'PUBLISHED' }).select('_id').lean().exec();
+    const ids = published.map((row) => String(row._id));
+    if (!ids.length) return { sizes: [], colors: [], minPrice: null, maxPrice: null };
+    const rows = await this.variants.find({ productId: { $in: ids }, status: 'ACTIVE' }).select('size color price').lean().exec();
+    const sizes = new Set<string>();
+    const colors = new Set<string>();
+    let minPrice: number | null = null;
+    let maxPrice: number | null = null;
+    for (const row of rows) {
+      if (row.size?.trim()) sizes.add(row.size.trim());
+      if (row.color?.trim()) colors.add(row.color.trim());
+      if (typeof row.price === 'number') {
+        minPrice = minPrice === null ? row.price : Math.min(minPrice, row.price);
+        maxPrice = maxPrice === null ? row.price : Math.max(maxPrice, row.price);
+      }
+    }
+    const collator = new Intl.Collator('vi', { numeric: true });
+    return { sizes: [...sizes].sort(collator.compare), colors: [...colors].sort(collator.compare), minPrice, maxPrice };
+  }
+
   async listAdmin(status?: string, page = 1, limit = 20) {
     const safePage = Math.max(1, page);
     const safeLimit = Math.min(50, Math.max(1, limit));

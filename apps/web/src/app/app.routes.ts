@@ -2,10 +2,12 @@ import { AdminLandingPage, ForbiddenPage } from './pages/admin/access.page';
 import { Routes } from '@angular/router';
 import { authGuard, adminGuard, staffGuard, commerceGuard, permissionGuard } from './guards/auth.guard';
 
+import { HomePage } from './pages/home.page';
 import { CatalogPage } from './pages/catalog.page';
 import { ProductPage } from './pages/product.page';
 import { LookbooksPage } from './pages/lookbooks.page';
 import { CommunityPage } from './pages/community.page';
+import { AboutPage } from './pages/about.page';
 import { CartPage } from './pages/cart.page';
 import { CheckoutPage } from './pages/checkout.page';
 import { PaymentPage } from './pages/payment.page';
@@ -14,12 +16,14 @@ import { OrderDetailPage } from './pages/order-detail.page';
 
 import { AuthPage } from './pages/auth.page';
 import { ProfilePage } from './pages/profile.page';
+import { AccountPage } from './pages/account.page';
 import { AddressesPage } from './pages/addresses.page';
 import { NotificationsPage } from './pages/notifications.page';
 import { VerifyPage } from './pages/verify.page';
 
 import { AiTryOnPage } from './pages/ai-try-on.page';
 import { AiMixMatchPage } from './pages/ai-mix-match.page';
+import { AiHistoryPage } from './pages/ai-history.page';
 
 import { AdminLayoutComponent } from './pages/admin/admin-layout.component';
 import { AdminLookbooksPage } from './pages/admin/admin-lookbooks.page';
@@ -35,10 +39,11 @@ import { AdminSettingsPage } from './pages/admin/admin-settings.page';
 
 export const routes: Routes = [
   // Storefront & Catalog
-  { path: '', component: CatalogPage, title: 'Cửa hàng thời trang cao cấp | Fashion Commerce' },
+  { path: '', component: HomePage, title: 'Cửa hàng thời trang cao cấp | Fashion Commerce' },
   { path: 'products', component: CatalogPage, title: 'Bộ sưu tập sản phẩm | Fashion Commerce' },
   { path: 'products/:slug', component: ProductPage, title: 'Chi tiết sản phẩm | Fashion Commerce' },
   { path: 'lookbooks', component: LookbooksPage, title: 'Bộ sưu tập Lookbook | Fashion Commerce' },
+  { path: 'about', component: AboutPage, title: 'Về chúng tôi | Fashion Commerce' },
   { path: 'community', component: CommunityPage, title: 'Cộng đồng phong cách | Fashion Commerce' },
 
   // Shopping & Checkout
@@ -52,7 +57,7 @@ export const routes: Routes = [
   { path: 'auth', component: AuthPage, title: 'Đăng nhập / Đăng ký | Fashion Commerce' },
   { path: 'forgot-password', component: AuthPage, title: 'Quên mật khẩu | Fashion Commerce' },
   { path: 'reset-password', component: AuthPage, title: 'Đặt lại mật khẩu | Fashion Commerce' },
-  { path: 'account', redirectTo: 'auth', pathMatch: 'full' },
+  { path: 'account', component: AccountPage, canActivate: [authGuard], title: 'Tổng quan tài khoản | Fashion Commerce' },
   { path: 'account/profile', redirectTo: 'profile', pathMatch: 'full' },
   { path: 'account/addresses', redirectTo: 'addresses', pathMatch: 'full' },
   { path: 'account/notifications', redirectTo: 'notifications', pathMatch: 'full' },
@@ -63,6 +68,7 @@ export const routes: Routes = [
 
   // AI Experiences
   { path: 'ai/try-on', component: AiTryOnPage, canActivate: [commerceGuard], title: 'Phòng thử đồ ảo AI Try-On | Fashion Commerce' },
+  { path: 'ai/history', component: AiHistoryPage, canActivate: [commerceGuard], title: 'Lịch sử thử đồ | Fashion Commerce' },
   { path: 'ai/mix-match', component: AiMixMatchPage, canActivate: [commerceGuard], title: 'Gợi ý phối đồ AI Mix & Match | Fashion Commerce' },
 
   // Operations & Admin (Staff & Admin)

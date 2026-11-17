@@ -1,4 +1,5 @@
-import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException, Optional } from '@nestjs/common';
+import { ModuleRef } from '@nestjs/core';
 import { InjectConnection, InjectModel } from '@nestjs/mongoose';
 import { Model, Types, type ClientSession, type Connection } from 'mongoose';
 import { withCommerceTransaction } from '../../common/mongo-transaction.util.js';
@@ -17,6 +18,7 @@ export class UsersService {
     @InjectModel(MediaObject.name) private readonly media: Model<MediaObject>,
     @InjectModel(Order.name) private readonly orders: Model<Order>,
     @InjectConnection() private readonly connection: Connection,
+    @Optional() private readonly moduleRef?: ModuleRef,
   ) {}
   findByEmail(email: string) { return this.model.findOne({ email: email.toLowerCase().trim() }).select('+passwordHash +verificationTokenHash').exec(); }
   findById(id: string) { return Types.ObjectId.isValid(id) ? this.model.findById(id).exec() : Promise.resolve(null); }
@@ -56,10 +58,26 @@ export class UsersService {
       createdAt: user.get('createdAt') };
   }
 
+  /** Liên kết ảnh đại diện: công khai nếu có, nếu không thì liên kết ký có thời hạn. Lỗi thì trả null. */
+  private async avatarUrl(user: UserDocument): Promise<string | null> {
+    if (!user.avatarMediaId || !this.moduleRef) return null;
+    try {
+      const media = await this.media.findOne({ _id: user.avatarMediaId, ownerId: String(user._id),
+        purpose: 'avatar', status: 'READY' }).lean().exec();
+      if (!media) return null;
+      // Nạp muộn để tránh vòng phụ thuộc giữa module người dùng và module lưu trữ.
+      const { StorageService } = await import('../storage/storage.service.js');
+      const storage = this.moduleRef.get(StorageService, { strict: false });
+      return storage.publicUrl(media.key) ?? await storage.signedReadUrl(media.key, 3600);
+    } catch {
+      return null;
+    }
+  }
+
   async getProfile(userId: string) {
     const user = await this.findById(userId);
     if (!user) throw new NotFoundException('User not found');
-    return { ...this.profile(user), permissions: user.role === 'STAFF' ? await this.permissionSnapshot(userId) : [] };
+    return { ...this.profile(user), avatarUrl: await this.avatarUrl(user), permissions: user.role === 'STAFF' ? await this.permissionSnapshot(userId) : [] };
   }
 
   async permissionSnapshot(staffId: string) {
@@ -95,7 +113,7 @@ export class UsersService {
       }
       return updated;
     });
-    return { ...this.profile(user), permissions: user.role === 'STAFF' ? await this.permissionSnapshot(String(user._id)) : [] };
+    return { ...this.profile(user), avatarUrl: await this.avatarUrl(user), permissions: user.role === 'STAFF' ? await this.permissionSnapshot(String(user._id)) : [] };
   }
 
   private address(address: Address & { _id: unknown }) {

@@ -1,46 +1,22 @@
 import { CurrencyPipe, DatePipe } from '@angular/common';
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import type { Order, OrderStatus } from '@fashion/contracts';
+import { AccountSidebarComponent } from '../components/account-sidebar.component';
 import { PaginationComponent, PaginationState } from '../components/pagination.component';
 import { ApiService } from '../services/api.service';
+import { orderStatusLabel } from '../shared/labels';
 import { STORE_ORDERS_CONTENT } from '../shared/store-content';
+import { PageStateComponent } from '../components/page-state.component';
 
 type OrderItem = Order['items'][number];
 
 @Component({
   standalone: true,
-  imports: [PaginationComponent, RouterLink, CurrencyPipe, DatePipe],
+  imports: [PageStateComponent, AccountSidebarComponent, PaginationComponent, RouterLink, CurrencyPipe, DatePipe],
   template: `
     <main class="account-shell">
-      <aside class="account-sidebar" aria-label="Điều hướng tài khoản">
-        <div class="account-identity">
-          <span class="account-avatar" aria-hidden="true">
-            <svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="4"/><path d="M4 21c.7-4.3 3.4-6.5 8-6.5s7.3 2.2 8 6.5"/></svg>
-          </span>
-          <div><span class="account-kicker">TÀI KHOẢN</span><strong>Tài khoản của bạn</strong></div>
-        </div>
-
-        <nav class="account-nav" aria-label="Các mục tài khoản">
-          <a routerLink="/account">
-            <svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="4"/><path d="M4 21c.7-4.3 3.4-6.5 8-6.5s7.3 2.2 8 6.5"/></svg>
-            <span>Thông tin cá nhân</span><span aria-hidden="true">→</span>
-          </a>
-          <a routerLink="/addresses">
-            <svg viewBox="0 0 24 24" fill="none"><path d="M20 10c0 5-8 11-8 11S4 15 4 10a8 8 0 1 1 16 0Z"/><circle cx="12" cy="10" r="2.5"/></svg>
-            <span>Sổ địa chỉ</span><span aria-hidden="true">→</span>
-          </a>
-          <a routerLink="/orders" class="active" aria-current="page">
-            <svg viewBox="0 0 24 24" fill="none"><path d="M5 7h14l-1 14H6L5 7Z"/><path d="M9 9V5a3 3 0 0 1 6 0v4"/></svg>
-            <span>Đơn hàng của tôi</span><span aria-hidden="true">→</span>
-          </a>
-        </nav>
-
-        <div class="sidebar-help">
-          <span>CẦN HỖ TRỢ?</span>
-          <p>Xem thông tin và thao tác phù hợp trong trang chi tiết của từng đơn hàng.</p>
-        </div>
-      </aside>
+      <fc-account-sidebar />
 
       <section class="orders-content">
         <header class="page-header">
@@ -48,46 +24,42 @@ type OrderItem = Order['items'][number];
           <p>Theo dõi trạng thái và xem lại các đơn hàng của bạn.</p>
         </header>
 
-        <div class="status-tabs" aria-label="Trạng thái đơn hàng" data-ui-only>
+        <div class="status-tabs" aria-label="Trạng thái đơn hàng">
           @for (tab of statusTabs; track tab.value) {
-            <button type="button" [class.active]="activeStatus() === tab.value" [attr.aria-pressed]="activeStatus() === tab.value" (click)="activeStatus.set(tab.value)" data-ui-only>{{ tab.label }}</button>
+            <button type="button" [class.active]="activeStatus() === tab.value" [attr.aria-pressed]="activeStatus() === tab.value" (click)="activeStatus.set(tab.value)">{{ tab.label }}</button>
           }
         </div>
 
         <div class="orders-toolbar">
-          <label class="search-control" data-ui-only>
+          <label class="search-control">
             <span class="visually-hidden">Tìm đơn hàng</span>
             <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="m16 16 4 4"/></svg>
-            <input type="search" placeholder="Tìm theo mã đơn hoặc tên sản phẩm..." [value]="searchTerm()" (input)="searchTerm.set($any($event.target).value)" data-ui-only />
+            <input type="search" placeholder="Tìm theo mã đơn hoặc tên sản phẩm..." [value]="searchTerm()" (input)="searchTerm.set($any($event.target).value)" />
           </label>
 
-          <label class="sort-control" data-ui-only>
+          <label class="sort-control">
             <span>SẮP XẾP</span>
-            <select [value]="sortMode()" (change)="sortMode.set($any($event.target).value)" data-ui-only>
+            <select [value]="sortMode()" (change)="sortMode.set($any($event.target).value)">
               <option value="newest">Mới nhất</option><option value="oldest">Cũ nhất</option>
             </select>
           </label>
         </div>
 
+        @if (!loading() && !error() && orders().length > 0 && (activeStatus() !== 'ALL' || searchTerm().trim())) {
+          <p class="filter-note">Lọc trong trang đang xem</p>
+        }
+
         @if (loading()) {
-          <div class="state-panel" aria-live="polite">
-            <span class="spinner" aria-hidden="true"></span><h2>Đang tải đơn hàng</h2><p>Danh sách đơn hàng của bạn đang được cập nhật.</p>
-          </div>
+          <fc-page-state kind="loading" title="Đang tải đơn hàng" message="Danh sách đơn hàng của bạn đang được cập nhật." />
         } @else if (error()) {
-          <div class="state-panel state-error" role="alert">
-            <span class="state-icon" aria-hidden="true">!</span><h2>Không thể tải đơn hàng</h2><p>{{ error() }}</p>
-            <button type="button" class="button button-primary" (click)="loadOrders()">THỬ LẠI</button>
-          </div>
+          <fc-page-state kind="error" title="Không thể tải đơn hàng" [message]="error()" actionLabel="THỬ LẠI" (action)="loadOrders()" />
         } @else if (orders().length === 0) {
-          <div class="state-panel empty-state">
-            <span class="empty-bag" aria-hidden="true"><svg viewBox="0 0 48 48" fill="none"><path d="M10 15h28l-2 27H12l-2-27Z"/><path d="M17 19v-6a7 7 0 0 1 14 0v6"/></svg></span>
-            <span class="state-eyebrow">LỊCH SỬ MUA SẮM</span><h2>Bạn chưa có đơn hàng</h2>
-            <p>Khi bạn hoàn tất mua sắm, đơn hàng sẽ xuất hiện tại đây.</p>
-            <a routerLink="/products" class="button button-primary">KHÁM PHÁ SẢN PHẨM <span aria-hidden="true">→</span></a>
-          </div>
+          <fc-page-state kind="empty" title="Bạn chưa có đơn hàng" message="Khi bạn hoàn tất mua sắm, đơn hàng sẽ xuất hiện tại đây." actionLabel="MUA SẮM NGAY" actionLink="/products" />
+        } @else if (visibleOrders().length === 0) {
+          <fc-page-state kind="empty" title="Không có đơn phù hợp" message="Không tìm thấy đơn hàng nào khớp với bộ lọc hiện tại trong trang đang xem." actionLabel="XÓA BỘ LỌC" (action)="clearFilters()" />
         } @else {
           <div class="orders-list">
-            @for (order of orders(); track order.id) {
+            @for (order of visibleOrders(); track order.id) {
               <article class="order-card">
                 <header class="order-card-header">
                   <div><strong>ĐƠN HÀNG #{{ order.code || order.id.slice(0, 8).toUpperCase() }}</strong><span>Đặt ngày {{ order.createdAt | date:'dd/MM/yyyy' }}</span></div>
@@ -122,12 +94,12 @@ type OrderItem = Order['items'][number];
 
                   <div class="order-total"><span>TỔNG CỘNG</span><strong>{{ order.money.payableTotal | currency:'VND':'symbol':'1.0-0' }}</strong></div>
                   <div class="order-actions">
-                    @if (order.state === 'PENDING_PAYMENT') { <a [routerLink]="['/orders', order.id]" class="cancel-link">HỦY ĐƠN HÀNG</a> }
+                    @if (order.state === 'PENDING_PAYMENT') { <a [routerLink]="['/orders', order.id]" [queryParams]="{ action: 'cancel' }" class="cancel-link">HỦY ĐƠN HÀNG</a> }
                     <span class="action-spacer"></span>
                     <a [routerLink]="['/orders', order.id]" class="button button-outline">XEM CHI TIẾT</a>
                     @if (order.state === 'PENDING_PAYMENT') { <a [routerLink]="['/payment', order.id]" class="button button-primary">THANH TOÁN NGAY <span aria-hidden="true">→</span></a> }
                     @if (order.state === 'SHIPPING') { <a [routerLink]="['/orders', order.id]" class="button button-primary">THEO DÕI VẬN ĐƠN <span aria-hidden="true">→</span></a> }
-                    @if (order.state === 'DELIVERED') { <a [routerLink]="['/orders', order.id]" class="button button-primary">ĐÁNH GIÁ SẢN PHẨM <span aria-hidden="true">→</span></a> }
+                    @if (order.state === 'DELIVERED') { <a [routerLink]="['/orders', order.id]" [queryParams]="{ action: 'review' }" class="button button-primary">ĐÁNH GIÁ SẢN PHẨM <span aria-hidden="true">→</span></a> }
                   </div>
                 </div>
               </article>
@@ -143,22 +115,9 @@ type OrderItem = Order['items'][number];
     @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&family=Outfit:wght@300;400;500;600&family=Playfair+Display:wght@400;500&display=swap');
     :host { display: block; color: #1f1b1b; background: #fff; }
     * { box-sizing: border-box; }
-    .account-shell { width: min(1184px, calc(100% - 48px)); margin: 0 auto; padding: 40px 0 88px; display: grid; grid-template-columns: 280px minmax(0, 1fr); gap: 32px; font-family: 'Montserrat', sans-serif; }
-    .account-sidebar { align-self: start; border: 1px solid #5f5353; padding: 24px; min-height: 492px; }
-    .account-identity { display: flex; align-items: center; gap: 14px; padding-bottom: 24px; border-bottom: 1px solid #dedada; }
-    .account-avatar { width: 48px; height: 48px; border-radius: 50%; background: #f6e7e9; display: grid; place-items: center; flex: 0 0 auto; }
-    .account-avatar svg { width: 24px; stroke: #1f1b1b; stroke-width: 1.5; }
-    .account-kicker { display: block; font: 500 10px/1.4 'Montserrat', sans-serif; letter-spacing: 1.5px; color: #786f6f; margin-bottom: 3px; }
-    .account-identity strong { font: 500 17px/1.3 'Outfit', sans-serif; }
-    .account-nav { padding: 18px 0; display: grid; gap: 4px; border-bottom: 1px solid #dedada; }
-    .account-nav a { min-height: 50px; padding: 0 12px; display: grid; grid-template-columns: 20px 1fr auto; align-items: center; gap: 12px; color: #312b2b; text-decoration: none; font-size: 12px; letter-spacing: .25px; }
-    .account-nav a:hover, .account-nav a:focus-visible { background: #f8f5f5; }
-    .account-nav a.active { background: #f5e6e8; font-weight: 600; }
-    .account-nav svg { width: 19px; stroke: currentColor; stroke-width: 1.4; }
-    .sidebar-help { padding-top: 24px; }
-    .sidebar-help span { font-size: 10px; font-weight: 600; letter-spacing: 1.4px; }
-    .sidebar-help p { margin: 9px 0 0; font: 300 13px/1.65 'Outfit', sans-serif; color: #706767; }
+    .account-shell { width: min(1184px, calc(100% - 48px)); margin: 0 auto; padding: 40px 0 88px; display: grid; grid-template-columns: 280px minmax(0, 1fr); gap: 32px; align-items: start; font-family: 'Montserrat', sans-serif; }
     .orders-content { min-width: 0; }
+    .filter-note { margin: 12px 0 0; color: #706767; font: 300 12px 'Outfit', sans-serif; }
     .page-header { padding-bottom: 24px; border-bottom: 1px solid #5f5353; }
     .page-header h1 { margin: -8px 0 9px; font: 400 clamp(34px, 4vw, 40px)/1.2 'Playfair Display', serif; letter-spacing: -1px; }
     .page-header p { margin: 0; font: 300 16px/26px 'Outfit', sans-serif; color: #675e5e; }
@@ -206,25 +165,13 @@ type OrderItem = Order['items'][number];
     .button-outline { background: #fff; } .button-primary { background: #f4b8c1; }
     .button:hover, .button:focus-visible { box-shadow: inset 0 0 0 1px #1f1b1b; }
     .pagination-wrap { display: flex; justify-content: flex-end; margin-top: 28px; }
-    .state-panel { min-height: 420px; border: 1px solid #5f5353; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 48px 24px; }
-    .state-panel h2 { margin: 12px 0 8px; font: 400 30px/1.25 'Playfair Display', serif; }
-    .state-panel p { max-width: 460px; margin: 0 0 24px; color: #6d6464; font: 300 15px/1.7 'Outfit', sans-serif; }
-    .spinner { width: 36px; height: 36px; border: 2px solid #e0dcdc; border-top-color: #1f1b1b; border-radius: 50%; animation: spin .8s linear infinite; }
-    .state-icon { width: 42px; height: 42px; border: 1px solid #a33d3d; border-radius: 50%; display: grid; place-items: center; color: #a33d3d; font: 500 24px 'Playfair Display', serif; }
-    .empty-bag { width: 58px; height: 58px; display: grid; place-items: center; } .empty-bag svg { width: 48px; stroke: #1f1b1b; stroke-width: 1.2; }
-    .state-eyebrow { margin-top: 16px; color: #8a6752; font-size: 9px; font-weight: 600; letter-spacing: 1.6px; }
-    .empty-state h2 { margin-top: 8px; }
     .visually-hidden { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
     @keyframes spin { to { transform: rotate(360deg); } }
     @media (max-width: 900px) {
       .account-shell { grid-template-columns: 1fr; width: min(100% - 32px, 720px); padding-top: 24px; gap: 24px; }
-      .account-sidebar { min-height: 0; } .account-identity, .sidebar-help { display: none; }
-      .account-nav { padding: 0; border: 0; grid-template-columns: repeat(3, 1fr); gap: 6px; }
-      .account-nav a { grid-template-columns: 18px 1fr; padding: 8px 10px; text-align: center; } .account-nav a > span:last-child { display: none; }
     }
     @media (max-width: 640px) {
-      .account-shell { width: 100%; padding: 20px 16px 64px; } .account-sidebar { padding: 10px; }
-      .account-nav { grid-template-columns: 1fr; } .account-nav a { text-align: left; }
+      .account-shell { width: 100%; padding: 20px 16px 64px; }
       .page-header h1 { font-size: 34px; }
       .status-tabs { flex-wrap: nowrap; overflow-x: auto; padding-bottom: 22px; } .status-tabs button { flex: 0 0 auto; }
       .orders-toolbar { align-items: stretch; flex-direction: column; gap: 12px; } .search-control { width: 100%; }
@@ -254,6 +201,22 @@ export class OrdersPage implements OnInit {
   ];
   private readonly api = inject(ApiService);
 
+  /** listOrders chưa nhận state nên lọc, tìm và sắp xếp trên danh sách trang đang tải. */
+  readonly visibleOrders = computed(() => {
+    const status = this.activeStatus();
+    const term = this.searchTerm().trim().toLowerCase();
+    const list = this.orders().filter((order) => {
+      if (status !== 'ALL' && order.state !== status) return false;
+      if (!term) return true;
+      const code = (order.code || order.id).toLowerCase();
+      return code.includes(term) || order.items.some((item) => item.productName.toLowerCase().includes(term));
+    });
+    const direction = this.sortMode() === 'oldest' ? 1 : -1;
+    return [...list].sort((a, b) => direction * (new Date(a.createdAt ?? 0).getTime() - new Date(b.createdAt ?? 0).getTime()));
+  });
+
+  clearFilters(): void { this.activeStatus.set('ALL'); this.searchTerm.set(''); }
+
   ngOnInit(): void { this.loadOrders(); }
   paginationChanged(page: number): void { this.pagination.page.set(page); this.loadOrders(); }
   loadOrders(): void {
@@ -273,16 +236,5 @@ export class OrdersPage implements OnInit {
   trackingCode(order: Order): string {
     return (order as unknown as { shipment?: { trackingCode?: string } }).shipment?.trackingCode || '';
   }
-  formatStatus(state: OrderStatus): string {
-    switch (state) {
-      case 'PENDING_PAYMENT': return 'Chờ thanh toán';
-      case 'CONFIRMED': return 'Đã xác nhận';
-      case 'PREPARING': return 'Đang chuẩn bị hàng';
-      case 'SHIPPING': return 'Đang giao hàng';
-      case 'DELIVERED': return 'Đã giao thành công';
-      case 'CANCELLED': return 'Đã hủy';
-      case 'CANCEL_PENDING_REFUND': return 'Hủy - Chờ hoàn tiền';
-      default: return state;
-    }
-  }
+  formatStatus(state: OrderStatus): string { return orderStatusLabel(state); }
 }

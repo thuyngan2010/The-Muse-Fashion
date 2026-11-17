@@ -36,6 +36,9 @@ import type {
 } from '@fashion/contracts';
 import { runtimeConfig } from '../runtime-config';
 
+/** Giá trị bộ lọc công khai của trang sản phẩm. */
+export type CatalogFilters = { sizes: string[]; colors: string[]; minPrice: number | null; maxPrice: number | null };
+
 @Injectable({ providedIn: 'root' })
 export class ApiService {
   private readonly http = inject(HttpClient);
@@ -87,7 +90,7 @@ export class ApiService {
     return this.http.get<UserProfile>(`${this.api}/users/me`);
   }
 
-  updateProfile(dto: { fullName?: string; phone?: string; avatarMediaId?: string }): Observable<UserProfile> {
+  updateProfile(dto: { fullName?: string; phone?: string; avatarMediaId?: string | null }): Observable<UserProfile> {
     return this.http.patch<UserProfile>(`${this.api}/users/me`, dto);
   }
 
@@ -117,6 +120,10 @@ export class ApiService {
   }
 
   // --- Catalog ---
+  catalogFilters(): Observable<CatalogFilters> {
+    return this.http.get<CatalogFilters>(`${this.api}/products/filters`);
+  }
+
   products(params?: {
     q?: string;
     category?: string;
@@ -334,11 +341,11 @@ export class ApiService {
   }
 
   // --- AI Experiences ---
-  createTryOn(dto: { productIds: string[]; inputMediaId: string; consentPolicyVersion: string }, idempotencyKey: string): Observable<AiJob> {
+  createTryOn(dto: { productIds: string[]; inputMediaId: string; consentPolicyVersion: string; heightCm?: number; weightKg?: number }, idempotencyKey: string): Observable<AiJob> {
     return this.http.post<AiJob>(`${this.api}/ai/try-on`, dto, { headers: { 'idempotency-key': idempotencyKey } });
   }
 
-  createMixMatch(dto: { productIds: string[]; inputMediaId: string; consentPolicyVersion: string; style?: string }, idempotencyKey: string): Observable<AiJob> {
+  createMixMatch(dto: { productIds: string[]; inputMediaId: string; consentPolicyVersion: string; style?: string; heightCm?: number; weightKg?: number }, idempotencyKey: string): Observable<AiJob> {
     return this.http.post<AiJob>(`${this.api}/ai/mix-match`, dto, { headers: { 'idempotency-key': idempotencyKey } });
   }
 
@@ -652,4 +659,23 @@ export class ApiService {
   adminUpdateLookbook(id: string, dto: Partial<Lookbook>): Observable<Lookbook> {
     return this.http.patch<Lookbook>(`${this.api}/admin/lookbooks/${id}`, dto);
   }
+}
+
+/** Kiểm tra số đo tùy chọn cho Thử đồ AI. Trả chuỗi rỗng nếu hợp lệ hoặc bỏ trống. */
+export function heightError(value: number | string | null | undefined): string {
+  if (value === null || value === undefined || value === '') return '';
+  const n = Number(value);
+  return Number.isInteger(n) && n >= 120 && n <= 220 ? '' : 'Chiều cao phải là số nguyên từ 120 đến 220 cm.';
+}
+export function weightError(value: number | string | null | undefined): string {
+  if (value === null || value === undefined || value === '') return '';
+  const n = Number(value);
+  return Number.isFinite(n) && n >= 30 && n <= 200 && Math.abs(n * 10 - Math.round(n * 10)) < 1e-9 ? '' : 'Cân nặng phải từ 30 đến 200 kg (tối đa 1 chữ số thập phân).';
+}
+/** Chỉ gửi trường nào có giá trị hợp lệ; bỏ trống thì không gửi. */
+export function bodyPayload(height: number | null | undefined, weight: number | null | undefined): { heightCm?: number; weightKg?: number } {
+  const out: { heightCm?: number; weightKg?: number } = {};
+  if (height !== null && height !== undefined && !heightError(height)) out.heightCm = Number(height);
+  if (weight !== null && weight !== undefined && !weightError(weight)) out.weightKg = Number(weight);
+  return out;
 }

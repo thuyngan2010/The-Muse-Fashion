@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import OpenAI from 'openai';
 import { AppConfig } from '../../common/app-config.js';
+import { describeBody, type BodyMeasurements } from './fashion-plan.js';
 import { sanitizeImage } from '../storage/image-sanitize.util.js';
 
 const JSON_RESPONSE_MAX_BYTES = 64 * 1024;
@@ -20,6 +21,7 @@ export type AiProviderSubmitInput = {
   productImageUrls: string[];
   providerJobId?: string;
   prompt?: string;
+  body?: BodyMeasurements;
 };
 
 export type AiProviderResult =
@@ -194,7 +196,7 @@ export class AiProviderService {
     try {
       return await client.post('/images/edits', {
         body: {
-          ...(model ? { model } : {}), prompt: input.prompt ?? OPENAI_PROMPTS[input.type],
+          ...(model ? { model } : {}), prompt: input.prompt ?? [OPENAI_PROMPTS[input.type], describeBody(input.body)].filter(Boolean).join(' '),
           images: [input.inputUrl, ...input.productImageUrls].map((image_url) => ({ image_url })),
           n: 1, output_format: 'png',
         },

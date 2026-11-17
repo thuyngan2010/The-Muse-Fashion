@@ -1,5 +1,6 @@
 import { Component } from '@angular/core';
 import { RouterLink } from '@angular/router';
+import { STORE_CONTACT } from '../shared/store-content';
 
 @Component({
   selector: 'fc-footer',
@@ -20,10 +21,10 @@ import { RouterLink } from '@angular/router';
         <div class="footer-col">
           <h4>DỊCH VỤ KHÁCH HÀNG</h4>
           <ul>
-            <li><a routerLink="/account">Tài khoản cá nhân</a></li>
+            <li><a routerLink="/profile">Tài khoản cá nhân</a></li>
             <li><a routerLink="/orders">Lịch sử đơn hàng</a></li>
             <li><a routerLink="/cart">Giỏ hàng của bạn</a></li>
-            <li><a routerLink="/account/addresses">Sổ địa chỉ nhận hàng</a></li>
+            <li><a routerLink="/addresses">Sổ địa chỉ nhận hàng</a></li>
           </ul>
         </div>
 
@@ -40,10 +41,23 @@ import { RouterLink } from '@angular/router';
         <div class="footer-col contact-col">
           <h4>LIÊN HỆ</h4>
           <ul class="contact-list">
-            <li><span class="contact-icon" aria-hidden="true">⌖</span><span>Trụ sở: Phường Linh Xuân, Thành phố Hồ Chí Minh</span></li>
-            <li><span class="contact-icon" aria-hidden="true">✉</span><span>support&#64;themuse.vn</span></li>
-            <li><span class="contact-icon" aria-hidden="true">☎</span><span>0990 888 999</span></li>
+            <li><span class="contact-icon" aria-hidden="true">⌖</span><span>Trụ sở: {{ contact.address }}</span></li>
+            <li><span class="contact-icon" aria-hidden="true">✉</span><a [href]="'mailto:' + contact.email">{{ contact.email }}</a></li>
+            <li><span class="contact-icon" aria-hidden="true">☎</span><a [href]="contact.hotlineHref">{{ contact.hotline }}</a></li>
           </ul>
+          <div class="social-links" aria-label="Mạng xã hội">
+            @for (s of socials; track s.key) {
+              @if (s.url) {
+                <a class="social-link" [href]="s.url" target="_blank" rel="noopener noreferrer" [attr.aria-label]="s.label">
+                  <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path [attr.d]="s.path"/></svg>
+                </a>
+              } @else {
+                <span class="social-link is-disabled" data-ui-only role="img" [attr.aria-label]="s.label + ' (sắp ra mắt)'" title="Tính năng sắp ra mắt">
+                  <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path [attr.d]="s.path"/></svg>
+                </span>
+              }
+            }
+          </div>
         </div>
       </div>
 
@@ -223,6 +237,12 @@ import { RouterLink } from '@angular/router';
       letter-spacing: 0.2px;
     }
     .footer-bottom p { margin: 0; }
+    .social-links { display: flex; gap: 12px; margin-top: 14px; }
+    .footer-col .social-link { width: 36px; height: 36px; border: 1px solid #fff; display: grid; place-items: center; color: #fff; }
+    .footer-col .social-link svg { width: 18px; height: 18px; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+    .footer-col a.social-link { display: grid; padding: 0; }
+    .footer-col a.social-link:hover, .footer-col a.social-link:focus-visible { color: #efb3bd; border-color: #efb3bd; text-decoration: none; }
+    .footer-col .social-link.is-disabled { opacity: .45; cursor: not-allowed; }
     @media (max-width: 900px) {
       .site-footer { padding: 44px 32px 0; }
       .footer-inner {
@@ -245,6 +265,19 @@ import { RouterLink } from '@angular/router';
     }
 
 
+    @media (max-width: 640px) {
+      .site-footer { min-height: 0; padding: 36px 20px 0; overflow-x: hidden; }
+      .footer-inner { display: grid; grid-template-columns: 1fr; gap: 28px; min-height: 0; }
+      .footer-col { min-width: 0; overflow-wrap: anywhere; }
+      .footer-bottom { text-align: left; }
+    }
   `],
 })
-export class FooterComponent {}
+export class FooterComponent {
+  readonly contact = STORE_CONTACT;
+  readonly socials = [
+    { key: 'facebook', label: 'Facebook', url: STORE_CONTACT.social.facebook, path: 'M14 8h3V4h-3a4 4 0 0 0-4 4v2H7v4h3v6h4v-6h3l1-4h-4V8Z' },
+    { key: 'instagram', label: 'Instagram', url: STORE_CONTACT.social.instagram, path: 'M7 3h10a4 4 0 0 1 4 4v10a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4V7a4 4 0 0 1 4-4Zm5 6a3 3 0 1 0 0 6 3 3 0 0 0 0-6Zm5.5-2.5h.01' },
+    { key: 'tiktok', label: 'TikTok', url: STORE_CONTACT.social.tiktok, path: 'M14 3v11.5a3.5 3.5 0 1 1-3.5-3.5M14 3c.3 2.4 1.9 4 4.5 4.2v3.3c-1.7 0-3.2-.5-4.5-1.5' },
+  ];
+}

@@ -30,7 +30,7 @@ export class AiFashionPlannerService {
           requiredOutput: { compatible: 'boolean', explanation: 'short Vietnamese explanation', summary: 'short Vietnamese outfit summary',
             items: [{ productId: 'exact product id', action: 'exact required action', notes: 'short placement/layering notes' }] } }) },
       ], value => validateStyling(value, analysis), controller.signal);
-      return buildFashionPrompt(input.type, analysis, styling);
+      return buildFashionPrompt(input.type, analysis, styling, input.body);
     } finally { clearTimeout(timer); }
   }
 

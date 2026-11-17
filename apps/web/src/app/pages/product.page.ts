@@ -1,7 +1,7 @@
 import { PaginationComponent, PaginationState } from '../components/pagination.component';
 import { Component, OnInit, OnDestroy, inject, signal, computed, effect, untracked } from '@angular/core';
 import { Subscription } from 'rxjs';
-import { ActivatedRoute, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { CurrencyPipe, DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import type { ProductDetail, ProductVariant, ProductReview, ProductSummary, ReviewMutationResult } from '@fashion/contracts';
@@ -10,10 +10,12 @@ import { CartService } from '../services/cart.service';
 import { AuthService } from '../services/auth.service';
 import { ToastService } from '../services/toast.service';
 import { ModalComponent } from '../components/modal.component';
+import { STORE_PRODUCT_CONTENT } from '../shared/store-content';
+import { PageStateComponent } from '../components/page-state.component';
 
 @Component({
   standalone: true,
-  imports: [PaginationComponent, RouterLink, CurrencyPipe, DatePipe, FormsModule, ModalComponent],
+  imports: [PageStateComponent, PaginationComponent, RouterLink, CurrencyPipe, DatePipe, FormsModule, ModalComponent],
   template: `
     <div class="product-page-container">
       <nav class="breadcrumb" aria-label="Đường dẫn">
@@ -21,14 +23,9 @@ import { ModalComponent } from '../components/modal.component';
       </nav>
 
       @if (loading()) {
-        <div class="product-loading">
-          <p>Đang tải thông tin sản phẩm...</p>
-        </div>
+        <fc-page-state kind="loading" title="Đang tải sản phẩm" message="Thông tin sản phẩm đang được cập nhật." />
       } @else if (error()) {
-        <div class="state-notice error-notice">
-          <p>{{ error() }}</p>
-          <a routerLink="/" class="btn-primary">← Về danh mục sản phẩm</a>
-        </div>
+        <fc-page-state kind="error" title="Không thể tải sản phẩm" [message]="error()" actionLabel="VỀ DANH MỤC SẢN PHẨM" actionLink="/products" />
       } @else if (product(); as p) {
         <div class="product-layout">
           <!-- Gallery / Images -->
@@ -43,6 +40,7 @@ import { ModalComponent } from '../components/modal.component';
               } @else {
                 <div class="placeholder-main"><span>MUSE</span></div>
               }
+              <a class="tryon-corner" [routerLink]="['/ai/try-on']" [queryParams]="{ productId: p.id }"><span aria-hidden="true">✦</span> {{ content.tryOnLabel }}</a>
             </div>
             @if (p.images && p.images.length > 1) {
               <div class="thumbnail-list">
@@ -66,8 +64,20 @@ import { ModalComponent } from '../components/modal.component';
             }
             <h1 class="p-title">{{ p.name }}</h1>
 
+            <div class="rating-row">
+              <button type="button" class="rating-link" (click)="scrollToReviews()">
+                @if (averageRating(); as avg) { <span class="rating-avg"><span aria-hidden="true">★</span> {{ avg }}</span> }
+                <span>({{ reviewPagination.total() }} đánh giá)</span>
+              </button>
+              @if (selectedVariant()?.sku; as sku) { <span class="sku">SKU: {{ sku }}</span> }
+            </div>
+
             <div class="price-box">
               <span class="current-price">{{ selectedVariant()?.price || p.price | currency:'VND':'symbol':'1.0-0' }}</span>
+              @if (listPrice(); as old) {
+                <span class="old-price">{{ old | currency:'VND':'symbol':'1.0-0' }}</span>
+                <span class="sale-badge">-{{ discountPercent() }}%</span>
+              }
               @if (selectedVariant()) {
                 <span class="stock-status" [class.in-stock]="selectedVariant()!.available > 0" [class.out-of-stock]="selectedVariant()!.available <= 0">
                   {{ selectedVariant()!.available > 0 ? ('Còn ' + selectedVariant()!.available + ' sản phẩm') : 'Hết hàng' }}
@@ -76,7 +86,7 @@ import { ModalComponent } from '../components/modal.component';
             </div>
 
             @if (p.description) {
-              <p class="product-intro">{{ p.description }}</p>
+              <p class="product-intro clamp-3">{{ p.description }}</p>
             }
 
             <hr class="divider" />
@@ -90,10 +100,14 @@ import { ModalComponent } from '../components/modal.component';
                     <button
                       type="button"
                       class="option-btn color-option"
+                      [class.swatch]="!!swatchHex(c)"
                       [class.active]="selectedColor() === c"
+                      [attr.aria-pressed]="selectedColor() === c"
+                      [attr.aria-label]="'Màu ' + c"
+                      [attr.title]="c"
                       (click)="chooseColor(c)"
                     >
-                      {{ c }}
+                      @if (swatchHex(c); as hex) { <span class="swatch-fill" [style.background]="hex"></span> } @else { {{ c }} }
                     </button>
                   }
                 </div>
@@ -118,6 +132,10 @@ import { ModalComponent } from '../components/modal.component';
                       type="button"
                       class="option-btn size-option"
                       [class.active]="selectedSize() === s"
+                      [class.sold-out]="!sizeAvailable(s)"
+                      [disabled]="!sizeAvailable(s)"
+                      [attr.title]="sizeAvailable(s) ? null : 'Hết hàng'"
+                      [attr.aria-pressed]="selectedSize() === s"
                       (click)="chooseSize(s)"
                     >
                       {{ s }}
@@ -155,11 +173,13 @@ import { ModalComponent } from '../components/modal.component';
               </button>
             </div>
 
-            <nav class="real-links-row" aria-label="Liên kết sản phẩm">
-              <a routerLink="/cart"><span aria-hidden="true">▣</span> Giỏ hàng</a>
-              <a routerLink="/lookbooks"><span aria-hidden="true">◇</span> Bộ sưu tập</a>
-              <a [routerLink]="['/ai/try-on']" [queryParams]="{ productId: p.id }"><span aria-hidden="true">✦</span> Thử đồ trực tuyến</a>
-            </nav>
+            <button type="button" class="buy-now-btn" [disabled]="!canAddToCart() || buyingNow()" (click)="buyNow()">
+              {{ buyingNow() ? 'ĐANG XỬ LÝ...' : 'MUA NGAY' }}
+            </button>
+
+            <ul class="value-props" aria-label="Cam kết mua sắm">
+              @for (item of content.valueProps; track item) { <li>{{ item }}</li> }
+            </ul>
 
             <section class="product-specifications" aria-label="Thông tin sản phẩm">
               @if (p.description) {
@@ -184,37 +204,48 @@ import { ModalComponent } from '../components/modal.component';
                 </details>
               }
               <details class="description-box">
-                <summary>Hỗ trợ mua sắm</summary>
-                <div class="accordion-links">
-                  <a routerLink="/cart">Xem giỏ hàng</a>
-                  <a routerLink="/lookbooks">Xem bộ sưu tập</a>
-                  <a [routerLink]="['/ai/try-on']" [queryParams]="{ productId: p.id }">Thử đồ trực tuyến</a>
-                </div>
+                <summary>{{ content.returnPolicy.title }}</summary>
+                <p>{{ content.returnPolicy.body }}</p>
               </details>
             </section>
           </div>
         </div>
 
+        <section class="lookbook-banner" aria-label="Triết lý thiết kế">
+          <div class="banner-copy">
+            <span class="section-kicker">{{ content.banner.eyebrow }}</span>
+            <h2>{{ content.banner.title }}</h2>
+            <p>{{ content.banner.quote }}</p>
+            <a routerLink="/lookbooks" class="banner-link">{{ content.banner.cta }} <span aria-hidden="true">→</span></a>
+          </div>
+          <div class="banner-media"><img [src]="content.banner.imageSrc" [alt]="content.banner.imageAlt" loading="lazy" (error)="$any($event.target).style.display = 'none'" /></div>
+        </section>
+
         @if (relatedProducts().length > 0) {
-          <section class="related-section">
-            <span class="section-kicker">GỢI Ý CÙNG DANH MỤC</span>
+          <section class="related-section" aria-label="Gợi ý hoàn hảo">
             <div class="related-heading">
-              <h2>Có thể bạn cũng thích</h2>
-              <a routerLink="/products">Xem tất cả</a>
+              <div>
+                <span class="section-kicker">GỢI Ý HOÀN HẢO</span>
+                <h2>Có thể bạn cũng thích</h2>
+              </div>
+              <a routerLink="/products">XEM TẤT CẢ SẢN PHẨM <span aria-hidden="true">→</span></a>
             </div>
             <div class="related-grid">
               @for (item of relatedProducts(); track item.id) {
                 <article class="related-card">
-                  <a class="related-image" [routerLink]="['/products', item.slug]">
-                    @if (item.images && item.images.length > 0) {
-                      <img [src]="item.images[0]" [alt]="item.name" loading="lazy">
-                    } @else {
-                      <span>MUSE</span>
-                    }
-                  </a>
-                  <h3>{{ item.name }}</h3>
+                  <div class="related-media">
+                    <a class="related-image" [routerLink]="['/products', item.slug]">
+                      @if (item.images && item.images.length > 0) {
+                        <img [src]="item.images[0]" [alt]="item.name" loading="lazy">
+                      } @else {
+                        <span>MUSE</span>
+                      }
+                    </a>
+                  </div>
+                  @if (relatedCategory(item); as cat) { <span class="related-cat">{{ cat }}</span> }
+                  <h3><a [routerLink]="['/products', item.slug]">{{ item.name }}</a></h3>
                   <p>{{ item.price | currency:'VND':'symbol':'1.0-0' }}</p>
-                  <a class="related-link" [routerLink]="['/products', item.slug]">XEM CHI TIẾT <span aria-hidden="true">→</span></a>
+                  <a class="related-link" [routerLink]="['/products', item.slug]">MUA NGAY <span aria-hidden="true">🛒︎</span></a>
                 </article>
               }
             </div>
@@ -222,7 +253,7 @@ import { ModalComponent } from '../components/modal.component';
         }
 
         <!-- Reviews & Feedback Section -->
-        <section class="reviews-section">
+        <section class="reviews-section" id="reviews-section">
           <div class="reviews-header">
             <div>
               <span class="eyebrow">NHẬN XÉT KHÁCH HÀNG</span>
@@ -707,9 +738,6 @@ import { ModalComponent } from '../components/modal.component';
     }
 
     .gallery-col,.details-col { min-width:0; }
-    .product-loading,.state-notice { padding:48px 24px; border:1px solid var(--color-divider); border-radius:var(--radius-card); background:var(--color-canvas); text-align:center; }
-    .product-loading { color:var(--color-muted); }
-    .error-notice { color:var(--color-danger); background:#fbeceb; border-color:#edc6c3; }
     .stars-select { display:flex; gap:6px; margin-bottom:20px; }
     .star-btn { width:44px; height:44px; padding:0; border:1px solid var(--color-border); border-radius:var(--radius-control); background:var(--color-surface); color:var(--color-muted); font-size:1.5rem; }
     .star-btn.active { color:var(--color-warning); background:#faf0da; border-color:#d7b77a; }
@@ -809,7 +837,6 @@ import { ModalComponent } from '../components/modal.component';
     .empty-reviews { margin: 0; padding: 32px 0; border-top: 1px solid #d8d8d8; border-bottom: 1px solid #d8d8d8; color: #666; font-style: normal; text-align: center; }
     .review-error { color: #a82121; font-size: 13px; }
     fc-pagination { display: block; margin-top: 28px; }
-    .product-loading, .state-notice { padding: 56px 24px; border: 1px solid #d8d8d8; border-radius: 0; background: #fafafa; }
     .edit-review-modal-body .form-group { display: grid; gap: 8px; }
     .form-group textarea, .form-grid input { padding: 12px; border: 1px solid #bfbfbf; border-radius: 0; background: #fff; font: inherit; }
     .star-btn { border-radius: 0; }
@@ -981,9 +1008,45 @@ import { ModalComponent } from '../components/modal.component';
       .related-grid { grid-template-columns: 1fr; }
     }
 
+    .tryon-corner { position:absolute; right:16px; bottom:16px; z-index:1; padding:9px 13px; border:1px solid #171717; background:rgba(255,255,255,.94); color:#171717; font-size:11px; font-weight:700; letter-spacing:.55px; text-decoration:none; text-transform:uppercase; }
+    .tryon-corner:hover, .tryon-corner:focus-visible { background:#171717; color:#fff; }
+    .rating-row { display:flex; align-items:center; justify-content:space-between; gap:12px; margin:6px 0 12px; font-size:12px; color:#444748; }
+    .rating-link { padding:0; border:0; background:none; color:inherit; font:inherit; letter-spacing:.24px; cursor:pointer; display:inline-flex; gap:8px; align-items:center; }
+    .rating-link:hover, .rating-link:focus-visible { text-decoration:underline; }
+    .rating-avg { color:#171717; font-weight:600; } .rating-avg span { color:#d89a36; }
+    .sku { letter-spacing:.6px; }
+    .old-price { color:#747878; font-size:14px; text-decoration:line-through; margin-left:10px; }
+    .sale-badge { margin-left:10px; padding:2px 8px; border:1px solid #000; background:#f4b8c1; color:#171717; font-size:11px; font-weight:700; letter-spacing:.55px; }
+    .clamp-3 { display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; }
+    .option-btn.swatch { width:36px; min-width:36px; height:36px; min-height:36px; padding:2px; border-color:#c4c7c7; background:#fff; }
+    .option-btn.swatch.active { border:2px solid #000; background:#fff; }
+    .swatch-fill { display:block; width:100%; height:100%; border:1px solid rgba(196,199,199,.6); }
+    .size-option { position:relative; overflow:hidden; }
+    .size-option.sold-out { background:#f5f3f3; border-color:rgba(196,199,199,.4); color:#c4c7c7; cursor:not-allowed; }
+    .size-option.sold-out::after { content:''; position:absolute; left:-10%; right:-10%; top:50%; border-top:1px solid rgba(196,199,199,.9); transform:rotate(-25deg); }
+    .buy-now-btn { width:100%; min-height:48px; margin-top:10px; border:2px solid #171717; background:#fff; color:#171717; font-size:13px; font-weight:700; letter-spacing:2px; cursor:pointer; }
+    .buy-now-btn:hover:not(:disabled), .buy-now-btn:focus-visible { background:#171717; color:#fff; }
+    .buy-now-btn:disabled { border-color:#bdbdbd; color:#999; cursor:not-allowed; }
+    .value-props { display:flex; justify-content:space-between; gap:12px; margin:18px 0 8px; padding:16px 0 0; border-top:1px solid #c4c7c7; list-style:none; font-size:12px; color:#444748; }
+    .lookbook-banner { display:grid; grid-template-columns:5fr 7fr; margin:32px 0 56px; border:1px solid #c4c7c7; background:#fff; }
+    .banner-copy { display:flex; flex-direction:column; justify-content:center; gap:14px; padding:40px 46px; }
+    .banner-copy h2 { margin:0; font:400 28px/36px 'Playfair Display',Georgia,serif; }
+    .banner-copy p { margin:0; color:#444748; font-size:14px; line-height:1.65; }
+    .banner-link { width:fit-content; padding-bottom:3px; border-bottom:1px solid #b84a62; color:#b84a62; font-size:13px; font-weight:600; letter-spacing:.65px; text-decoration:none; }
+    .banner-media { min-height:340px; background:#efeded; } .banner-media img { display:block; width:100%; height:100%; object-fit:cover; }
+    @media (max-width:900px) { .lookbook-banner { grid-template-columns:1fr; } .banner-copy { padding:28px 24px; } .banner-media { min-height:240px; } .value-props { flex-direction:column; } }
 
-
-
+    .related-heading { align-items: flex-end; border-bottom: 1px solid #000; }
+    .related-heading .section-kicker { color: #8f485d; }
+    .related-heading h2 { font-weight: 400; font-size: 28px; line-height: 36px; margin: 6px 0 0; }
+    .related-heading > a { text-decoration: none; font-size: 13px; letter-spacing: .65px; font-weight: 600; white-space: nowrap; }
+    .related-media { position: relative; border: 1px solid rgba(196,199,199,.3); background: #efeded; }
+    .related-cat { display: block; margin: 16px 0 0; color: #444748; font-size: 11px; font-weight: 600; letter-spacing: 1.1px; text-transform: uppercase; }
+    .related-card h3 { margin: 4px 0 6px; font-size: 16px; font-weight: 600; letter-spacing: .96px; text-transform: none; color: #000; }
+    .related-card h3 a { color: inherit; text-decoration: none; }
+    .related-card p { color: #000; font-size: 14px; font-weight: 600; margin: 0 0 16px; }
+    .related-link { width: calc(100% - 12px); margin: 0 auto; display: flex; min-height: 40px; border-radius: 15px; background: #171717; border-color: #000; color: #fff; font-size: 13px; letter-spacing: 1.3px; }
+    .related-link:hover { background: #fff; color: #171717; }
   `],
 })
 export class ProductPage implements OnInit, OnDestroy {
@@ -999,6 +1062,9 @@ export class ProductPage implements OnInit, OnDestroy {
   readonly auth = inject(AuthService);
   private readonly cart = inject(CartService);
   private readonly toast = inject(ToastService);
+  private readonly router = inject(Router);
+  readonly content = STORE_PRODUCT_CONTENT;
+  readonly buyingNow = signal(false);
 
   readonly product = signal<ProductDetail | null>(null);
   readonly relatedProducts = signal<ProductSummary[]>([]);
@@ -1064,6 +1130,56 @@ export class ProductPage implements OnInit, OnDestroy {
     return !!v && v.status === 'ACTIVE' && v.available >= this.quantity() && this.quantity() > 0;
   });
 
+  /** Giá gốc, số sao: chỉ có khi API trả về trường tương ứng. */
+  readonly listPrice = computed<number | null>(() => {
+    const v = this.selectedVariant() as unknown as { compareAtPrice?: number; originalPrice?: number; listPrice?: number } | null;
+    const p = this.product() as unknown as { compareAtPrice?: number; originalPrice?: number; listPrice?: number } | null;
+    const old = v?.compareAtPrice ?? v?.originalPrice ?? v?.listPrice ?? p?.compareAtPrice ?? p?.originalPrice ?? p?.listPrice;
+    const current = this.selectedVariant()?.price ?? this.product()?.price ?? 0;
+    return typeof old === 'number' && old > current ? old : null;
+  });
+  readonly discountPercent = computed(() => {
+    const old = this.listPrice();
+    const current = this.selectedVariant()?.price ?? this.product()?.price ?? 0;
+    return old ? Math.round((1 - current / old) * 100) : 0;
+  });
+  readonly averageRating = computed<string | null>(() => {
+    const p = this.product() as unknown as { ratingAverage?: number; averageRating?: number; rating?: number | { average?: number } } | null;
+    const value = p?.ratingAverage ?? p?.averageRating ?? (typeof p?.rating === 'number' ? p.rating : p?.rating?.average);
+    return typeof value === 'number' && value > 0 ? value.toFixed(1) : null;
+  });
+
+  swatchHex(color: string): string {
+    const name = color.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd').toLowerCase().trim();
+    const words = ` ${name.replace(/[^a-z0-9]+/g, ' ')} `;
+    const sorted = [...this.content.colorSwatches].sort((a, b) => Math.max(...b.keys.map(k => k.length)) - Math.max(...a.keys.map(k => k.length)));
+    return sorted.find(entry => entry.keys.some(key => words.includes(` ${key} `)))?.hex ?? '';
+  }
+  sizeAvailable(size: string): boolean {
+    const color = this.selectedColor();
+    return (this.product()?.variants ?? []).some(v => v.status === 'ACTIVE' && v.size === size && (!color || v.color === color) && v.available > 0);
+  }
+  scrollToReviews(): void { document.getElementById('reviews-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
+
+  /** MUA NGAY: thêm vào giỏ như nút thêm giỏ, thành công thì sang thanh toán (khách chưa đăng nhập sang đăng nhập). */
+  buyNow(): void {
+    const v = this.selectedVariant();
+    if (!v || !this.canAddToCart() || this.buyingNow()) return;
+    this.buyingNow.set(true);
+    this.addToCart();
+    this.whenCartIdle(() => {
+      this.buyingNow.set(false);
+      const inCart = (this.cart.cart()?.items ?? []).some(item => item.variantId === v.id);
+      if (!inCart) return;
+      if (!this.auth.isAuthenticated()) { this.router.navigate(['/auth'], { queryParams: { returnUrl: '/checkout' } }); return; }
+      this.router.navigate(['/checkout']);
+    });
+  }
+  private whenCartIdle(done: () => void, tries = 0): void {
+    if (!this.cart.loading() || tries > 60) { done(); return; }
+    setTimeout(() => this.whenCartIdle(done, tries + 1), 100);
+  }
+
   ngOnInit(): void {
     this.routeSubscription = this.route.paramMap.subscribe(params => this.loadProduct(params.get('slug') || ''));
   }
@@ -1127,11 +1243,25 @@ export class ProductPage implements OnInit, OnDestroy {
   private loadRelatedProducts(p: ProductDetail): void {
     const source = p as ProductDetail & { categoryId?: string; category?: { id?: string; slug?: string } };
     const category = source.category?.slug || source.category?.id || source.categoryId;
-    if (!category) return;
+    const pick = (items: ProductSummary[], exclude: ProductSummary[] = []) =>
+      items.filter(item => item.id !== p.id && !exclude.some(e => e.id === item.id));
+    const fillGeneral = (current: ProductSummary[]) => {
+      if (current.length >= 4) { this.relatedProducts.set(current.slice(0, 4)); return; }
+      this.relatedProductsSubscription = this.api.products({ page: 1, limit: 8 }).subscribe({
+        next: (res) => this.relatedProducts.set([...current, ...pick(res.items, current)].slice(0, 4)),
+        error: () => this.relatedProducts.set(current),
+      });
+    };
+    if (!category) { fillGeneral([]); return; }
     this.relatedProductsSubscription = this.api.products({ category, page: 1, limit: 5 }).subscribe({
-      next: (res) => this.relatedProducts.set(res.items.filter(item => item.id !== p.id).slice(0, 4)),
-      error: () => this.relatedProducts.set([]),
+      next: (res) => fillGeneral(pick(res.items)),
+      error: () => fillGeneral([]),
     });
+  }
+
+  relatedCategory(item: ProductSummary): string {
+    const x = item as unknown as { categoryName?: string; category?: { name?: string } | string };
+    return x.categoryName || (typeof x.category === 'string' ? '' : x.category?.name) || '';
   }
 
   loadReviews(productId: string): void {

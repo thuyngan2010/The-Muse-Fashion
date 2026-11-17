@@ -62,7 +62,7 @@ export class AiCleanupWorker implements OnModuleInit, OnModuleDestroy {
         cleaned += 1;
       }
       if (outputDue && job.state !== 'EXPIRED') {
-        await this.jobs.updateOne({ _id: job._id }, { $set: { state: 'EXPIRED', ...updates }, $unset: { renderPlan: 1 } }).exec();
+        await this.jobs.updateOne({ _id: job._id }, { $set: { state: 'EXPIRED', ...updates }, $unset: { renderPlan: 1, heightCm: 1, weightKg: 1 } }).exec();
       } else if (Object.keys(updates).length) {
         await this.jobs.updateOne({ _id: job._id }, { $set: updates }).exec();
       }

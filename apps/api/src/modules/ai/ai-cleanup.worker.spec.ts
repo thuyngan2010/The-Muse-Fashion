@@ -13,7 +13,7 @@ describe('AiCleanupWorker', () => {
 
     expect(await worker.run()).toBe(2);
     expect(updateOne).toHaveBeenCalledWith({ _id: job._id },
-      { $set: { state: 'EXPIRED', inputCleanupDone: true, outputCleanupDone: true }, $unset: { renderPlan: 1 } });
+      { $set: { state: 'EXPIRED', inputCleanupDone: true, outputCleanupDone: true }, $unset: { renderPlan: 1, heightCm: 1, weightKg: 1 } });
   });
   it('keeps the plan while only the input retention deadline has elapsed', async () => {
     const job = { _id: 'job-2', state: 'COMPLETED', terminalAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000),

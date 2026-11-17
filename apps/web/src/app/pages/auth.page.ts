@@ -5,6 +5,7 @@ import { AuthService } from '../services/auth.service';
 import { CartService } from '../services/cart.service';
 import { ToastService } from '../services/toast.service';
 import { ApiService } from '../services/api.service';
+import { STORE_AUTH_CONTENT } from '../shared/store-content';
 
 @Component({
   standalone: true,
@@ -12,7 +13,20 @@ import { ApiService } from '../services/api.service';
   template: `
     <main class="auth-page-container">
       <section class="auth-visual" aria-label="Bộ sưu tập MUSE">
-        <img src="/assets/auth/muse-auth-model.png" alt="Người mẫu MUSE trong trang phục trắng">
+        <div class="visual-img">
+          <img src="/assets/auth/muse-auth-model.png" alt="Người mẫu MUSE trong trang phục trắng">
+        </div>
+        @if (mode() === 'auth' && isRegisterMode()) {
+          <aside class="privileges" aria-label="Đặc quyền thành viên">
+            <h2>{{ content.privileges.title }}</h2>
+            <p>{{ content.privileges.intro }}</p>
+            <ul>
+              @for (item of content.privileges.items; track item.title) {
+                <li><span aria-hidden="true">✓</span><span><strong>{{ item.title }}:</strong> {{ item.text }}</span></li>
+              }
+            </ul>
+          </aside>
+        }
       </section>
 
       <div class="auth-card">
@@ -40,13 +54,16 @@ import { ApiService } from '../services/api.service';
 
             <label class="form-group">
               <span>Mật khẩu *</span>
-              <input
-                type="password"
+              <span class="pw-field"><input
+                [type]="isShown('login') ? 'text' : 'password'"
                 [(ngModel)]="loginPassword"
                 name="password"
                 placeholder="••••••••"
                 required
               />
+                <button type="button" class="pw-eye" (click)="toggleShow('login')" [attr.aria-label]="isShown('login') ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'" [attr.aria-pressed]="isShown('login')">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z"></path><circle cx="12" cy="12" r="3"></circle>@if (isShown('login')) {<line x1="3" y1="3" x2="21" y2="21"></line>}</svg>
+                </button></span>
             </label>
 
             <button type="submit" class="btn-submit" [disabled]="submitting()">
@@ -87,18 +104,44 @@ import { ApiService } from '../services/api.service';
 
             <label class="form-group">
               <span>Mật khẩu *</span>
-              <input
-                type="password"
+              <span class="pw-field"><input
+                [type]="isShown('reg') ? 'text' : 'password'"
                 [(ngModel)]="regPassword"
                 name="password"
                 placeholder="Tối thiểu 12 ký tự"
                 minlength="12"
                 required
               />
+                <button type="button" class="pw-eye" (click)="toggleShow('reg')" [attr.aria-label]="isShown('reg') ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'" [attr.aria-pressed]="isShown('reg')">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z"></path><circle cx="12" cy="12" r="3"></circle>@if (isShown('reg')) {<line x1="3" y1="3" x2="21" y2="21"></line>}</svg>
+                </button></span>
             </label>
-            <p class="password-rule">Ít nhất 12 ký tự, có chữ hoa, chữ thường và số.</p>
+            <div class="strength" aria-live="polite">
+              <div class="strength-head"><span>Độ mạnh: {{ strengthText(regPassword) }}</span></div>
+              <div class="strength-bars"><span [class.on]="strength(regPassword).level >= 1"></span><span [class.on]="strength(regPassword).level >= 2"></span><span [class.on]="strength(regPassword).level >= 3"></span></div>
+            </div>
+            <p class="password-rule">{{ content.passwordRule }}</p>
 
-            <button type="submit" class="btn-submit" [disabled]="submitting()">
+            <label class="form-group">
+              <span>Xác nhận mật khẩu *</span>
+              <span class="pw-field"><input
+                [type]="isShown('regConfirm') ? 'text' : 'password'"
+                [(ngModel)]="regConfirm"
+                name="confirmPassword"
+                placeholder="Nhập lại mật khẩu"
+                required
+              />
+                <button type="button" class="pw-eye" (click)="toggleShow('regConfirm')" [attr.aria-label]="isShown('regConfirm') ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'" [attr.aria-pressed]="isShown('regConfirm')">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z"></path><circle cx="12" cy="12" r="3"></circle>@if (isShown('regConfirm')) {<line x1="3" y1="3" x2="21" y2="21"></line>}</svg>
+                </button></span>
+            </label>
+
+            <label class="terms-row">
+              <input type="checkbox" [(ngModel)]="regTerms" name="terms" />
+              <span>{{ content.terms }}</span>
+            </label>
+
+            <button type="submit" class="btn-submit" [disabled]="submitting() || !regTerms">
               <span>{{ submitting() ? 'Đang tạo tài khoản...' : 'Tạo tài khoản' }}</span><span aria-hidden="true">→</span>
             </button>
           </form>
@@ -121,9 +164,19 @@ import { ApiService } from '../services/api.service';
           <p class="back-row"><button type="button" class="link-btn back-link" (click)="mode.set('auth')">← Quay lại đăng nhập</button></p>
         } @else {
           <form (ngSubmit)="handleResetPassword()" class="auth-form">
-            <label class="form-group"><span>Mật khẩu mới *</span><input type="password" name="resetPassword" [(ngModel)]="resetPassword" placeholder="Tối thiểu 12 ký tự" minlength="12" required /></label>
-            <p class="password-rule">Ít nhất 12 ký tự, có chữ hoa, chữ thường và số.</p>
-            <label class="form-group"><span>Xác nhận mật khẩu *</span><input type="password" name="resetConfirm" [(ngModel)]="resetConfirm" placeholder="Nhập lại mật khẩu mới" minlength="12" required /></label>
+            <label class="form-group"><span>Mật khẩu mới *</span><span class="pw-field"><input [type]="isShown('reset') ? 'text' : 'password'" name="resetPassword" [(ngModel)]="resetPassword" placeholder="Tối thiểu 12 ký tự" minlength="12" required />
+              <button type="button" class="pw-eye" (click)="toggleShow('reset')" [attr.aria-label]="isShown('reset') ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'" [attr.aria-pressed]="isShown('reset')">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z"></path><circle cx="12" cy="12" r="3"></circle>@if (isShown('reset')) {<line x1="3" y1="3" x2="21" y2="21"></line>}</svg>
+                </button></span></label>
+            <div class="strength" aria-live="polite">
+              <div class="strength-head"><span>Độ mạnh: {{ strengthText(resetPassword) }}</span></div>
+              <div class="strength-bars"><span [class.on]="strength(resetPassword).level >= 1"></span><span [class.on]="strength(resetPassword).level >= 2"></span><span [class.on]="strength(resetPassword).level >= 3"></span></div>
+            </div>
+            <p class="password-rule">{{ content.passwordRule }}</p>
+            <label class="form-group"><span>Xác nhận mật khẩu *</span><span class="pw-field"><input [type]="isShown('resetConfirm') ? 'text' : 'password'" name="resetConfirm" [(ngModel)]="resetConfirm" placeholder="Nhập lại mật khẩu mới" minlength="12" required />
+              <button type="button" class="pw-eye" (click)="toggleShow('resetConfirm')" [attr.aria-label]="isShown('resetConfirm') ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'" [attr.aria-pressed]="isShown('resetConfirm')">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z"></path><circle cx="12" cy="12" r="3"></circle>@if (isShown('resetConfirm')) {<line x1="3" y1="3" x2="21" y2="21"></line>}</svg>
+                </button></span></label>
             <button type="submit" class="btn-submit" [disabled]="submitting()"><span>{{ submitting() ? 'Đang cập nhật...' : 'Đặt lại mật khẩu' }}</span><span aria-hidden="true">→</span></button>
           </form>
           <p class="back-row"><a class="back-link" routerLink="/auth">← Quay lại đăng nhập</a></p>
@@ -352,6 +405,29 @@ import { ApiService } from '../services/api.service';
       .auth-aux-links { align-items: flex-start; flex-direction: column; }
       .mode-switch { margin-top: 32px; }
     }
+    .auth-visual { display: flex; flex-direction: column; }
+    .visual-img { position: relative; flex: 1 1 auto; min-height: 814px; overflow: hidden; }
+    .visual-img img { position: absolute; inset: 0; display: block; width: 100%; height: 100%; object-fit: cover; object-position: center; }
+    .privileges { padding: 24px 32px 32px; border-top: 1px solid #e4e4e4; background: #f9f9f9; color: #171717; }
+    .privileges h2 { margin: 0 0 8px; font: 400 20px/28px Georgia, "Times New Roman", serif; }
+    .privileges p { margin: 0 0 14px; color: #5d5d5d; font-size: 13px; line-height: 1.55; }
+    .privileges ul { display: grid; gap: 10px; margin: 0; padding: 0; list-style: none; font-size: 12px; line-height: 1.5; }
+    .privileges li { display: flex; gap: 10px; }
+    .privileges li > span:first-child { color: #8b455b; font-weight: 700; }
+    .pw-field { position: relative; display: block; }
+    .pw-field input { padding-right: 48px; }
+    .pw-eye { position: absolute; top: 0; right: 0; width: 48px; height: 48px; display: inline-flex; align-items: center; justify-content: center; border: 0; background: none; color: #444; cursor: pointer; }
+    .pw-eye:hover { color: #000; }
+    .pw-eye:focus-visible { outline: 2px solid #000; outline-offset: -2px; }
+    .strength { margin-top: -14px; }
+    .strength-head { display: flex; justify-content: flex-end; margin-bottom: 6px; color: #8b455b; font-size: 11px; font-weight: 600; letter-spacing: .6px; }
+    .strength-bars { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+    .strength-bars span { height: 3px; background: #f6d2d8; }
+    .strength-bars span.on { background: #8b455b; }
+    .strength + .password-rule { margin-top: 6px; }
+    .terms-row { display: flex; align-items: flex-start; gap: 10px; color: #444; font-size: 12px; line-height: 1.5; cursor: pointer; }
+    .terms-row input { width: 16px; height: 16px; margin: 2px 0 0; accent-color: #000; flex: none; }
+    @media (max-width: 900px) { .visual-img, .privileges { display: none; } }
   `],
 })
 export class AuthPage implements OnInit {
@@ -361,6 +437,18 @@ export class AuthPage implements OnInit {
   private readonly cart = inject(CartService);
   private readonly toast = inject(ToastService);
   private readonly api = inject(ApiService);
+
+  readonly content = STORE_AUTH_CONTENT;
+  private readonly shown = signal<Record<string, boolean>>({});
+  isShown(key: string): boolean { return !!this.shown()[key]; }
+  toggleShow(key: string): void { this.shown.update(v => ({ ...v, [key]: !v[key] })); }
+
+  /** Độ mạnh 3 nấc theo 4 quy tắc thật: 12 ký tự, chữ hoa, chữ thường, số. */
+  strength(pw: string): { score: number; level: number } {
+    const score = [pw.length >= 12, /[A-Z]/.test(pw), /[a-z]/.test(pw), /\d/.test(pw)].filter(Boolean).length;
+    return { score, level: score === 0 ? 0 : score <= 2 ? 1 : score === 3 ? 2 : 3 };
+  }
+  strengthText(pw: string): string { return this.content.strengthLabels[this.strength(pw).level] || '—'; }
 
   readonly isRegisterMode = signal<boolean>(false);
   readonly registered = signal(false);
@@ -378,6 +466,8 @@ export class AuthPage implements OnInit {
   regFullName = '';
   regEmail = '';
   regPassword = '';
+  regConfirm = '';
+  regTerms = false;
 
   private returnUrl = '/';
 
@@ -458,6 +548,8 @@ export class AuthPage implements OnInit {
       this.toast.warning('Mật khẩu cần 12–128 ký tự, có chữ hoa, chữ thường và số.');
       return;
     }
+    if (this.regPassword !== this.regConfirm) { this.toast.warning('Mật khẩu xác nhận không khớp.'); return; }
+    if (!this.regTerms) { this.toast.warning(this.content.termsRequired); return; }
 
     this.submitting.set(true);
     this.auth.register({
@@ -471,6 +563,8 @@ export class AuthPage implements OnInit {
         this.isRegisterMode.set(false);
         this.loginEmail = this.regEmail;
         this.regPassword = '';
+        this.regConfirm = '';
+        this.regTerms = false;
         this.toast.success('Kiểm tra email để xác minh tài khoản trước khi đăng nhập.');
       },
       error: (err) => {

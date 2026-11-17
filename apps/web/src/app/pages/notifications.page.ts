@@ -6,6 +6,7 @@ import { PaginationState } from '../components/pagination.component';
 import { ApiService } from '../services/api.service';
 import { ToastService } from '../services/toast.service';
 import { STORE_NOTIFICATIONS_CONTENT } from '../shared/store-content';
+import { PageStateComponent } from '../components/page-state.component';
 
 type NotificationKind = 'order' | 'payment' | 'refund' | 'ai' | 'community' | 'lookbook' | 'general';
 
@@ -21,7 +22,7 @@ const KIND_LABEL: Record<NotificationKind, string> = {
 
 @Component({
   standalone: true,
-  imports: [RouterLink, AccountSidebarComponent],
+  imports: [PageStateComponent, RouterLink, AccountSidebarComponent],
   template: `
     <main class="account-shell">
       <fc-account-sidebar activeItem="notifications" />
@@ -34,10 +35,10 @@ const KIND_LABEL: Record<NotificationKind, string> = {
 
         <div class="controls">
           <div class="tabs" role="tablist" aria-label="Bộ lọc thông báo">
-            <button type="button" role="tab" class="tab" data-ui-only [class.active]="tab() === 'all'" [attr.aria-selected]="tab() === 'all'" (click)="tab.set('all')">
+            <button type="button" role="tab" class="tab" [class.active]="tab() === 'all'" [attr.aria-selected]="tab() === 'all'" (click)="tab.set('all')">
               TẤT CẢ <span class="tab-count">({{ pagination.total() }})</span>
             </button>
-            <button type="button" role="tab" class="tab" data-ui-only [class.active]="tab() === 'unread'" [attr.aria-selected]="tab() === 'unread'" (click)="tab.set('unread')">
+            <button type="button" role="tab" class="tab" [class.active]="tab() === 'unread'" [attr.aria-selected]="tab() === 'unread'" (click)="tab.set('unread')">
               CHƯA ĐỌC @if (unreadCount() > 0) { <span class="tab-badge">{{ unreadCount() }}</span> }
             </button>
           </div>
@@ -50,30 +51,16 @@ const KIND_LABEL: Record<NotificationKind, string> = {
         </div>
 
         @if (loading()) {
-          <div class="state-panel" aria-live="polite">
-            <span class="spinner" aria-hidden="true"></span>
-            <h2>Đang tải thông báo</h2>
-            <p>Danh sách thông báo đang được cập nhật.</p>
-          </div>
+          <fc-page-state kind="loading" title="Đang tải thông báo" message="Danh sách thông báo đang được cập nhật." />
         } @else if (error()) {
-          <div class="state-panel" role="alert">
-            <span class="state-icon" aria-hidden="true">!</span>
-            <h2>Không thể tải thông báo</h2>
-            <p>{{ error() }}</p>
-            <button type="button" class="btn-outline" (click)="loadNotifications()">THỬ LẠI</button>
-          </div>
+          <fc-page-state kind="error" title="Không thể tải thông báo" [message]="error()" actionLabel="THỬ LẠI" (action)="loadNotifications()" />
+        } @else if (visibleNotifications().length === 0 && tab() === 'unread' && notifications().length > 0) {
+          <fc-page-state kind="empty" title="Bạn đã đọc hết thông báo" message="Không còn thông báo chưa đọc trong trang đang xem." actionLabel="XEM TẤT CẢ THÔNG BÁO" (action)="tab.set('all')" />
         } @else if (notifications().length === 0) {
-          <div class="state-panel">
-            <span class="state-icon bell" aria-hidden="true">
-              <svg viewBox="0 0 24 24" fill="none"><path d="M6 17h12l-1.5-2.5V9a4.5 4.5 0 0 0-9 0v5.5L6 17Z"/><path d="M10 20h4"/></svg>
-            </span>
-            <h2>Không có thông báo mới</h2>
-            <p>{{ content.emptyDescription }}</p>
-            <a routerLink="/" class="btn-primary">Tiếp tục mua sắm</a>
-          </div>
+          <fc-page-state kind="empty" title="Không có thông báo mới" [message]="content.emptyDescription" actionLabel="TIẾP TỤC MUA SẮM" actionLink="/products" />
         } @else {
           <div class="feed" role="list">
-            @for (n of notifications(); track n.id) {
+            @for (n of visibleNotifications(); track n.id) {
               <article class="item" role="listitem" tabindex="0" [class.unread]="!n.readAt" (click)="markRead(n)" (keydown.enter)="markRead(n)">
                 <span class="icon-box" aria-hidden="true">
                   @switch (kindOf(n.type)) {
@@ -157,16 +144,10 @@ const KIND_LABEL: Record<NotificationKind, string> = {
     .pg svg { width:10px; height:10px; stroke:currentColor; stroke-width:1.2; stroke-linecap:round; stroke-linejoin:round; }
     .pg:hover:not(:disabled) { border-color:#000; color:#000; } .pg.current { background:#000; border-color:#000; color:#fff; } .pg:disabled { opacity:.5; cursor:default; }
     .gap { color:#444748; font:400 14px/22px 'Outfit',sans-serif; }
-    .state-panel { min-height:420px; margin-top:32px; border:1px solid #e3e2e2; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; padding:40px; }
-    .state-panel h2 { margin:14px 0 8px; font:400 28px 'Playfair Display',serif; color:#000; }
-    .state-panel p { margin:0 0 22px; color:#555; font:400 13px/20px 'Montserrat',sans-serif; }
-    .spinner { width:34px; height:34px; border:2px solid #e3e2e2; border-top-color:#000; border-radius:50%; animation:spin .8s linear infinite; }
-    .state-icon { width:40px; height:40px; border:1px solid #de233f; border-radius:50%; display:grid; place-items:center; color:#de233f; font:500 22px 'Playfair Display',serif; }
-    .state-icon.bell { border-color:#e3e2e2; color:#171414; } .state-icon svg { width:20px; height:20px; stroke:currentColor; stroke-width:1.5; stroke-linecap:round; stroke-linejoin:round; }
     @keyframes spin { to { transform:rotate(360deg); } }
     @media (max-width:980px) { .account-shell { width:min(100% - 32px,760px); grid-template-columns:1fr; } }
     @media (max-width:640px) { .account-shell { width:100%; padding:20px 16px 64px; } .page-header h1 { font-size:34px; line-height:40px; } .tabs { gap:20px; } .item { padding:16px; } .item-top { align-items:flex-start; flex-direction:column; gap:2px; } }
-    @media (prefers-reduced-motion:reduce) { .spinner { animation-duration:.01ms; } }
+    
   `],
 })
 export class NotificationsPage implements OnInit {
@@ -181,8 +162,11 @@ export class NotificationsPage implements OnInit {
   readonly unreadCount = signal<number>(0);
   readonly loading = signal<boolean>(true);
   readonly error = signal<string>('');
-  /** UI-ONLY: chuyển trạng thái active, chưa lọc dữ liệu. */
   readonly tab = signal<'all' | 'unread'>('all');
+  /** Tab "Chưa đọc" lọc trong trang đang xem: chỉ giữ thông báo chưa có readAt. */
+  readonly visibleNotifications = computed(() =>
+    this.tab() === 'unread' ? this.notifications().filter((n) => !n.readAt) : this.notifications(),
+  );
 
   readonly pageCount = computed(() => Math.max(1, Math.ceil(this.pagination.total() / this.pagination.limit)));
   /** Danh sách số trang; 0 là dấu "…". */

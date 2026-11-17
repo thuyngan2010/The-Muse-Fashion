@@ -3,11 +3,14 @@ import { Component, OnInit, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import type { Order, OrderStatus } from '@fashion/contracts';
+import { AccountSidebarComponent } from '../components/account-sidebar.component';
 import { ModalComponent } from '../components/modal.component';
 import { ApiService } from '../services/api.service';
 import { AuthService } from '../services/auth.service';
 import { ToastService } from '../services/toast.service';
+import { ORDER_STATUS_LABELS, orderStatusLabel } from '../shared/labels';
 import { STORE_ORDER_DETAIL_CONTENT } from '../shared/store-content';
+import { PageStateComponent } from '../components/page-state.component';
 
 function generateUUID(): string {
   if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();
@@ -20,29 +23,18 @@ function generateUUID(): string {
 
 @Component({
   standalone: true,
-  imports: [RouterLink, CurrencyPipe, DatePipe, FormsModule, ModalComponent],
+  imports: [PageStateComponent, AccountSidebarComponent, RouterLink, CurrencyPipe, DatePipe, FormsModule, ModalComponent],
   template: `
     <main class="account-shell">
-      <aside class="account-sidebar" aria-label="Điều hướng tài khoản">
-        <div class="account-identity">
-          <span class="account-avatar" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="4"/><path d="M4 21c.7-4.3 3.4-6.5 8-6.5s7.3 2.2 8 6.5"/></svg></span>
-          <div><span>TÀI KHOẢN</span><strong>Tài khoản của bạn</strong></div>
-        </div>
-        <nav class="account-nav" aria-label="Các mục tài khoản">
-          <a routerLink="/account"><span>Thông tin cá nhân</span><span aria-hidden="true">→</span></a>
-          <a routerLink="/addresses"><span>Sổ địa chỉ</span><span aria-hidden="true">→</span></a>
-          <a routerLink="/orders" class="active" aria-current="page"><span>Đơn hàng của tôi</span><span aria-hidden="true">→</span></a>
-        </nav>
-        <div class="sidebar-note"><span>CẦN HỖ TRỢ?</span><p>Thông tin hỗ trợ của đơn hàng được hiển thị trong trang này.</p></div>
-      </aside>
+      <fc-account-sidebar />
 
       <section class="detail-content">
         <a routerLink="/orders" class="back-link"><span aria-hidden="true">←</span> QUAY LẠI ĐƠN HÀNG</a>
 
         @if (loading()) {
-          <div class="state-panel" aria-live="polite"><span class="spinner" aria-hidden="true"></span><h1>Đang tải đơn hàng</h1><p>Thông tin chi tiết đang được cập nhật.</p></div>
+          <fc-page-state kind="loading" title="Đang tải đơn hàng" message="Thông tin chi tiết đang được cập nhật." />
         } @else if (error()) {
-          <div class="state-panel error-panel" role="alert"><span class="error-icon">!</span><h1>Không thể tải đơn hàng</h1><p>{{ error() }}</p><button type="button" class="button button-pink" (click)="reloadOrder()">THỬ LẠI</button></div>
+          <fc-page-state kind="error" title="Không thể tải đơn hàng" [message]="error()" actionLabel="THỬ LẠI" (action)="reloadOrder()" />
         } @else if (order(); as o) {
           <header class="detail-header">
             <div>
@@ -72,7 +64,7 @@ function generateUUID(): string {
 
           <div class="detail-grid">
             <div class="main-column">
-              <section class="box products-box">
+              <section class="box products-box" id="order-products">
                 <div class="box-heading"><span>SẢN PHẨM</span><strong>{{ o.items.length }} sản phẩm</strong></div>
                 @for (item of o.items; track item.variantId) {
                   <article class="product-row">
@@ -190,15 +182,7 @@ function generateUUID(): string {
   styles: [`
     @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&family=Outfit:wght@300;400;500&family=Playfair+Display:wght@400;500&display=swap');
     :host { display:block; color:#171414; background:#fff; } * { box-sizing:border-box; }
-    .account-shell { width:min(1184px, calc(100% - 48px)); margin:0 auto; padding:40px 0 88px; display:grid; grid-template-columns:280px minmax(0,1fr); gap:32px; font-family:'Montserrat',sans-serif; }
-    .account-sidebar { align-self:start; border:1px solid #5f5353; padding:24px; min-height:523px; }
-    .account-identity { display:flex; gap:14px; align-items:center; padding-bottom:24px; border-bottom:1px solid #e3e2e2; }
-    .account-avatar { width:52px; height:52px; border-radius:50%; display:grid; place-items:center; background:#f5e6e8; } .account-avatar svg { width:24px; stroke:#171414; stroke-width:1.5; }
-    .account-identity div > span { display:block; margin-bottom:4px; color:#756d6d; font-size:9px; font-weight:600; letter-spacing:1.3px; } .account-identity strong { font:500 16px 'Outfit',sans-serif; }
-    .account-nav { display:grid; gap:4px; padding:20px 0; border-bottom:1px solid #e3e2e2; }
-    .account-nav a { min-height:46px; padding:0 12px; display:flex; align-items:center; justify-content:space-between; color:#444748; text-decoration:none; font-size:13px; }
-    .account-nav a:hover,.account-nav a:focus-visible { background:#f7f4f4; } .account-nav a.active { color:#000; background:#ffd9e1; border:1px solid #000; }
-    .sidebar-note { padding-top:24px; } .sidebar-note > span { font-size:10px; font-weight:600; letter-spacing:1.2px; } .sidebar-note p { margin:9px 0 0; color:#625b5b; font:300 13px/1.6 'Outfit',sans-serif; }
+    .account-shell { width:min(1184px, calc(100% - 48px)); margin:0 auto; padding:40px 0 88px; display:grid; grid-template-columns:280px minmax(0,1fr); gap:32px; align-items:start; font-family:'Montserrat',sans-serif; }
     .detail-content { min-width:0; } .back-link { display:inline-flex; gap:10px; margin-bottom:24px; color:#171414; text-decoration:none; font-size:10px; font-weight:600; letter-spacing:1px; }
     .detail-header { padding-bottom:24px; border-bottom:1px solid #5f5353; display:flex; align-items:flex-end; justify-content:space-between; gap:24px; }
     .eyebrow { color:#8f485d; font-size:10px; font-weight:600; letter-spacing:1.5px; } .detail-header h1 { margin:7px 0 10px; font:400 40px/1.2 'Playfair Display',serif; letter-spacing:-.5px; }
@@ -232,8 +216,6 @@ function generateUUID(): string {
     .history-row { padding:14px 20px; } .history-row + .history-row { border-top:1px solid #e3e2e2; } .history-row time { display:block; color:#777; font-size:9px; } .history-row strong { display:block; margin-top:5px; font-size:10px; letter-spacing:.5px; } .history-row p { margin:5px 0 0; color:#666; font-size:10px; line-height:1.5; }
     .support-box { padding:22px; background:#f5f3f3; border:1px solid #e3e2e2; } .support-box > span { font-size:10px; font-weight:600; letter-spacing:1.2px; } .support-box p { color:#615959; font:300 13px/1.55 'Outfit',sans-serif; } .support-box a { color:#000; font-size:10px; font-weight:600; letter-spacing:.8px; text-decoration:none; }
     .cancel-order-button { width:100%; margin-top:16px; border:0; background:none; color:#a33d3d; padding:12px; font:600 10px 'Montserrat',sans-serif; letter-spacing:1px; text-decoration:underline; text-underline-offset:4px; cursor:pointer; }
-    .state-panel { min-height:500px; border:1px solid #5f5353; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; padding:40px; } .state-panel h1 { margin:14px 0 8px; font:400 34px 'Playfair Display',serif; } .state-panel p { margin:0 0 22px; color:#666; font:300 14px 'Outfit',sans-serif; }
-    .spinner { width:36px; height:36px; border:2px solid #e3e2e2; border-top-color:#000; border-radius:50%; animation:spin .8s linear infinite; } .error-icon { width:40px; height:40px; border:1px solid #a33d3d; border-radius:50%; display:grid; place-items:center; color:#a33d3d; }
     .cancel-modal-content,.review-modal-content { width:min(100%,780px); font-family:'Montserrat',sans-serif; } .modal-intro { margin:-4px 0 18px; color:#444748; font-size:12px; } .cancel-warning { padding:16px; margin-bottom:18px; border:1px solid #e3e2e2; background:#f5f3f3; font-size:11px; line-height:1.6; }
     .cancel-summary { border:1px solid #5f5353; } .cancel-summary header { padding:16px 24px; display:flex; justify-content:space-between; align-items:center; background:#f5f3f3; border-bottom:1px solid #5f5353; }
     .cancel-summary header div { display:flex; gap:14px; align-items:center; } .cancel-summary header strong { font-size:12px; letter-spacing:.8px; } .cancel-summary header div span { color:#555; font-size:10px; } .cancel-summary header > span { padding:5px 10px; border:1px solid #000; font-size:9px; font-weight:600; letter-spacing:.8px; }
@@ -244,9 +226,9 @@ function generateUUID(): string {
     .modal-actions { margin-top:16px; padding-top:16px; border-top:1px solid #e3e2e2; display:flex; gap:12px; justify-content:space-between; } .review-actions > span { flex:1; } .modal-kicker { color:#8f485d; font-size:9px; font-weight:600; letter-spacing:1px; } .review-modal-content h3 { margin:6px 0 14px; font:500 18px 'Playfair Display',serif; }
     .stars-select { display:flex; gap:5px; } .star-button { border:0; background:none; color:#d5d0d0; padding:0; font-size:30px; cursor:pointer; } .star-button.active { color:#d89a36; } .delete-review { border:0; background:none; color:#a33d3d; font:600 9px 'Montserrat',sans-serif; letter-spacing:.8px; text-decoration:underline; cursor:pointer; }
     @keyframes spin { to { transform:rotate(360deg); } }
-    @media (max-width:960px) { .account-shell { grid-template-columns:1fr; width:min(100% - 32px,760px); } .account-sidebar { min-height:0; } .account-identity,.sidebar-note { display:none; } .account-nav { grid-template-columns:repeat(3,1fr); padding:0; border:0; } .detail-grid { grid-template-columns:1fr; } }
-    @media (max-width:640px) { .account-shell { width:100%; padding:20px 16px 64px; } .account-sidebar { padding:10px; } .account-nav { grid-template-columns:1fr; } .detail-header { align-items:flex-start; flex-direction:column; } .detail-header h1 { font-size:34px; } .progress-card { overflow-x:auto; padding:20px 12px; } .progress-step { min-width:86px; } .progress-line { min-width:30px; } .estimated { display:none; } .product-row { grid-template-columns:72px minmax(0,1fr); padding:16px; } .product-image { width:72px; height:96px; } .product-price { grid-column:2; text-align:left; padding:0; } .shipping-meta p { align-items:flex-start; flex-wrap:wrap; } .shipping-meta p > span { min-width:100%; } .cancel-summary header,.cancel-summary header div { align-items:flex-start; flex-direction:column; } .cancel-product { grid-template-columns:64px 1fr; padding:16px; } .mini-image { width:64px; height:72px; } .cancel-product > p { grid-column:2; text-align:left; } .modal-actions { flex-wrap:wrap; } .modal-actions .button { flex:1; } }
-    @media (prefers-reduced-motion:reduce) { .spinner { animation-duration:.01ms; } }
+    @media (max-width:960px) { .account-shell { grid-template-columns:1fr; width:min(100% - 32px,760px); } .detail-grid { grid-template-columns:1fr; } }
+    @media (max-width:640px) { .account-shell { width:100%; padding:20px 16px 64px; } .detail-header { align-items:flex-start; flex-direction:column; } .detail-header h1 { font-size:34px; } .progress-card { overflow-x:auto; padding:20px 12px; } .progress-step { min-width:86px; } .progress-line { min-width:30px; } .estimated { display:none; } .product-row { grid-template-columns:72px minmax(0,1fr); padding:16px; } .product-image { width:72px; height:96px; } .product-price { grid-column:2; text-align:left; padding:0; } .shipping-meta p { align-items:flex-start; flex-wrap:wrap; } .shipping-meta p > span { min-width:100%; } .cancel-summary header,.cancel-summary header div { align-items:flex-start; flex-direction:column; } .cancel-product { grid-template-columns:64px 1fr; padding:16px; } .mini-image { width:64px; height:72px; } .cancel-product > p { grid-column:2; text-align:left; } .modal-actions { flex-wrap:wrap; } .modal-actions .button { flex:1; } }
+    
   `],
 })
 export class OrderDetailPage implements OnInit {
@@ -269,8 +251,7 @@ export class OrderDetailPage implements OnInit {
   readonly submittingReview = signal(false);
   readonly policy = STORE_ORDER_DETAIL_CONTENT;
   readonly progressSteps: ReadonlyArray<{ state: OrderStatus; label: string }> = [
-    { state: 'PENDING_PAYMENT', label: 'Chờ thanh toán' }, { state: 'CONFIRMED', label: 'Đã xác nhận' },
-    { state: 'PREPARING', label: 'Đang chuẩn bị' }, { state: 'SHIPPING', label: 'Đang giao' }, { state: 'DELIVERED', label: 'Đã giao' },
+    ...(['PENDING_PAYMENT', 'CONFIRMED', 'PREPARING', 'SHIPPING', 'DELIVERED'] as const).map(state => ({ state, label: ORDER_STATUS_LABELS[state] })),
   ];
   cancelReason = '';
   reviewStars = 5;
@@ -286,14 +267,32 @@ export class OrderDetailPage implements OnInit {
         if (this.auth.isCustomer()) {
           this.loadingReviews.set(true); this.reviewsLoadFailed.set(false);
           this.api.myOrderReviews(o.id).subscribe({
-            next: result => { this.itemReviews.set(Object.fromEntries(result.items.map(review => [review.orderItemId, { id: review.id, stars: review.stars, content: review.content }]))); this.loadingReviews.set(false); },
+            next: result => { this.itemReviews.set(Object.fromEntries(result.items.map(review => [review.orderItemId, { id: review.id, stars: review.stars, content: review.content }]))); this.loadingReviews.set(false); this.handleReviewAction(o); },
             error: () => { this.loadingReviews.set(false); this.reviewsLoadFailed.set(true); this.toast.error('Không thể tải đánh giá đã gửi. Vui lòng tải lại đơn hàng trước khi đánh giá.'); },
           });
         }
         this.loading.set(false);
+        this.handleAction(o);
       },
       error: () => { this.error.set('Không thể tìm thấy thông tin đơn hàng này.'); this.loading.set(false); },
     });
+  }
+  private actionHandled = false;
+  /** Đọc ?action= sau khi tải đơn; không mở được thì bỏ qua, không báo lỗi. */
+  private handleAction(o: Order): void {
+    const action = this.route.snapshot.queryParamMap.get('action');
+    if (this.actionHandled || !action) return;
+    if (action === 'cancel' && o.state === 'PENDING_PAYMENT') { this.actionHandled = true; this.cancelModalOpen.set(true); }
+    if (action === 'review' && o.state === 'DELIVERED' && !this.auth.isCustomer()) this.actionHandled = true;
+  }
+  private handleReviewAction(o: Order): void {
+    if (this.actionHandled || this.route.snapshot.queryParamMap.get('action') !== 'review' || o.state !== 'DELIVERED') return;
+    this.actionHandled = true;
+    setTimeout(() => {
+      document.getElementById('order-products')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      const pending = o.items.filter((item) => !this.itemReviews()[item.lineId]);
+      if (pending.length === 1) this.openReviewModal(pending[0]);
+    }, 0);
   }
   isStepCompleted(step: OrderStatus, current: OrderStatus): boolean { const steps: OrderStatus[] = ['PENDING_PAYMENT','CONFIRMED','PREPARING','SHIPPING','DELIVERED']; return steps.indexOf(current) >= steps.indexOf(step); }
   itemImage(item: Order['items'][number]): string { const data = item as unknown as { imageUrl?:string; productImage?:string; image?:{url?:string} }; return data.imageUrl || data.productImage || data.image?.url || ''; }
@@ -301,9 +300,7 @@ export class OrderDetailPage implements OnInit {
   voucherCode(order: Order): string { return (order as unknown as { voucherCode?:string; voucher?:{code?:string} }).voucherCode || (order as unknown as { voucher?:{code?:string} }).voucher?.code || ''; }
   formatHistoryStatus(state: string): string { return this.formatStatus(state as OrderStatus); }
   async copyTrackingCode(code: string): Promise<void> { try { await navigator.clipboard.writeText(code); this.toast.success('Đã sao chép mã vận đơn.'); } catch { this.toast.error('Không thể sao chép mã vận đơn.'); } }
-  formatStatus(state: OrderStatus): string {
-    switch (state) { case 'PENDING_PAYMENT':return 'Chờ thanh toán'; case 'CONFIRMED':return 'Đã xác nhận'; case 'PREPARING':return 'Đang chuẩn bị hàng'; case 'SHIPPING':return 'Đang giao hàng'; case 'DELIVERED':return 'Đã giao thành công'; case 'CANCELLED':return 'Đã hủy'; case 'CANCEL_PENDING_REFUND':return 'Hủy - Chờ hoàn tiền'; default:return state; }
-  }
+  formatStatus(state: OrderStatus): string { return orderStatusLabel(state); }
   confirmCancel(): void {
     const o = this.order(); if (!o) return; this.cancelling.set(true);
     this.api.cancelOrder(o.id, this.cancelReason || 'Khách hàng yêu cầu hủy đơn', generateUUID()).subscribe({
