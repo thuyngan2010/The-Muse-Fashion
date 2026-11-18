@@ -1,4 +1,5 @@
 import 'reflect-metadata';
+import './common/mongo-dns.js';
 import { NestFactory } from '@nestjs/core';
 import { BadRequestException, ValidationPipe } from '@nestjs/common';
 import type { ValidationError } from 'class-validator';
