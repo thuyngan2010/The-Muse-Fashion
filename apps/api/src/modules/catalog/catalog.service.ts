@@ -21,6 +21,7 @@ import type { CategoryDto } from './catalog.dto.js';
 import { MediaObject } from '../storage/media-object.schema.js';
 import { StorageService } from '../storage/storage.service.js';
 import { AuditService } from '../operations/audit.service.js';
+import { escapeRegex } from '../../common/escape-regex.js';
 import { withCommerceTransaction } from '../../common/mongo-transaction.util.js';
 
 type ListQuery = {
@@ -136,10 +137,27 @@ export class CatalogService {
     return { sizes: [...sizes].sort(collator.compare), colors: [...colors].sort(collator.compare), minPrice, maxPrice };
   }
 
-  async listAdmin(status?: string, page = 1, limit = 20) {
+  async listAdmin(status?: string, page = 1, limit = 20, search: { q?: string; category?: string } = {}) {
     const safePage = Math.max(1, page);
     const safeLimit = Math.min(50, Math.max(1, limit));
-    const filter = status ? { status } : {};
+    const empty = { page: safePage, limit: safeLimit, total: 0, items: [] };
+    const filter: Record<string, unknown> = status ? { status } : {};
+    const category = search.category?.trim();
+    if (category) {
+      const match = Types.ObjectId.isValid(category)
+        ? { $or: [{ slug: category.toLowerCase() }, { _id: category }] }
+        : { slug: category.toLowerCase() };
+      const found = await this.categories.findOne(match).lean().exec();
+      if (!found) return empty;
+      filter.categoryId = String(found._id);
+    }
+    const q = search.q?.trim();
+    if (q) {
+      const pattern = new RegExp(escapeRegex(q), 'i');
+      const skuRows = await this.variants.find({ sku: pattern }).select('productId').lean().exec();
+      const productIds = [...new Set(skuRows.map((row) => String(row.productId)))];
+      filter.$or = [{ name: pattern }, ...(productIds.length ? [{ _id: { $in: productIds } }] : [])];
+    }
     const [rows, total] = await Promise.all([
       this.products.find(filter).sort({ createdAt: -1 }).skip((safePage - 1) * safeLimit).limit(safeLimit).lean().exec(),
       this.products.countDocuments(filter).exec(),

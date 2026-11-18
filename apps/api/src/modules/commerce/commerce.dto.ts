@@ -6,6 +6,8 @@ import { PaginationQueryDto } from '../../common/pagination-query.dto.js';
 
 export class AdminOrdersQueryDto extends PaginationQueryDto {
   @IsOptional() @IsString() state?: string;
+  @IsOptional() @IsString() @MaxLength(100) q?: string;
+  @IsOptional() @IsMongoId() customerId?: string;
 }
 
 export class InventoryLedgerQueryDto extends PaginationQueryDto {

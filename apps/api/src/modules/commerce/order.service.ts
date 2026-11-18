@@ -10,6 +10,7 @@ import { InjectConnection, InjectModel } from '@nestjs/mongoose';
 import { Model, Types, type Connection } from 'mongoose';
 import { randomUUID } from 'node:crypto';
 import type { UserRole } from '@fashion/contracts';
+import { escapeRegex } from '../../common/escape-regex.js';
 import { withCommerceTransaction } from '../../common/mongo-transaction.util.js';
 import { assertSameRequest, requestHash, requireIdempotencyKey } from '../../common/idempotency.util.js';
 import { AuditService } from '../operations/audit.service.js';
@@ -200,10 +201,20 @@ export class OrderService {
     return { page: safePage, limit: safeLimit, total, items: items.map(serializeOrder) };
   }
 
-  async listAdminOrders(principal: { sub: string; role: UserRole }, state?: string, page = 1, limit = 20) {
+  async listAdminOrders(principal: { sub: string; role: UserRole }, state?: string, page = 1, limit = 20,
+    search: { q?: string; customerId?: string } = {}) {
     const safePage = Math.max(1, page);
     const safeLimit = Math.min(50, Math.max(1, limit));
     const filter: Record<string, unknown> = state ? { state } : {};
+    if (search.customerId) {
+      if (!Types.ObjectId.isValid(search.customerId)) return { page: safePage, limit: safeLimit, total: 0, items: [] };
+      filter.customerId = search.customerId;
+    }
+    const q = search.q?.trim();
+    if (q) {
+      const pattern = new RegExp(escapeRegex(q), 'i');
+      filter.$or = [{ code: pattern }, { 'shippingSnapshot.receiver': pattern }, { 'shippingSnapshot.phone': pattern }];
+    }
     if (principal.role === 'STAFF') {
       const scope = await this.users.permissionScope(principal.sub, 'order.read');
       if (!scope) throw new ForbiddenException('Insufficient permissions');

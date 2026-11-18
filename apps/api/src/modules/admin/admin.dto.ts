@@ -1,10 +1,13 @@
 import { Type } from 'class-transformer';
-import { IsArray, IsEmail, IsIn, IsInt, IsOptional, IsString, MinLength, ValidateNested, Max, Min } from 'class-validator';
+import { IsArray, IsEmail, IsIn, IsInt, IsOptional, IsString, MaxLength, MinLength, ValidateNested, Max, Min } from 'class-validator';
 import { STAFF_PERMISSIONS, type StaffPermissionName } from '../../common/permissions.decorator.js';
 import { PaginationQueryDto } from '../../common/pagination-query.dto.js';
 
 export class AdminUsersQueryDto extends PaginationQueryDto {
   @IsOptional() @IsIn(['CUSTOMER', 'STAFF', 'ADMIN']) role?: string;
+  /** Lọc theo trạng thái; 'ALL' bỏ lọc (kể cả khi có role). */
+  @IsOptional() @IsIn(['ACTIVE', 'PENDING_VERIFICATION', 'SUSPENDED', 'ALL']) status?: string;
+  @IsOptional() @IsString() @MaxLength(100) q?: string;
 }
 
 export class UserStatusDto {

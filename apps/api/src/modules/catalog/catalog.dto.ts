@@ -7,6 +7,8 @@ import { PaginationQueryDto } from '../../common/pagination-query.dto.js';
 
 export class AdminProductsQueryDto extends PaginationQueryDto {
   @IsOptional() @IsString() status?: string;
+  @IsOptional() @IsString() @MaxLength(100) q?: string;
+  @IsOptional() @IsString() @MaxLength(100) category?: string;
 }
 
 export class CatalogListQueryDto extends PaginationQueryDto {

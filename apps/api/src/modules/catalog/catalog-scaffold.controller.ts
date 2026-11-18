@@ -30,7 +30,7 @@ export class AdminProductsController {
   constructor(private readonly catalog: CatalogService) {}
 
   @Get() list(@Query() query: AdminProductsQueryDto) {
-    return this.catalog.listAdmin(query.status, query.page ?? 1, query.limit ?? 20);
+    return this.catalog.listAdmin(query.status, query.page ?? 1, query.limit ?? 20, { q: query.q, category: query.category });
   }
 
   @Get(':productId') detail(@Param('productId') productId: string) {

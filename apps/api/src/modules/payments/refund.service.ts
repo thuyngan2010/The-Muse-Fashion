@@ -106,8 +106,16 @@ export class RefundService {
       this.refunds.find(filter).select('+beneficiaryEncrypted').sort({ createdAt: -1 }).skip((safePage - 1) * safeLimit).limit(safeLimit).lean().exec(),
       this.refunds.countDocuments(filter).exec(),
     ]);
-    return { page: safePage, limit: safeLimit, total, items: rows.map((row) =>
-      role === 'ADMIN' && row.state === 'APPROVED' ? this.approvedResponse(row) : serializeRefund(row as never)) };
+    const [orderRows, names] = await Promise.all([
+      this.orders.find({ _id: { $in: [...new Set(rows.map((row) => String(row.orderId)))] } }).select('code').lean().exec(),
+      this.users.displayNames(rows.map((row) => String(row.proposedBy))),
+    ]);
+    const codes = new Map(orderRows.map((order) => [String(order._id), order.code]));
+    return { page: safePage, limit: safeLimit, total, items: rows.map((row) => ({
+      ...(role === 'ADMIN' && row.state === 'APPROVED' ? this.approvedResponse(row) : serializeRefund(row as never)),
+      orderCode: codes.get(String(row.orderId)) ?? null,
+      proposedByName: names.get(String(row.proposedBy)) ?? null,
+    })) };
   }
 
   async setBeneficiary(refundId: string, actorId: string, role: UserRole, key: string | undefined, dto: RefundBeneficiaryDto) {
