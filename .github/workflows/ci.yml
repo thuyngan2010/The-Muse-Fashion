@@ -15,7 +15,11 @@ jobs:
       - run: npm run check:env
       - run: npm run check:scripts
       - run: npm ci --no-audit
+      # Chặn lỗ hổng mức high trong thư viện chạy thật (production).
+      - run: npm audit --audit-level=high --omit=dev
+      # Công cụ build/test (devDependencies) chỉ báo, không chặn: có lỗ hổng chưa có bản vá như picomatch GHSA-fc5q-39xc-vjpf.
       - run: npm audit --audit-level=high
+        continue-on-error: true
       - run: npm run build
       - run: npm run check:routes
       - run: npm run test:audit
