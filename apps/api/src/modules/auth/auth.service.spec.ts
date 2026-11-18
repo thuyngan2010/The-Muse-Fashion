@@ -118,7 +118,8 @@ describe('AuthService Google sign-in', () => {
       findOneAndUpdate: vi.fn().mockReturnValue(exec(options.linked ?? null)),
       create: vi.fn(async (doc: Record<string, unknown>) => ({ ...doc, _id: 'new-user' })),
     };
-    const users = { findByEmail: vi.fn().mockResolvedValue(options.byEmail ?? null), model, permissionSnapshot: vi.fn().mockResolvedValue([]) };
+    const users = { findByEmail: vi.fn().mockResolvedValue(options.byEmail ?? null), model, permissionSnapshot: vi.fn().mockResolvedValue([]),
+      avatarUrl: vi.fn().mockResolvedValue(null) };
     const sessions = { createSession: vi.fn().mockResolvedValue({ sessionId: 's1', refreshToken: 'r1', persistent: true }) };
     const jwt = { signAsync: vi.fn().mockResolvedValue('access-token') };
     const service = new AuthService(users as never, jwt as never, {} as never, sessions as never,
@@ -171,6 +172,18 @@ describe('AuthService Google sign-in', () => {
     expect(sessions.createSession).toHaveBeenCalledWith('new-user', false);
     expect(session).toMatchObject({ accessToken: 'access-token', tokenType: 'Bearer', expiresIn: 3600, refreshToken: 'r1', persistent: true });
     expect(session.user).toMatchObject({ email: 'khach@example.com', role: 'CUSTOMER', hasPassword: false });
+  });
+
+  it('returns the saved avatar and phone with the session user so the UI keeps them after signing in again', async () => {
+    verifyIdToken.mockResolvedValue({ getPayload: () => payload() });
+    const existing = { _id: 'u-avatar', email: 'khach@example.com', fullName: 'Khách Hàng', role: 'CUSTOMER', status: 'ACTIVE',
+      googleSub: 'google-sub-1', phone: '0901234567', avatarMediaId: 'm-avatar', hasPassword: true };
+    const { service, users } = googleService({ bySub: existing });
+    users.avatarUrl.mockResolvedValue('https://cdn.example.com/avatar.jpg');
+    const session = await call(service);
+    expect(users.avatarUrl).toHaveBeenCalledWith(existing);
+    expect(session.user).toMatchObject({ id: 'u-avatar', phone: '0901234567', avatarMediaId: 'm-avatar',
+      avatarUrl: 'https://cdn.example.com/avatar.jpg' });
   });
 
   it('uses the part before @ when Google sends no name', async () => {
