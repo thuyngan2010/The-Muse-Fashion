@@ -91,7 +91,7 @@ type CategoryTile = { category: Category; image: string; count: number | null };
       <p>{{ content.craft.text }}</p>
       <div class="craft-actions">
         <a routerLink="/lookbooks" class="btn-dark">{{ content.craft.primary }}</a>
-        <a routerLink="/lookbooks" class="btn-outline">{{ content.craft.secondary }}</a>
+        <a routerLink="/community" class="btn-outline">{{ content.craft.secondary }}</a>
       </div>
     </section>
 

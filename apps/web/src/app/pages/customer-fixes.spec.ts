@@ -10,3 +10,10 @@ describe('Customer UI fixes', () => {
     expect(footer).not.toContain('<li><a routerLink="/">Sản phẩm</a></li>');
   });
 });
+
+describe('Home page links', () => {
+  it('"XEM CỘNG ĐỒNG" goes to the community blog page', () => {
+    const home = source('./home.page.ts');
+    expect(home).toContain('<a routerLink="/community" class="btn-outline">{{ content.craft.secondary }}</a>');
+  });
+});
