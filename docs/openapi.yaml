@@ -14,6 +14,7 @@ tags:
 - name: Operations
 - name: Experience
 - name: Notification
+- name: Support
 paths:
   /health:
     get:
@@ -79,11 +80,40 @@ paths:
           application/json:
             schema: {$ref: '#/components/schemas/RegisterRequest'}
       responses:
-        '201': {$ref: '#/components/responses/AcceptedResource'}
+        '201':
+          description: Account created, verification email queued. registrationToken is returned only here; use it with GET /auth/registration-status.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/RegisterResponse'}
         '400': {$ref: '#/components/responses/ValidationError'}
         '409': {$ref: '#/components/responses/Conflict'}
         '429': {$ref: '#/components/responses/RateLimited'}
         '503': {$ref: '#/components/responses/Unavailable'}
+  /auth/registration-status:
+    get:
+      tags: [Auth]
+      operationId: getRegistrationStatus
+      security: []
+      x-implementation-status: partial
+      description: Public, rate limited by IP (60 requests per minute). Returns EXPIRED for an unknown or expired token without telling the two apart, and never returns an email or any other account data.
+      parameters:
+        - name: token
+          in: query
+          required: true
+          schema: {type: string, maxLength: 2048}
+      responses:
+        '200':
+          description: Registration status
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [status]
+                properties:
+                  status: {type: string, enum: [PENDING, VERIFIED, EXPIRED]}
+        '400': {$ref: '#/components/responses/ValidationError'}
+        '429': {$ref: '#/components/responses/RateLimited'}
   /auth/verify-email:
     post:
       tags: [Auth]
@@ -124,8 +154,59 @@ paths:
           content:
             application/json:
               schema: {$ref: '#/components/schemas/AuthSession'}
-        '401': {$ref: '#/components/responses/Unauthorized'}
+        '401':
+          description: Invalid credentials (code INVALID_CREDENTIALS), or the password is right but the email is not verified yet (code EMAIL_NOT_VERIFIED).
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Error'}
         '429': {$ref: '#/components/responses/RateLimited'}
+  /auth/google:
+    post:
+      tags: [Auth]
+      operationId: loginWithGoogle
+      security: []
+      x-implementation-status: partial
+      description: Public, rate limited by IP (30 requests per 15 minutes). Verifies a Google ID token (audience = GOOGLE_CLIENT_ID, email_verified required), then signs in, links or creates a CUSTOMER account and returns the same session as /auth/login. Returns 503 when GOOGLE_CLIENT_ID is not configured and 403 for STAFF/ADMIN accounts.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [credential]
+              properties:
+                credential: {type: string, minLength: 20, maxLength: 4096, description: Google ID token returned by Google Identity Services.}
+                remember:
+                  type: boolean
+                  default: true
+      responses:
+        '201':
+          description: Session created
+          headers:
+            Set-Cookie:
+              description: HttpOnly Secure SameSite=Lax refresh token cookie
+              schema: {type: string}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/AuthSession'}
+        '400': {$ref: '#/components/responses/ValidationError'}
+        '401':
+          description: Invalid Google token (GOOGLE_TOKEN_INVALID), unverified Google email (GOOGLE_EMAIL_NOT_VERIFIED) or suspended account.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Error'}
+        '403':
+          description: STAFF and ADMIN accounts can only sign in with a password.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Error'}
+        '429': {$ref: '#/components/responses/RateLimited'}
+        '503':
+          description: Google sign-in is not configured.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Error'}
   /auth/refresh:
     post:
       tags: [Auth]
@@ -1191,7 +1272,69 @@ paths:
       responses:
         '200':
           $ref: '#/components/responses/UserListResponse'
+  /admin/ai-jobs:
+    get:
+      tags: [AI Admin]
+      operationId: listAdminAiJobs
+      x-permissions: [ADMIN]
+      x-implementation-status: implemented
+      description: Paginated AI jobs of all customers. Never includes customer source photos, prompts or body measurements.
+      parameters:
+      - {$ref: '#/components/parameters/Page'}
+      - {$ref: '#/components/parameters/Limit'}
+      - {name: type, in: query, schema: {type: string, enum: [TRY_ON, MIX_MATCH]}}
+      - {name: state, in: query, schema: {type: string, enum: [PENDING, PROCESSING, COMPLETED, FAILED, EXPIRED]}}
+      responses:
+        '200':
+          description: AI jobs
+          content:
+            application/json:
+              schema: {type: object, additionalProperties: true}
+        '400': {$ref: '#/components/responses/ValidationError'}
+  /admin/ai-jobs/stats:
+    get:
+      tags: [AI Admin]
+      operationId: getAdminAiJobStats
+      x-permissions: [ADMIN]
+      x-implementation-status: implemented
+      description: Job counts by state, total, and average processing time of jobs completed in the last 24 hours.
+      responses:
+        '200':
+          description: AI job statistics
+          content:
+            application/json:
+              schema: {type: object, additionalProperties: true}
+  /admin/ai-jobs/{jobId}:
+    get:
+      tags: [AI Admin]
+      operationId: getAdminAiJob
+      x-permissions: [ADMIN]
+      x-implementation-status: implemented
+      parameters:
+      - {name: jobId, in: path, required: true, schema: {$ref: '#/components/schemas/ObjectId'}}
+      responses:
+        '200':
+          description: AI job detail
+          content:
+            application/json:
+              schema: {type: object, additionalProperties: true}
+        '404': {$ref: '#/components/responses/NotFound'}
   /admin/users/{userId}:
+    get:
+      tags: [Operations]
+      operationId: getUserDetail
+      x-permissions: [ADMIN]
+      x-implementation-status: implemented
+      description: User profile for admin support view, with default shipping address and the three most recent orders.
+      parameters:
+      - {$ref: '#/components/parameters/UserId'}
+      responses:
+        '200':
+          description: User detail
+          content:
+            application/json:
+              schema: {type: object, additionalProperties: true}
+        '404': {$ref: '#/components/responses/NotFound'}
     patch:
       tags: [Operations]
       operationId: updateUserStatus
@@ -1566,6 +1709,31 @@ paths:
       responses:
         '200':
           description: Request processed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  page: {type: integer}
+                  limit: {type: integer}
+                  total: {type: integer}
+                  items:
+                    type: array
+                    items:
+                      type: object
+                      required: [id, type, quantity, eventKey, actorId]
+                      properties:
+                        id: {$ref: '#/components/schemas/ObjectId'}
+                        variantId: {type: [string, 'null']}
+                        orderId: {type: [string, 'null']}
+                        type: {type: string}
+                        quantity: {type: integer}
+                        eventKey: {type: string}
+                        reason: {type: string}
+                        actorId: {$ref: '#/components/schemas/ObjectId'}
+                        actorName:
+                          type: [string, 'null']
+                          description: Họ tên người thực hiện; null nếu không xác định được.
   /admin/moderation:
     get:
       tags:
@@ -1911,6 +2079,333 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/PaymentReviewEvent'
+  /support/tickets:
+    post:
+      tags: [Support]
+      operationId: createSupportTicket
+      summary: Khách tạo phiếu hỗ trợ kèm tin nhắn đầu
+      x-implementation-status: implemented
+      x-permissions: [CUSTOMER]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {type: object, additionalProperties: false, required: [subject, category, message], properties: {subject: {type: string, minLength: 5, maxLength: 150}, category: {$ref: '#/components/schemas/SupportTicketCategory'}, orderId: {$ref: '#/components/schemas/ObjectId'}, message: {type: string, minLength: 1, maxLength: 2000}}}
+      responses:
+        '201':
+          description: Phiếu OPEN đã tạo; orderId phải là đơn của chính khách
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/SupportTicket'}
+        '400': {$ref: '#/components/responses/ValidationError'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '429': {$ref: '#/components/responses/RateLimited'}
+    get:
+      tags: [Support]
+      operationId: listMySupportTickets
+      summary: Phiếu của tôi, mới nhất theo lastMessageAt
+      x-implementation-status: implemented
+      x-permissions: [CUSTOMER]
+      parameters:
+      - {$ref: '#/components/parameters/Page'}
+      - {$ref: '#/components/parameters/Limit'}
+      - {name: status, in: query, schema: {$ref: '#/components/schemas/SupportTicketStatus'}}
+      responses:
+        '200':
+          description: Danh sách phân trang
+          content:
+            application/json:
+              schema: {allOf: [{$ref: '#/components/schemas/PageMeta'}, {type: object, properties: {items: {type: array, items: {$ref: '#/components/schemas/SupportTicket'}}}}]}
+        '400': {$ref: '#/components/responses/ValidationError'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+  /support/tickets/{id}:
+    get:
+      tags: [Support]
+      operationId: getMySupportTicket
+      summary: Chi tiết phiếu của tôi
+      x-implementation-status: implemented
+      x-permissions: [CUSTOMER]
+      parameters:
+      - {$ref: '#/components/parameters/SupportTicketId'}
+      responses:
+        '200':
+          description: Phiếu kèm mã đơn và tên nhân viên phụ trách
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/SupportTicketDetail'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+  /support/tickets/{id}/messages:
+    get:
+      tags: [Support]
+      operationId: listMySupportMessages
+      summary: Tin nhắn tăng dần theo thời gian; after để polling
+      x-implementation-status: implemented
+      x-permissions: [CUSTOMER]
+      parameters:
+      - {$ref: '#/components/parameters/SupportTicketId'}
+      - {name: after, in: query, description: 'ISO-8601; chỉ trả tin có createdAt mới hơn mốc này (polling)', schema: {type: string, format: date-time}}
+      - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 100, default: 50}}
+      responses:
+        '200':
+          description: Danh sách tin nhắn
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/SupportMessageList'}
+        '400': {$ref: '#/components/responses/ValidationError'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+    post:
+      tags: [Support]
+      operationId: sendMySupportMessage
+      summary: Khách gửi tin; phiếu RESOLVED được mở lại, CLOSED trả 409
+      x-implementation-status: implemented
+      x-permissions: [CUSTOMER]
+      parameters:
+      - {$ref: '#/components/parameters/SupportTicketId'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {type: object, additionalProperties: false, required: [message], properties: {message: {type: string, minLength: 1, maxLength: 2000, description: 'Chữ thuần, đã trim'}}}
+      responses:
+        '201':
+          description: Tin nhắn đã lưu
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/SupportMessage'}
+        '400': {$ref: '#/components/responses/ValidationError'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '429': {$ref: '#/components/responses/RateLimited'}
+  /support/tickets/{id}/read:
+    post:
+      tags: [Support]
+      operationId: markMySupportTicketRead
+      summary: Đặt unreadForCustomer = 0
+      x-implementation-status: implemented
+      x-permissions: [CUSTOMER]
+      parameters:
+      - {$ref: '#/components/parameters/SupportTicketId'}
+      responses:
+        '200':
+          description: Đã đọc
+          content:
+            application/json:
+              schema: {type: object, properties: {ok: {type: boolean}}}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+  /support/tickets/{id}/close:
+    post:
+      tags: [Support]
+      operationId: closeMySupportTicket
+      summary: Khách tự đóng phiếu của mình
+      x-implementation-status: implemented
+      x-permissions: [CUSTOMER]
+      parameters:
+      - {$ref: '#/components/parameters/SupportTicketId'}
+      responses:
+        '200':
+          description: Phiếu đã đóng (gọi lại vẫn 200)
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/SupportTicket'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+  /admin/support/stats:
+    get:
+      tags: [Support]
+      operationId: getSupportStats
+      summary: Thống kê theo phạm vi người xem
+      x-implementation-status: implemented
+      x-permissions: [ADMIN, STAFF order.read]
+      responses:
+        '200':
+          description: Số phiếu theo trạng thái, chưa đọc, phản hồi đầu trung bình 7 ngày
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/SupportStats'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+  /admin/support/tickets:
+    get:
+      tags: [Support]
+      operationId: listAdminSupportTickets
+      summary: Danh sách phiếu; STAFF ASSIGNED chỉ thấy phiếu giao cho mình
+      x-implementation-status: implemented
+      x-permissions: [ADMIN, STAFF order.read]
+      parameters:
+      - {$ref: '#/components/parameters/Page'}
+      - {$ref: '#/components/parameters/Limit'}
+      - {name: status, in: query, schema: {$ref: '#/components/schemas/SupportTicketStatus'}}
+      - {name: q, in: query, description: 'Tìm theo mã phiếu, tiêu đề, tên/email khách (escape regex)', schema: {type: string, maxLength: 100}}
+      - {name: assigned, in: query, schema: {type: string, enum: [me, unassigned]}}
+      responses:
+        '200':
+          description: Danh sách phân trang
+          content:
+            application/json:
+              schema: {allOf: [{$ref: '#/components/schemas/PageMeta'}, {type: object, properties: {items: {type: array, items: {$ref: '#/components/schemas/AdminSupportTicketRow'}}}}]}
+        '400': {$ref: '#/components/responses/ValidationError'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+  /admin/support/tickets/{id}:
+    get:
+      tags: [Support]
+      operationId: getAdminSupportTicket
+      summary: Chi tiết phiếu kèm tóm tắt khách và đơn gắn kèm
+      x-implementation-status: implemented
+      x-permissions: [ADMIN, STAFF order.read]
+      parameters:
+      - {$ref: '#/components/parameters/SupportTicketId'}
+      responses:
+        '200':
+          description: Chi tiết
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/AdminSupportTicketDetail'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+  /admin/support/tickets/{id}/messages:
+    get:
+      tags: [Support]
+      operationId: listAdminSupportMessages
+      summary: Tin nhắn tăng dần theo thời gian; after để polling
+      x-implementation-status: implemented
+      x-permissions: [ADMIN, STAFF order.read]
+      parameters:
+      - {$ref: '#/components/parameters/SupportTicketId'}
+      - {name: after, in: query, description: 'ISO-8601; chỉ trả tin có createdAt mới hơn mốc này (polling)', schema: {type: string, format: date-time}}
+      - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 100, default: 50}}
+      responses:
+        '200':
+          description: Danh sách tin nhắn
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/SupportMessageList'}
+        '400': {$ref: '#/components/responses/ValidationError'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+    post:
+      tags: [Support]
+      operationId: replyAdminSupportTicket
+      summary: Nhân sự trả lời; ghi firstResponseAt, OPEN→IN_PROGRESS, tạo thông báo SUPPORT_REPLY cho khách
+      x-implementation-status: implemented
+      x-permissions: [ADMIN, STAFF order.read]
+      parameters:
+      - {$ref: '#/components/parameters/SupportTicketId'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {type: object, additionalProperties: false, required: [message], properties: {message: {type: string, minLength: 1, maxLength: 2000, description: 'Chữ thuần, đã trim'}}}
+      responses:
+        '201':
+          description: Tin nhắn đã lưu
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/SupportMessage'}
+        '400': {$ref: '#/components/responses/ValidationError'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '429': {$ref: '#/components/responses/RateLimited'}
+  /admin/support/tickets/{id}/claim:
+    post:
+      tags: [Support]
+      operationId: claimSupportTicket
+      summary: Nhận phiếu chưa có người phụ trách (ADMIN hoặc STAFF phạm vi GLOBAL)
+      x-implementation-status: implemented
+      x-permissions: [ADMIN, STAFF order.read (GLOBAL)]
+      parameters:
+      - {$ref: '#/components/parameters/SupportTicketId'}
+      responses:
+        '200':
+          description: Phiếu sau khi nhận
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/SupportTicket'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+  /admin/support/tickets/{id}/assign:
+    patch:
+      tags: [Support]
+      operationId: assignSupportTicket
+      summary: Phân công hoặc bỏ phân công (staffId null); chỉ ADMIN
+      x-implementation-status: implemented
+      x-permissions: [ADMIN]
+      parameters:
+      - {$ref: '#/components/parameters/SupportTicketId'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {type: object, additionalProperties: false, required: [staffId], properties: {staffId: {anyOf: [{$ref: '#/components/schemas/ObjectId'}, {type: 'null'}]}}}
+      responses:
+        '200':
+          description: Phiếu sau khi phân công
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/SupportTicket'}
+        '400': {$ref: '#/components/responses/ValidationError'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+  /admin/support/tickets/{id}/status:
+    patch:
+      tags: [Support]
+      operationId: changeSupportTicketStatus
+      summary: Đổi trạng thái; thêm tin nhắn SYSTEM và ghi audit
+      x-implementation-status: implemented
+      x-permissions: [ADMIN, STAFF order.read]
+      parameters:
+      - {$ref: '#/components/parameters/SupportTicketId'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {type: object, additionalProperties: false, required: [status], properties: {status: {type: string, enum: [IN_PROGRESS, RESOLVED, CLOSED]}}}
+      responses:
+        '200':
+          description: Phiếu sau khi đổi
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/SupportTicket'}
+        '400': {$ref: '#/components/responses/ValidationError'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+  /admin/support/tickets/{id}/read:
+    post:
+      tags: [Support]
+      operationId: markAdminSupportTicketRead
+      summary: Đặt unreadForStaff = 0
+      x-implementation-status: implemented
+      x-permissions: [ADMIN, STAFF order.read]
+      parameters:
+      - {$ref: '#/components/parameters/SupportTicketId'}
+      responses:
+        '200':
+          description: Đã đọc
+          content:
+            application/json:
+              schema: {type: object, properties: {ok: {type: boolean}}}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
 components:
   securitySchemes:
     bearerAuth:
@@ -1949,6 +2444,7 @@ components:
     TargetId: {name: targetId, in: path, required: true, schema: {$ref: '#/components/schemas/ObjectId'}}
     UserId: {name: userId, in: path, required: true, schema: {$ref: '#/components/schemas/ObjectId'}}
     StaffId: {name: staffId, in: path, required: true, schema: {$ref: '#/components/schemas/ObjectId'}}
+    SupportTicketId: {name: id, in: path, required: true, schema: {$ref: '#/components/schemas/ObjectId'}}
   requestBodies:
     ProfileWrite:
       required: true
@@ -2136,6 +2632,100 @@ components:
               consentPolicyVersion: {type: string, minLength: 1, maxLength: 50}
               style: {type: string, enum: [office, streetwear, evening, minimalist], description: 'Optional styling context for outfit planning; participates in idempotency matching.'}
   schemas:
+    SupportTicketCategory: {type: string, enum: [ORDER, SIZE, PAYMENT_REFUND, PRODUCT, ACCOUNT, OTHER]}
+    SupportTicketStatus: {type: string, enum: [OPEN, IN_PROGRESS, RESOLVED, CLOSED]}
+    SupportTicket:
+      type: object
+      required: [id, code, customerId, subject, category, orderId, status, assignedStaffId, lastMessageAt, lastMessagePreview, unreadForCustomer, unreadForStaff, firstResponseAt, createdAt, updatedAt]
+      properties:
+        id: {$ref: '#/components/schemas/ObjectId'}
+        code: {type: string, pattern: '^TKT-[A-Z0-9]{6}$'}
+        customerId: {$ref: '#/components/schemas/ObjectId'}
+        subject: {type: string, minLength: 5, maxLength: 150}
+        category: {$ref: '#/components/schemas/SupportTicketCategory'}
+        orderId: {anyOf: [{$ref: '#/components/schemas/ObjectId'}, {type: 'null'}]}
+        status: {$ref: '#/components/schemas/SupportTicketStatus'}
+        assignedStaffId: {anyOf: [{$ref: '#/components/schemas/ObjectId'}, {type: 'null'}]}
+        lastMessageAt: {type: string, format: date-time}
+        lastMessagePreview: {type: string, maxLength: 80}
+        unreadForCustomer: {type: integer, minimum: 0}
+        unreadForStaff: {type: integer, minimum: 0}
+        firstResponseAt: {type: [string, 'null'], format: date-time}
+        createdAt: {type: string, format: date-time}
+        updatedAt: {type: string, format: date-time}
+    SupportTicketDetail:
+      allOf:
+      - {$ref: '#/components/schemas/SupportTicket'}
+      - type: object
+        required: [orderCode, assignedStaffName]
+        properties:
+          orderCode: {type: [string, 'null']}
+          assignedStaffName: {type: [string, 'null'], description: 'Chỉ tên hiển thị, không có email nội bộ'}
+    AdminSupportTicketRow:
+      allOf:
+      - {$ref: '#/components/schemas/SupportTicket'}
+      - type: object
+        required: [customerName, assignedStaffName, orderCode]
+        properties:
+          customerName: {type: string}
+          assignedStaffName: {type: [string, 'null']}
+          orderCode: {type: [string, 'null']}
+    AdminSupportTicketDetail:
+      allOf:
+      - {$ref: '#/components/schemas/SupportTicketDetail'}
+      - type: object
+        required: [customer, order]
+        properties:
+          customer:
+            type: object
+            required: [id, fullName, email, phone]
+            properties:
+              id: {$ref: '#/components/schemas/ObjectId'}
+              fullName: {type: string}
+              email: {type: string}
+              phone: {type: [string, 'null']}
+          order:
+            anyOf:
+            - type: object
+              required: [id, code, state, payableTotal]
+              properties:
+                id: {$ref: '#/components/schemas/ObjectId'}
+                code: {type: string}
+                state: {type: string}
+                payableTotal: {type: integer}
+                createdAt: {type: string, format: date-time}
+            - type: 'null'
+    SupportMessage:
+      type: object
+      required: [id, ticketId, senderId, senderRole, senderName, body, createdAt]
+      properties:
+        id: {$ref: '#/components/schemas/ObjectId'}
+        ticketId: {$ref: '#/components/schemas/ObjectId'}
+        senderId: {$ref: '#/components/schemas/ObjectId'}
+        senderRole: {type: string, enum: [CUSTOMER, STAFF, ADMIN, SYSTEM]}
+        senderName: {type: string, description: 'Tên hiển thị; tin SYSTEM là MUSE'}
+        body: {type: string, minLength: 1, maxLength: 2000, description: 'Chữ thuần; client hiển thị dạng text, không render HTML'}
+        createdAt: {type: string, format: date-time}
+    SupportMessageList:
+      type: object
+      required: [items]
+      properties:
+        items: {type: array, items: {$ref: '#/components/schemas/SupportMessage'}}
+    SupportStats:
+      type: object
+      required: [byStatus, unreadForStaff, avgFirstResponseMinutes, windowDays]
+      properties:
+        byStatus:
+          type: object
+          required: [OPEN, IN_PROGRESS, RESOLVED, CLOSED]
+          properties:
+            OPEN: {type: integer}
+            IN_PROGRESS: {type: integer}
+            RESOLVED: {type: integer}
+            CLOSED: {type: integer}
+        unreadForStaff: {type: integer, description: 'Số phiếu có tin chưa đọc phía nhân sự'}
+        avgFirstResponseMinutes: {type: [number, 'null']}
+        windowDays: {type: integer, const: 7}
     PaymentReviewEvent:
       type: object
       required:
@@ -2194,6 +2784,14 @@ components:
       type: integer
       minimum: 0
       description: Integer VND
+    RegisterResponse:
+      type: object
+      additionalProperties: false
+      required: [id, message, registrationToken]
+      properties:
+        id: {type: string}
+        message: {type: string}
+        registrationToken: {type: string, minLength: 64, maxLength: 64, description: 32 random bytes in hex, valid 24 hours; stored only as a SHA-256 hash.}
     RegisterRequest:
       type: object
       additionalProperties: false
@@ -2258,6 +2856,9 @@ components:
             - PENDING_VERIFICATION
             - ACTIVE
             - SUSPENDED
+        hasPassword:
+          type: boolean
+          description: false for an account created with Google that has not set a password yet.
         permissions:
           type: array
           items:
@@ -2574,7 +3175,15 @@ components:
             required: [productId, quantity]
             properties:
               productId: {$ref: '#/components/schemas/ObjectId'}
+              productName: {type: string}
               quantity: {type: integer, minimum: 0}
+              revenue:
+                type: integer
+                minimum: 0
+                description: Doanh thu đã thanh toán của sản phẩm trong kỳ (không vượt paidRevenue).
+              sku:
+                type: string
+                description: Mã SKU khi mọi dòng của sản phẩm cùng một SKU; vắng mặt nếu nhiều biến thể.
     Product:
       allOf:
       - {$ref: '#/components/schemas/ProductWrite'}
@@ -2733,6 +3342,12 @@ components:
             - FAILED
         proposedBy:
           $ref: '#/components/schemas/ObjectId'
+        proposedByName:
+          type: [string, 'null']
+          description: Họ tên người đề xuất (chỉ có ở danh sách hoàn tiền).
+        orderCode:
+          type: [string, 'null']
+          description: Mã đơn hàng (chỉ có ở danh sách hoàn tiền).
         approvedBy:
           $ref: '#/components/schemas/ObjectId'
         confirmedBy:

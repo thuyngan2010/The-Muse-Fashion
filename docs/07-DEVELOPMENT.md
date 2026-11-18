@@ -132,3 +132,16 @@ node --env-file=apps/api/.env scripts/probe-fashion-agent.mjs
 ```
 
 Probe ghi evidence vào `reports/fashion-agent/`; gọi provider thật có thể phát sinh usage. Ảnh tổng hợp kiểm đường truyền và điều phối, không thay bộ QA ảnh thời trang thật.
+
+## 12. Cấu hình đăng nhập Google
+
+Nút "Đăng nhập với Google" chỉ hiện khi web có `PUBLIC_GOOGLE_CLIENT_ID`; API cần `GOOGLE_CLIENT_ID` cùng giá trị. Để trống cả hai thì mọi thứ chạy như trước (không có nút Google, `POST /auth/google` trả 503).
+
+1. Vào Google Cloud Console, chọn hoặc tạo project, mở **APIs & Services → OAuth consent screen** và hoàn tất màn hình xin quyền (loại External, scope mặc định `email`, `profile`, `openid`).
+2. Mở **Credentials → Create credentials → OAuth client ID**, loại **Web application**.
+3. Mục **Authorized JavaScript origins** khai báo từng origin của web, không có dấu `/` cuối và không có đường dẫn: `http://localhost:4200` cho môi trường dev, `https://<tên-miền-web>` cho production. Không cần Authorized redirect URI vì dùng chế độ popup.
+4. Sao chép Client ID (dạng `xxxx.apps.googleusercontent.com`) vào hai biến:
+   - `apps/api/.env`: `GOOGLE_CLIENT_ID=...`
+   - `apps/web/.env` (hoặc biến môi trường của host/CI khi build): `PUBLIC_GOOGLE_CLIENT_ID=...`
+5. Chạy lại `npm run dev:api` và `npm run dev:web` (runtime config chỉ được ghi khi khởi động hoặc build). Nếu đổi origin, chờ vài phút để Google cập nhật.
+6. Trình duyệt chặn popup hoặc có CSP riêng thì phải cho phép `https://accounts.google.com/gsi/` như trong `vercel.json` và `deploy/nginx/security-headers.conf`.

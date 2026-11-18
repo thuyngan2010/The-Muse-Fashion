@@ -104,6 +104,20 @@ export class AuthService {
     );
   }
 
+  loginWithGoogle(credential: string, remember = true) {
+    return this.api.loginWithGoogle(credential, remember).pipe(
+      tap((res) => {
+        this.setToken(res.accessToken, remember);
+        if (res.user) {
+          this.setCurrentUser(res.user, remember);
+        } else {
+          this.initAuth().subscribe();
+        }
+        this.toast.success('Đăng nhập thành công', 'Xin chào');
+      }),
+    );
+  }
+
   register(
     fullNameOrDto: string | { fullName: string; email: string; password: string; phone?: string },
     email?: string,

@@ -26,6 +26,9 @@ Tài sản: thông tin tài khoản, ảnh cá nhân/AI, đơn hàng, payment st
 - Swagger hiện cần giới hạn hoặc tắt trên production theo chính sách; CORS/Helmet mới ở mức cơ bản.
 - `User` schema có bcrypt hash, nhưng secret protection/rotation/PII retention cần triển khai thêm.
 
+- Đăng nhập Google (`POST /auth/google`): chỉ chấp nhận ID token có `aud` đúng `GOOGLE_CLIENT_ID` và `email_verified = true`, xác minh bằng `google-auth-library`; giới hạn tần suất theo IP; không ghi token vào log. Tài khoản `STAFF`/`ADMIN` không đăng nhập bằng Google. Khi kích hoạt tài khoản đang chờ xác thực qua Google, mật khẩu đặt lúc đăng ký bị thay bằng chuỗi ngẫu nhiên để người đăng ký trước bằng email của người khác không dùng được tài khoản.
+- CSP cho phép riêng `https://accounts.google.com/gsi/client` (script), `https://accounts.google.com/gsi/style` (style) và `https://accounts.google.com/gsi/` (frame); các nguồn khác giữ nguyên. Khai báo ở `vercel.json` và `deploy/nginx/security-headers.conf`.
+
 Trước production cần đánh giá các kiểm soát còn thiếu theo dữ liệu và phạm vi triển khai thực tế.
 
 ## 4. SendGrid và R2 secrets

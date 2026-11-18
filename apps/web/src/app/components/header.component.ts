@@ -43,11 +43,6 @@ import { CartService } from '../services/cart.service';
         <div class="header-actions">
           <!-- Tìm kiếm -->
           <div class="search-wrap" (click)="$event.stopPropagation()">
-            @if (searchOpen()) {
-              <form class="header-search" role="search" (submit)="submitSearch($event)">
-                <input #searchInput type="search" name="q" [value]="searchTerm()" (input)="searchTerm.set($any($event.target).value)" placeholder="Tìm sản phẩm..." aria-label="Tìm kiếm sản phẩm" autocomplete="off">
-              </form>
-            }
             <button type="button" class="icon-btn search-btn" (click)="toggleSearch($event)" aria-label="Tìm kiếm" [attr.aria-expanded]="searchOpen()">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="10" cy="10" r="6.5"></circle><line x1="15" y1="15" x2="21" y2="21"></line></svg>
             </button>
@@ -90,6 +85,7 @@ import { CartService } from '../services/cart.service';
                   <a routerLink="/profile" (click)="userMenuOpen.set(false)">Hồ sơ cá nhân</a>
                   <a routerLink="/addresses" (click)="userMenuOpen.set(false)">Sổ địa chỉ</a>
                   <a routerLink="/notifications" (click)="userMenuOpen.set(false)">Thông báo</a>
+                  @if (auth.isCustomer()) { <a routerLink="/support" (click)="userMenuOpen.set(false)">Hỗ trợ</a> }
                   @if (auth.isStaff() || auth.isAdmin()) {
                     <hr class="dropdown-divider">
                     <a routerLink="/admin" class="highlight-link" (click)="userMenuOpen.set(false)">Trang quản trị</a>
@@ -161,6 +157,7 @@ import { CartService } from '../services/cart.service';
               <a routerLink="/profile" routerLinkActive="active" ariaCurrentWhenActive="page" (click)="closeMobile()">Hồ sơ cá nhân</a>
               <a routerLink="/addresses" routerLinkActive="active" ariaCurrentWhenActive="page" (click)="closeMobile()">Sổ địa chỉ</a>
               <a routerLink="/notifications" routerLinkActive="active" ariaCurrentWhenActive="page" (click)="closeMobile()">Thông báo</a>
+              @if (auth.isCustomer()) { <a routerLink="/support" routerLinkActive="active" ariaCurrentWhenActive="page" (click)="closeMobile()">Hỗ trợ</a> }
               <button type="button" class="drawer-logout" (click)="onLogout()">Đăng xuất</button>
             } @else {
               <a routerLink="/auth" class="m-login" (click)="closeMobile()">ĐĂNG NHẬP</a>
@@ -168,9 +165,19 @@ import { CartService } from '../services/cart.service';
           </div>
         </aside>
       }
+      @if (searchOpen()) {
+        <div class="search-panel" (click)="$event.stopPropagation()">
+          <form class="header-search" role="search" (submit)="submitSearch($event)">
+            <input #searchInput type="search" name="q" [value]="searchTerm()" (input)="searchTerm.set($any($event.target).value)" placeholder="Tìm sản phẩm..." aria-label="Tìm kiếm sản phẩm" autocomplete="off">
+            <button type="submit" class="search-submit">TÌM</button>
+          </form>
+        </div>
+      }
     </header>
   `,
   styles: [`
+    /* Host phải tự sticky: nó cao bằng header nên sticky của <header> bên trong không có chỗ để dính. */
+    :host { display: block; position: sticky; top: 0; z-index: 900; }
     .site-header {
       background: var(--color-surface);
       border-bottom: 1px solid var(--color-divider);
@@ -689,12 +696,14 @@ import { CartService } from '../services/cart.service';
 
 
     .search-wrap { display:flex; align-items:center; gap:6px; }
-    .header-search input { width:220px; height:36px; padding:0 12px; border:1px solid #171717; border-radius:0; background:#fff; color:#171717; font:inherit; font-size:13px; }
+    .search-panel { position:absolute; top:100%; left:0; right:0; background:#fff; border-bottom:1px solid #c4c7c7; box-shadow:0 8px 16px rgba(23,23,23,.08); }
+    .header-search { display:flex; gap:8px; max-width:1280px; margin:0 auto; padding:12px 5vw; }
+    .search-submit { height:40px; padding:0 20px; border:1px solid #171717; background:#171717; color:#fff; font:inherit; font-size:12px; font-weight:700; letter-spacing:.12em; cursor:pointer; }
+    .header-search input { flex:1; min-width:0; width:auto; height:40px; padding:0 12px; border:1px solid #171717; border-radius:0; background:#fff; color:#171717; font:inherit; font-size:14px; }
     .header-search input:focus-visible { outline:2px solid #171717; outline-offset:2px; }
     .bell-badge { background:#f4b8c1; color:#171717; border:1px solid #000; }
     .login-btn { background:#f4b8c1; }
     .login-btn:hover { background:#efa5b2; }
-    @media (max-width:560px) { .header-search input { width:140px; } }
     /* Cụm icon theo Figma: kính lúp, chuông, túi, avatar viền hồng */
     .header-actions { gap: 20px; }
     .header-actions .icon-btn { min-width: 32px; min-height: 32px; padding: 4px; background: transparent; }

@@ -8,6 +8,14 @@ export type AuthTokens = {
   user?: UserSummary;
 };
 
+export type RegisterResponse = {
+  id: string;
+  message: string;
+  registrationToken: string;
+};
+
+export type RegistrationStatus = 'PENDING' | 'VERIFIED' | 'EXPIRED';
+
 export type UserSummary = {
   permissions?: StaffPermissionGrant[];
   id: string;
@@ -15,6 +23,8 @@ export type UserSummary = {
   fullName: string;
   role: UserRole;
   status: 'ACTIVE' | 'PENDING_VERIFICATION' | 'SUSPENDED';
+  /** false với tài khoản tạo bằng Google và chưa đặt mật khẩu. */
+  hasPassword?: boolean;
   phone?: string | null;
   avatarMediaId?: string | null;
   avatarUrl?: string | null;
@@ -22,6 +32,26 @@ export type UserSummary = {
 };
 
 export type UserProfile = UserSummary;
+
+/** Dòng danh sách người dùng của admin; khách hàng có thêm số đơn và chi tiêu (đơn đã thanh toán, không tính đơn hủy). */
+export type AdminUserRow = UserSummary & { orderCount?: number; totalSpent?: number };
+
+export type AdminUserList = {
+  items: AdminUserRow[];
+  page: number;
+  limit: number;
+  total: number;
+  /** Tổng theo trạng thái, tính trên bộ lọc role và q, bỏ qua status. */
+  statusCounts: Record<'ACTIVE' | 'PENDING_VERIFICATION' | 'SUSPENDED', number>;
+};
+
+export type AdminUserDetail = UserSummary & {
+  emailVerifiedAt: string | null;
+  orderCount?: number;
+  totalSpent?: number;
+  defaultAddress: { id: string; receiver: string; phone: string; line1: string; ward: string; district: string; province: string; note?: string } | null;
+  recentOrders: Array<{ id: string; code: string; state: OrderStatus; money: OrderMoney; createdAt?: string; itemCount: number }>;
+};
 
 export type UserAddress = {
   id: string;
@@ -227,6 +257,9 @@ export type Refund = {
   qrImageUrl?: string;
   reconciliationCode?: string;
   createdAt?: string;
+  proposedBy?: string;
+  proposedByName?: string | null;
+  orderCode?: string | null;
 };
 
 export type Lookbook = {
@@ -334,6 +367,37 @@ export type AiJob = {
   expiresAt: string;
 };
 
+/** Tác vụ AI trong khu quản trị. Không có ảnh gốc, prompt hay số đo cơ thể của khách. */
+export type AdminAiJob = {
+  id: string;
+  customerId: string;
+  customerName: string | null;
+  customerEmail: string | null;
+  type: 'TRY_ON' | 'MIX_MATCH';
+  productNames: string[];
+  state: AiJob['state'];
+  phase: AiJob['phase'] | null;
+  createdAt?: string;
+  startedAt: string | null;
+  /** Thời điểm tác vụ chạm trạng thái cuối (hoàn thành hoặc thất bại). */
+  completedAt: string | null;
+  processingMs: number | null;
+  errorMessage: string | null;
+  attempts: number;
+  quotaRefunded: boolean;
+};
+
+export type AdminAiJobList = { items: AdminAiJob[]; page: number; limit: number; total: number };
+
+export type AdminAiJobStats = {
+  total: number;
+  byState: Record<AiJob['state'], number>;
+  /** Trung bình của tác vụ hoàn thành trong windowHours giờ qua có ghi nhận thời điểm bắt đầu; null nếu chưa có. */
+  avgProcessingMs: number | null;
+  avgSampleSize: number;
+  windowHours: number;
+};
+
 export type NotificationItem = {
   id: string;
   type: string;
@@ -378,6 +442,7 @@ export type InventoryLedgerEntry = {
   eventKey: string;
   reason: string;
   actorId: string;
+  actorName?: string | null;
 };
 
 export type SalesReport = {
@@ -396,7 +461,7 @@ export type SalesReport = {
     netRevenue: number;
     paymentCount: number;
   }>;
-  topProducts: Array<{ productId: string; productName: string; quantity: number }>;
+  topProducts: Array<{ productId: string; productName: string; quantity: number; revenue: number; sku?: string }>;
   generatedAt: string;
 };
 
@@ -413,4 +478,59 @@ export type ListResponse<T> = {
   page: number;
   limit: number;
   total: number;
+};
+
+export const SUPPORT_TICKET_CATEGORIES = ['ORDER', 'SIZE', 'PAYMENT_REFUND', 'PRODUCT', 'ACCOUNT', 'OTHER'] as const;
+export type SupportTicketCategory = (typeof SUPPORT_TICKET_CATEGORIES)[number];
+export const SUPPORT_TICKET_STATUSES = ['OPEN', 'IN_PROGRESS', 'RESOLVED', 'CLOSED'] as const;
+export type SupportTicketStatus = (typeof SUPPORT_TICKET_STATUSES)[number];
+export type SupportSenderRole = 'CUSTOMER' | 'STAFF' | 'ADMIN' | 'SYSTEM';
+
+export type SupportTicket = {
+  id: string;
+  code: string;
+  customerId: string;
+  subject: string;
+  category: SupportTicketCategory;
+  orderId: string | null;
+  status: SupportTicketStatus;
+  assignedStaffId: string | null;
+  lastMessageAt: string;
+  lastMessagePreview: string;
+  unreadForCustomer: number;
+  unreadForStaff: number;
+  firstResponseAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+export type SupportTicketList = ListResponse<SupportTicket>;
+export type SupportTicketDetail = SupportTicket & {
+  orderCode: string | null;
+  assignedStaffName: string | null;
+};
+export type AdminSupportTicketRow = SupportTicket & {
+  customerName: string;
+  assignedStaffName: string | null;
+  orderCode: string | null;
+};
+export type AdminSupportTicketList = ListResponse<AdminSupportTicketRow>;
+export type AdminSupportTicketDetail = SupportTicketDetail & {
+  customer: { id: string; fullName: string; email: string; phone: string | null };
+  order: { id: string; code: string; state: string; payableTotal: number; createdAt?: string } | null;
+};
+export type SupportMessage = {
+  id: string;
+  ticketId: string;
+  senderId: string;
+  senderRole: SupportSenderRole;
+  senderName: string;
+  body: string;
+  createdAt: string;
+};
+export type SupportMessageList = { items: SupportMessage[] };
+export type SupportStats = {
+  byStatus: Record<SupportTicketStatus, number>;
+  unreadForStaff: number;
+  avgFirstResponseMinutes: number | null;
+  windowDays: number;
 };

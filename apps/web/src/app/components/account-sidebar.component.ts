@@ -3,7 +3,7 @@ import { NavigationEnd, Router, RouterLink } from '@angular/router';
 import { Subscription, filter } from 'rxjs';
 import { AuthService } from '../services/auth.service';
 
-type AccountItem = 'overview' | 'profile' | 'orders' | 'addresses' | 'ai-history' | 'notifications' | 'password';
+type AccountItem = 'overview' | 'profile' | 'orders' | 'addresses' | 'ai-history' | 'notifications' | 'support' | 'password';
 
 @Component({
   selector: 'fc-account-sidebar',
@@ -34,6 +34,9 @@ type AccountItem = 'overview' | 'profile' | 'orders' | 'addresses' | 'ai-history
         </a>
         <a routerLink="/notifications" [class.active]="current() === 'notifications'" [attr.aria-current]="current() === 'notifications' ? 'page' : null">
           <svg viewBox="0 0 24 24" fill="none"><path d="M6 17h12l-1.5-2.5V9a4.5 4.5 0 0 0-9 0v5.5L6 17Z"/><path d="M10 20h4"/></svg><span>Thông báo</span>
+        </a>
+        <a routerLink="/support" [class.active]="current() === 'support'" [attr.aria-current]="current() === 'support' ? 'page' : null">
+          <svg viewBox="0 0 24 24" fill="none"><path d="M4 5h16v11H9l-5 4V5Z"/><path d="M8.5 9.5h7M8.5 12.5h4"/></svg><span>Hỗ trợ</span>
         </a>
         <a routerLink="/profile" [queryParams]="{ tab: 'password' }" [class.active]="current() === 'password'" [attr.aria-current]="current() === 'password' ? 'page' : null">
           <svg viewBox="0 0 24 24" fill="none"><rect x="5" y="10" width="14" height="11"/><path d="M8 10V7a4 4 0 0 1 8 0v3M12 14v3"/></svg><span>Đổi mật khẩu</span>
@@ -93,6 +96,7 @@ export class AccountSidebarComponent implements OnDestroy {
     if (path === '/orders' || path.startsWith('/orders/')) return 'orders';
     if (path === '/addresses') return 'addresses';
     if (path === '/notifications') return 'notifications';
+    if (path === '/support') return 'support';
     if (path === '/ai/history') return 'ai-history';
     return this.activeItem ?? 'profile';
   }

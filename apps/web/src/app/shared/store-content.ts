@@ -35,6 +35,12 @@ export const STORE_ORDER_DETAIL_CONTENT = {
 } as const;
 
 export const STORE_PROFILE_CONTENT = {
+  googleAccount: {
+    eyebrow: 'BẢO MẬT',
+    title: 'Tài khoản đăng nhập bằng Google',
+    text: 'Tài khoản này đăng nhập bằng Google nên chưa có mật khẩu MUSE. Bạn có thể đặt mật khẩu để đăng nhập bằng email và mật khẩu.',
+    cta: 'Đặt mật khẩu',
+  },
   securityNotes: [
     'Mật khẩu cần từ 12 đến 128 ký tự, có chữ hoa, chữ thường và số.',
     'Không chia sẻ mật khẩu hoặc thông tin phiên đăng nhập với người khác.',
@@ -129,6 +135,10 @@ export const STORE_CATALOG_CONTENT = {
 
 export const STORE_AUTH_CONTENT = {
   passwordRule: 'Ít nhất 12 ký tự, có chữ hoa, chữ thường và số.',
+  google: {
+    divider: 'hoặc',
+    error: 'Không thể đăng nhập bằng Google. Vui lòng thử lại.',
+  },
   strengthLabels: ['', 'Yếu', 'Trung bình', 'Mạnh'],
   terms: 'Tôi đồng ý với Điều khoản dịch vụ và Chính sách bảo mật của MUSE.',
   termsRequired: 'Vui lòng đồng ý với Điều khoản và Chính sách để tạo tài khoản.',
@@ -142,6 +152,66 @@ export const STORE_AUTH_CONTENT = {
       { title: 'Đánh giá sản phẩm', text: 'Chia sẻ nhận xét sau khi nhận hàng.' },
     ],
   },
+} as const;
+
+export const STORE_EMAIL_VERIFICATION_CONTENT = {
+  broadcastChannel: 'muse-auth',
+  pending: {
+    title: 'Kiểm tra hộp thư của bạn',
+    sentPrefix: 'Chúng tôi đã gửi liên kết xác thực tới',
+    sentSuffix: 'Liên kết có hiệu lực trong 60 phút.',
+    waiting: 'Đang chờ bạn xác thực...',
+    noTokenHint: 'Sau khi bấm liên kết trong thư, hãy quay lại đây và đăng nhập.',
+    spamNote: 'Không thấy thư? Hãy kiểm tra cả thư mục Spam và Quảng cáo.',
+    resend: 'Gửi lại email xác thực',
+    resending: 'Đang gửi...',
+    resendIn: 'Gửi lại sau',
+    resendSent: 'Đã gửi lại email xác thực. Vui lòng kiểm tra hộp thư.',
+    resendFailed: 'Không thể gửi lại email xác thực. Vui lòng thử lại sau.',
+    wrongEmail: 'Sai email?',
+    registerAgain: 'Đăng ký lại',
+  },
+  verified: {
+    title: 'Xác thực thành công',
+    prefix: 'Tài khoản',
+    suffix: 'đã được kích hoạt.',
+    cta: 'ĐĂNG NHẬP NGAY',
+  },
+  expired: {
+    title: 'Phiên chờ đã hết hạn',
+    text: 'Phiên chờ xác thực đã hết hạn. Bạn có thể gửi lại email xác thực hoặc quay về đăng nhập.',
+    backToLogin: 'Về đăng nhập',
+  },
+  unverified: {
+    resend: 'Gửi lại email xác thực',
+    hint: 'Nếu chưa thấy thư, hãy kiểm tra cả thư mục Spam và Quảng cáo.',
+  },
+  verifyPage: {
+    eyebrow: 'XÁC MINH TÀI KHOẢN',
+    title: 'Xác thực địa chỉ email',
+    busy: 'Đang tiến hành xác minh liên kết của bạn...',
+    successTitle: 'Xác thực thành công',
+    success: 'Địa chỉ email của bạn đã được xác thực và tài khoản đã được kích hoạt.',
+    closeTabHint: 'Bạn có thể đóng tab này và quay lại tab đăng ký.',
+    missingToken: 'Liên kết xác thực không hợp lệ hoặc thiếu mã xác thực.',
+    failed: 'Liên kết xác thực không hợp lệ hoặc đã hết hạn.',
+    resendPrompt: 'Nhập email bạn đã đăng ký để nhận liên kết mới. Liên kết mới có hiệu lực trong 60 phút.',
+    resendPlaceholder: 'Nhập email đã đăng ký',
+    resendButton: 'GỬI LẠI EMAIL XÁC THỰC',
+    resendBusy: 'ĐANG GỬI...',
+    resendDoneTitle: 'Đã gửi lại thư',
+    resendDone: 'Nếu email này đang chờ xác thực, một liên kết mới đã được gửi. Vui lòng kiểm tra cả thư mục Spam và Quảng cáo.',
+    resendFailed: 'Không thể gửi lại email xác thực. Vui lòng thử lại sau.',
+    backToLogin: 'Quay lại đăng nhập',
+  },
+} as const;
+
+export const STORE_ADMIN_LOGIN_CONTENT = {
+  quote: 'Quản lý cửa hàng thời trang của bạn một cách dễ dàng và hiệu quả.',
+  photoAlt: 'Người mẫu MUSE trong trang phục bộ sưu tập mới',
+  photoTag: 'BỘ SƯU TẬP THU - ĐÔNG',
+  forbidden: 'Tài khoản này không có quyền quản trị.',
+  loginFailed: 'Email hoặc mật khẩu không chính xác.',
 } as const;
 
 export const STORE_ACCOUNT_CONTENT = {

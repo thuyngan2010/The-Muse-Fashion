@@ -26,6 +26,9 @@
 | Báo cáo và cấu hình | — | — | All | — |
 | Tạo Staff / cấp quyền | — | — | All | — |
 | Thông báo | — | Own | Own + admin ops | Own |
+| Chat hỗ trợ (phiếu và tin nhắn) | — | Own | All; phân công phiếu chỉ Admin | `order.read`: GLOBAL thấy tất cả và được nhận phiếu, ASSIGNED chỉ thấy phiếu có `assignedStaffId` là mình |
+
+Chat hỗ trợ **không thêm permission mới**: Staff dùng `order.read` và phạm vi của nó. Phạm vi được kiểm trong service theo từng phiếu (như `GET /admin/orders`), phiếu ngoài phạm vi trả `404`. Phân công phiếu (`PATCH /admin/support/tickets/:id/assign`) chỉ Admin; người được giao phải là Staff đang hoạt động có `order.read`.
 
 **Own** = phải so khớp principal user ID với owner ID từ DB, không chỉ kiểm token hợp lệ. **Assigned** = phải kiểm cả staff assignment hoặc phạm vi được cấp.
 

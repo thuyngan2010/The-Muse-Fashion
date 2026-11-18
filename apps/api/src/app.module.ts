@@ -22,6 +22,7 @@ import { PaymentsModule } from './modules/payments/payments.module.js';
 import { AdminModule } from './modules/admin/admin.module.js';
 import { NotificationsModule } from './modules/notifications/notifications.module.js';
 import { OperationsModule } from './modules/operations/operations.module.js';
+import { SupportModule } from './modules/support/support.module.js';
 import { RateLimitModule } from './common/rate-limit.module.js';
 import { RateLimitMiddleware } from './common/rate-limit.middleware.js';
 
@@ -33,7 +34,7 @@ import { RateLimitMiddleware } from './common/rate-limit.middleware.js';
     JwtModule.register({ global: true, secret: AppConfig.require('JWT_SECRET'), signOptions: { expiresIn: '1h' } }),
     ScaffoldModule, UsersModule, MailModule, AuthModule, CatalogModule, StorageModule,
     LookbooksModule, AiModule, CommerceModule, CommunityModule, PaymentsModule,
-    AdminModule, NotificationsModule, OperationsModule,
+    AdminModule, NotificationsModule, OperationsModule, SupportModule,
   ],
   controllers: [HealthController],
   providers: [

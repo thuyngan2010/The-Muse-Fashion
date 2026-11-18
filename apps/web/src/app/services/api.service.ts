@@ -4,6 +4,11 @@ import { Observable, catchError, defer, from, map, switchMap, throwError } from 
 import type {
   AuthTokens,
   UserSummary,
+  AdminUserList,
+  AdminAiJob,
+  AdminAiJobList,
+  AdminAiJobStats,
+  AdminUserDetail,
   UserProfile,
   UserAddress,
   Category,
@@ -27,6 +32,15 @@ import type {
   PaymentReviewEvent,
   AiJob,
   NotificationItem,
+  SupportTicket,
+  SupportTicketCategory,
+  SupportTicketDetail,
+  AdminSupportTicketDetail,
+  AdminSupportTicketList,
+  SupportStats,
+  SupportTicketList,
+  SupportMessage,
+  SupportMessageList,
   Voucher,
   InventoryItem,
   InventoryLedgerEntry,
@@ -45,8 +59,12 @@ export class ApiService {
   readonly api = runtimeConfig.apiBaseUrl;
 
   // --- Auth ---
-  register(fullName: string, email: string, password: string): Observable<{ id?: string; message: string }> {
-    return this.http.post<{ id?: string; message: string }>(`${this.api}/auth/register`, { fullName, email, password });
+  register(fullName: string, email: string, password: string): Observable<{ id?: string; message: string; registrationToken?: string }> {
+    return this.http.post<{ id?: string; message: string; registrationToken?: string }>(`${this.api}/auth/register`, { fullName, email, password });
+  }
+
+  registrationStatus(token: string): Observable<{ status: 'PENDING' | 'VERIFIED' | 'EXPIRED' }> {
+    return this.http.get<{ status: 'PENDING' | 'VERIFIED' | 'EXPIRED' }>(`${this.api}/auth/registration-status`, { params: { token } });
   }
 
   verifyEmail(token: string): Observable<{ verified: boolean }> {
@@ -59,6 +77,10 @@ export class ApiService {
 
   login(email: string, password: string, remember = true): Observable<AuthTokens> {
     return this.http.post<AuthTokens>(`${this.api}/auth/login`, { email, password, remember });
+  }
+
+  loginWithGoogle(credential: string, remember = true): Observable<AuthTokens> {
+    return this.http.post<AuthTokens>(`${this.api}/auth/google`, { credential, remember });
   }
 
   refresh(): Observable<AuthTokens> {
@@ -376,6 +398,83 @@ export class ApiService {
     return this.http.patch<{ ok: boolean }>(`${this.api}/notifications/read-all`, {});
   }
 
+  // --- Support (khách hàng) ---
+  createSupportTicket(dto: { subject: string; category: SupportTicketCategory; orderId?: string; message: string }): Observable<SupportTicket> {
+    return this.http.post<SupportTicket>(`${this.api}/support/tickets`, dto);
+  }
+
+  listSupportTickets(page = 1, limit = 20, status?: string): Observable<SupportTicketList> {
+    let params = new HttpParams().set('page', page.toString()).set('limit', limit.toString());
+    if (status) params = params.set('status', status);
+    return this.http.get<SupportTicketList>(`${this.api}/support/tickets`, { params });
+  }
+
+  getSupportTicket(id: string): Observable<SupportTicketDetail> {
+    return this.http.get<SupportTicketDetail>(`${this.api}/support/tickets/${encodeURIComponent(id)}`);
+  }
+
+  /** Có `after` (ISO-8601) thì chỉ trả tin mới hơn mốc đó, dùng cho polling. */
+  listSupportMessages(id: string, after?: string, limit = 100): Observable<SupportMessageList> {
+    let params = new HttpParams().set('limit', limit.toString());
+    if (after) params = params.set('after', after);
+    return this.http.get<SupportMessageList>(`${this.api}/support/tickets/${encodeURIComponent(id)}/messages`, { params });
+  }
+
+  sendSupportMessage(id: string, message: string): Observable<SupportMessage> {
+    return this.http.post<SupportMessage>(`${this.api}/support/tickets/${encodeURIComponent(id)}/messages`, { message });
+  }
+
+  markSupportTicketRead(id: string): Observable<{ ok: boolean }> {
+    return this.http.post<{ ok: boolean }>(`${this.api}/support/tickets/${encodeURIComponent(id)}/read`, {});
+  }
+
+  closeSupportTicket(id: string): Observable<SupportTicket> {
+    return this.http.post<SupportTicket>(`${this.api}/support/tickets/${encodeURIComponent(id)}/close`, {});
+  }
+
+  // --- Support (nhân sự) ---
+  adminSupportStats(): Observable<SupportStats> {
+    return this.http.get<SupportStats>(`${this.api}/admin/support/stats`);
+  }
+
+  adminListSupportTickets(page = 1, limit = 50, filter: { status?: string; q?: string; assigned?: 'me' | 'unassigned' } = {}): Observable<AdminSupportTicketList> {
+    let params = new HttpParams().set('page', page.toString()).set('limit', limit.toString());
+    if (filter.status) params = params.set('status', filter.status);
+    if (filter.q?.trim()) params = params.set('q', filter.q.trim());
+    if (filter.assigned) params = params.set('assigned', filter.assigned);
+    return this.http.get<AdminSupportTicketList>(`${this.api}/admin/support/tickets`, { params });
+  }
+
+  adminGetSupportTicket(id: string): Observable<AdminSupportTicketDetail> {
+    return this.http.get<AdminSupportTicketDetail>(`${this.api}/admin/support/tickets/${encodeURIComponent(id)}`);
+  }
+
+  adminListSupportMessages(id: string, after?: string, limit = 100): Observable<SupportMessageList> {
+    let params = new HttpParams().set('limit', limit.toString());
+    if (after) params = params.set('after', after);
+    return this.http.get<SupportMessageList>(`${this.api}/admin/support/tickets/${encodeURIComponent(id)}/messages`, { params });
+  }
+
+  adminReplySupportTicket(id: string, message: string): Observable<SupportMessage> {
+    return this.http.post<SupportMessage>(`${this.api}/admin/support/tickets/${encodeURIComponent(id)}/messages`, { message });
+  }
+
+  adminClaimSupportTicket(id: string): Observable<SupportTicket> {
+    return this.http.post<SupportTicket>(`${this.api}/admin/support/tickets/${encodeURIComponent(id)}/claim`, {});
+  }
+
+  adminAssignSupportTicket(id: string, staffId: string | null): Observable<SupportTicket> {
+    return this.http.patch<SupportTicket>(`${this.api}/admin/support/tickets/${encodeURIComponent(id)}/assign`, { staffId });
+  }
+
+  adminSetSupportTicketStatus(id: string, status: 'IN_PROGRESS' | 'RESOLVED' | 'CLOSED'): Observable<SupportTicket> {
+    return this.http.patch<SupportTicket>(`${this.api}/admin/support/tickets/${encodeURIComponent(id)}/status`, { status });
+  }
+
+  adminMarkSupportTicketRead(id: string): Observable<{ ok: boolean }> {
+    return this.http.post<{ ok: boolean }>(`${this.api}/admin/support/tickets/${encodeURIComponent(id)}/read`, {});
+  }
+
   // --- Storage ---
   presignUpload(dto: { contentType: string; sizeBytes: number; purpose: 'avatar' | 'product' | 'lookbook' | 'community' | 'tryon' | 'refund_evidence' }): Observable<{
     uploadUrl: string;
@@ -412,9 +511,11 @@ export class ApiService {
   }
 
   // --- Admin API ---
-  adminListProducts(status?: string, page = 1, limit = 20): Observable<ListResponse<ProductSummary>> {
+  adminListProducts(status?: string, page = 1, limit = 20, search?: { q?: string; category?: string }): Observable<ListResponse<ProductSummary>> {
     let params = new HttpParams().set('page', page.toString()).set('limit', limit.toString());
     if (status) params = params.set('status', status);
+    if (search?.q?.trim()) params = params.set('q', search.q.trim());
+    if (search?.category?.trim()) params = params.set('category', search.category.trim());
     return this.http.get<ListResponse<ProductSummary>>(`${this.api}/admin/products`, { params });
   }
 
@@ -450,9 +551,11 @@ export class ApiService {
     return this.http.patch<ProductVariant>(`${this.api}/admin/products/${productId}/variants/${variantId}`, dto);
   }
 
-  adminListOrders(state?: string, page = 1, limit = 20): Observable<ListResponse<AdminOrderSummary>> {
+  adminListOrders(state?: string, page = 1, limit = 20, search?: { q?: string; customerId?: string }): Observable<ListResponse<AdminOrderSummary>> {
     let params = new HttpParams().set('page', page.toString()).set('limit', limit.toString());
     if (state) params = params.set('state', state);
+    if (search?.q?.trim()) params = params.set('q', search.q.trim());
+    if (search?.customerId) params = params.set('customerId', search.customerId);
     return this.http.get<ListResponse<AdminOrderSummary>>(`${this.api}/admin/orders`, { params });
   }
 
@@ -565,10 +668,16 @@ export class ApiService {
     return this.http.patch<any>(`${this.api}/admin/moderation/${targetId}`, dto);
   }
 
-  adminListUsers(page = 1, limit = 20, role?: string): Observable<ListResponse<UserSummary>> {
+  adminListUsers(page = 1, limit = 20, role?: string, search?: { q?: string; status?: string }): Observable<AdminUserList> {
     let params = new HttpParams().set('page', page.toString()).set('limit', limit.toString());
     if (role) params = params.set('role', role);
-    return this.http.get<ListResponse<UserSummary>>(`${this.api}/admin/users`, { params });
+    if (search?.q?.trim()) params = params.set('q', search.q.trim());
+    if (search?.status) params = params.set('status', search.status);
+    return this.http.get<AdminUserList>(`${this.api}/admin/users`, { params });
+  }
+
+  adminGetUser(userId: string): Observable<AdminUserDetail> {
+    return this.http.get<AdminUserDetail>(`${this.api}/admin/users/${userId}`);
   }
 
   adminUpdateUserStatus(userId: string, status: 'ACTIVE' | 'SUSPENDED'): Observable<UserSummary> {
@@ -634,6 +743,21 @@ export class ApiService {
 
   adminUpdateSettings(dto: Partial<SystemSettings>): Observable<SystemSettings> {
     return this.http.patch<SystemSettings>(`${this.api}/admin/settings`, dto);
+  }
+
+  adminListAiJobs(page = 1, limit = 20, filter?: { type?: string; state?: string }): Observable<AdminAiJobList> {
+    let params = new HttpParams().set('page', page.toString()).set('limit', limit.toString());
+    if (filter?.type) params = params.set('type', filter.type);
+    if (filter?.state) params = params.set('state', filter.state);
+    return this.http.get<AdminAiJobList>(`${this.api}/admin/ai-jobs`, { params });
+  }
+
+  adminAiJobStats(): Observable<AdminAiJobStats> {
+    return this.http.get<AdminAiJobStats>(`${this.api}/admin/ai-jobs/stats`);
+  }
+
+  adminGetAiJob(jobId: string): Observable<AdminAiJob> {
+    return this.http.get<AdminAiJob>(`${this.api}/admin/ai-jobs/${jobId}`);
   }
 
   adminGetAiQuota(): Observable<{ dailyJobs: number }> {

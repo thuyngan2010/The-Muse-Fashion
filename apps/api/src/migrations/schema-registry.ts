@@ -13,6 +13,7 @@ import { MediaObjectSchema } from '../modules/storage/media-object.schema.js';
 import { NotificationSchema } from '../modules/notifications/notification.schema.js';
 import { AuditLogSchema } from '../modules/operations/audit.schema.js';
 import { OutboxEventSchema } from '../modules/operations/outbox-event.schema.js';
+import { SupportMessageSchema, SupportTicketSchema } from '../modules/support/support.schemas.js';
 import { SystemSettingSchema } from '../modules/admin/admin.schemas.js';
 
 export const modelSchemas: Array<[string, Schema]> = [
@@ -29,6 +30,7 @@ export const modelSchemas: Array<[string, Schema]> = [
   ['EmailEvent', EmailEventSchema], ['MediaObject', MediaObjectSchema],
   ['Notification', NotificationSchema], ['AuditLog', AuditLogSchema], ['OutboxEvent', OutboxEventSchema],
   ['SystemSetting', SystemSettingSchema],
+  ['SupportTicket', SupportTicketSchema], ['SupportMessage', SupportMessageSchema],
 ];
 
 export type DeclaredIndex = {

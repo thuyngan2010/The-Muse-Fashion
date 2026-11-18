@@ -64,6 +64,14 @@ flowchart LR
 | Inventory | available/on-hand/reserved, ledger | adjustment bắt buộc reason và version |
 | Staff permissions | permission + scope | Admin only; cảnh báo khi thu quyền đang dùng |
 
+### 5.1 Chat hỗ trợ khách hàng
+
+- **Khách (`/support`):** hai cột (danh sách phiếu | hội thoại), một cột trên mobile. Tạo yêu cầu bằng hộp thoại (loại, tiêu đề 5–150 ký tự, đơn liên quan tùy chọn, nội dung ≤ 2000). `/orders/:id` có nút "Gửi yêu cầu hỗ trợ" → `/support?orderId=` tự mở hộp thoại với loại Đơn hàng. Thông báo "Hỗ trợ" mở `/support?ticketId=`.
+- **Nhân sự (`/admin/support`, quyền `order.read`):** tab Cần xử lý / Tất cả / Đã đóng, tìm kiếm qua API (chờ 300 ms), bộ lọc Của tôi / Chưa phân công / loại phiếu; hội thoại chia theo ngày; drawer thông tin khách và đơn với các nút Tiếp nhận (Admin hoặc GLOBAL), Phân công (chỉ Admin), Đã giải quyết, Đóng phiếu (có xác nhận). Mục menu "Khách hàng & Hỗ trợ" có số phiếu chưa đọc.
+- **Vòng đời:** `OPEN` → nhân sự trả lời hoặc nhận phiếu → `IN_PROGRESS` → `RESOLVED` → khách nhắn tiếp thì mở lại (`IN_PROGRESS` nếu đã có người phụ trách, ngược lại `OPEN`) → `CLOSED` (khách hoặc nhân sự đóng; không nhắn thêm được, khách tạo yêu cầu mới).
+- **Cập nhật gần thời gian thực bằng polling:** tin nhắn của phiếu đang mở mỗi 5 giây (`messages?after=`), danh sách khách 30 giây, danh sách nhân sự 15 giây, số chưa đọc trên menu 30 giây. Chỉ chạy khi `document.visibilityState === 'visible'` và dừng khi rời trang. Không dùng WebSocket.
+- **Giới hạn bản này:** chưa có tệp đính kèm; nội dung là chữ thuần (hiển thị bằng nội suy, không HTML); khách tối đa 20 tin/phút và 5 phiếu/giờ (429 kèm thông báo tiếng Việt); danh sách tải tối đa 50 phiếu mới nhất, tìm kiếm để thu hẹp; lọc theo loại phiếu của nhân sự làm ở trình duyệt.
+
 ## 6. Flow AI và media
 
 - Trước upload phải hiển thị consent riêng cho mục đích AI, thời gian giữ input/output và nút xóa.
