@@ -32,3 +32,16 @@ describe('AI Mix & Match hero links', () => {
     expect(page).toContain('<a routerLink="/ai/try-on" class="text-link">{{ content.tryOnLink }}</a>');
   });
 });
+
+describe('AI Try-on hero links', () => {
+  it('history and Mix & Match links sit in a spaced flex row with the same font size', () => {
+    const page = source('./ai-try-on.page.ts');
+    const row = page.indexOf('<div class="hero-links">');
+    expect(row).toBeGreaterThan(-1);
+    expect(page.indexOf('class="history-link"')).toBeGreaterThan(row);
+    expect(page.indexOf('class="text-link">Khám phá Mix &amp; Match')).toBeGreaterThan(row);
+    expect(page).toMatch(/\.hero-links\{display:flex;[^}]*gap:/);
+    expect(page).toMatch(/\.history-link\{[^}]*font-size:12px/);
+    expect(page).toMatch(/\.text-link\{[^}]*font-size:12px/);
+  });
+});
