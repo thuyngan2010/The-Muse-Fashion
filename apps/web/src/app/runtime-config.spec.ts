@@ -3,9 +3,9 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 describe('Frontend backend URL configuration', () => {
   afterEach(() => { vi.unstubAllGlobals(); vi.resetModules(); });
 
-  async function config(apiBaseUrl?: string) {
+  async function config(apiBaseUrl?: string, googleClientId?: unknown) {
     vi.resetModules();
-    vi.stubGlobal('window', { __FASHION_CONFIG__: { apiBaseUrl } });
+    vi.stubGlobal('window', { __FASHION_CONFIG__: { apiBaseUrl, googleClientId } });
     return (await import('./runtime-config')).runtimeConfig;
   }
 
@@ -26,5 +26,12 @@ describe('Frontend backend URL configuration', () => {
     'https://api.example.com/api/v1?key=value', '/\\other.example/api', 'https://api.example.com/api/v1#fragment'])
   ('rejects unsafe or ambiguous base URL %s', async (input) => {
     await expect(config(input)).rejects.toThrow('apiBaseUrl');
+  });
+
+  it('exposes a valid Google client id and ignores missing or malformed ones', async () => {
+    expect((await config(undefined, ' 123-abc.apps.googleusercontent.com ')).googleClientId).toBe('123-abc.apps.googleusercontent.com');
+    expect((await config()).googleClientId).toBeUndefined();
+    expect((await config(undefined, 'not-a-client-id')).googleClientId).toBeUndefined();
+    expect((await config(undefined, 42)).googleClientId).toBeUndefined();
   });
 });

@@ -7,12 +7,18 @@ import { STAFF_PERMISSIONS, type StaffPermissionName } from '../../common/permis
 import { withCommerceTransaction } from '../../common/mongo-transaction.util.js';
 import { AuditService } from '../operations/audit.service.js';
 import { StaffPermission } from '../users/identity.schemas.js';
-import { EmailToken } from '../users/identity.schemas.js';
+import { Address, EmailToken } from '../users/identity.schemas.js';
 import { EmailDispatchService } from '../mail/email-dispatch.service.js';
 import type { CreateStaffDto } from './admin.dto.js';
 import { User } from '../users/user.schema.js';
+import { Order } from '../commerce/commerce.schemas.js';
+import { serializeOrder } from '../commerce/order.types.js';
+import { escapeRegex } from '../../common/escape-regex.js';
 
 const GLOBAL_ONLY: StaffPermissionName[] = ['catalog.manage', 'inventory.manage', 'content.moderate'];
+/** Đơn đã thanh toán và chưa hủy/hoàn tiền: dùng cho orderCount và totalSpent. */
+const PAID_ORDER_STATES = ['CONFIRMED', 'PREPARING', 'SHIPPING', 'DELIVERED'];
+const USER_STATUSES = ['ACTIVE', 'PENDING_VERIFICATION', 'SUSPENDED'] as const;
 const INVITATION_TTL_MS = 24 * 60 * 60 * 1000;
 const SYSTEM_LOCKS = 'system_locks';
 const ACTIVE_ADMINS_LOCK = 'active-admins';
@@ -26,6 +32,8 @@ export class AdminService {
     private readonly audit: AuditService,
     @InjectModel(EmailToken.name) private readonly emailTokens: Model<EmailToken>,
     private readonly email: EmailDispatchService,
+    @InjectModel(Order.name) private readonly orders?: Model<Order>,
+    @InjectModel(Address.name) private readonly addresses?: Model<Address>,
   ) {}
 
   async createStaff(actorId: string, dto: CreateStaffDto) {
@@ -60,19 +68,46 @@ export class AdminService {
     });
   }
 
-  async listUsers(page = 1, limit = 20, role?: string) {
+  /** Số đơn đã thanh toán (không tính đơn hủy) và tổng chi tiêu theo từng khách. */
+  private async customerSpending(customerIds: string[]): Promise<Map<string, { orderCount: number; totalSpent: number }>> {
+    const result = new Map<string, { orderCount: number; totalSpent: number }>();
+    if (!customerIds.length || !this.orders) return result;
+    const rows = await this.orders.aggregate<{ _id: unknown; orderCount: number; totalSpent: number }>([
+      { $match: { customerId: { $in: customerIds.map((id) => new Types.ObjectId(id)) }, state: { $in: PAID_ORDER_STATES } } },
+      { $group: { _id: '$customerId', orderCount: { $sum: 1 }, totalSpent: { $sum: { $ifNull: ['$money.payableTotal', 0] } } } },
+    ]).exec();
+    for (const row of rows) result.set(String(row._id), { orderCount: row.orderCount, totalSpent: row.totalSpent });
+    return result;
+  }
+
+  async listUsers(page = 1, limit = 20, role?: string, search: { status?: string; q?: string } = {}) {
     const safePage = Math.max(1, page);
     const safeLimit = Math.min(50, Math.max(1, limit));
     const skip = (safePage - 1) * safeLimit;
-    const filter: Record<string, unknown> = role ? { role, status: 'ACTIVE' } : {};
-    const [items, total] = await Promise.all([
+    // Giữ hành vi cũ: có role mà không có status thì chỉ lấy tài khoản ACTIVE. status=ALL bỏ lọc.
+    const status = search.status ?? (role ? 'ACTIVE' : undefined);
+    const base: Record<string, unknown> = role ? { role } : {};
+    const q = search.q?.trim();
+    if (q) {
+      const pattern = new RegExp(escapeRegex(q), 'i');
+      base.$or = [{ fullName: pattern }, { email: pattern }];
+    }
+    const filter: Record<string, unknown> = status && status !== 'ALL' ? { ...base, status } : base;
+    const [items, total, countRows] = await Promise.all([
       this.users.find(filter).sort({ createdAt: -1 }).skip(skip).limit(safeLimit).lean().exec(),
       this.users.countDocuments(filter).exec(),
+      this.users.aggregate<{ _id: string; count: number }>([{ $match: base }, { $group: { _id: '$status', count: { $sum: 1 } } }]).exec(),
     ]);
+    const statusCounts: Record<string, number> = Object.fromEntries(USER_STATUSES.map((s) => [s, 0]));
+    for (const row of countRows) statusCounts[row._id] = row.count;
+    const spending = role === 'CUSTOMER'
+      ? await this.customerSpending(items.map((user) => String(user._id)))
+      : null;
     return {
       page: safePage,
       limit: safeLimit,
       total,
+      statusCounts,
       items: items.map((user) => ({
         id: String(user._id),
         email: user.email,
@@ -80,7 +115,46 @@ export class AdminService {
         role: user.role,
         status: user.status,
         createdAt: user.createdAt?.toISOString(),
+        ...(spending ? {
+          orderCount: spending.get(String(user._id))?.orderCount ?? 0,
+          totalSpent: spending.get(String(user._id))?.totalSpent ?? 0,
+        } : {}),
       })),
+    };
+  }
+
+  /** Hồ sơ người dùng cho admin: không có mật khẩu hay token. */
+  async getUserDetail(userId: string) {
+    if (!Types.ObjectId.isValid(userId)) throw new NotFoundException('User not found');
+    const user = await this.users.findById(userId).lean().exec();
+    if (!user) throw new NotFoundException('User not found');
+    const isCustomer = user.role === 'CUSTOMER';
+    const [address, recent, spending] = isCustomer && this.addresses && this.orders
+      ? await Promise.all([
+        this.addresses.findOne({ customerId: userId, isDefault: true }).lean().exec(),
+        this.orders.find({ customerId: userId }).sort({ createdAt: -1 }).limit(3).lean().exec(),
+        this.customerSpending([userId]),
+      ])
+      : [null, [], new Map<string, { orderCount: number; totalSpent: number }>()];
+    const loc = (address?.location ?? {}) as Record<string, unknown>;
+    return {
+      id: String(user._id),
+      email: user.email,
+      fullName: user.fullName,
+      phone: user.phone ?? null,
+      role: user.role,
+      status: user.status,
+      emailVerifiedAt: user.emailVerifiedAt ? new Date(user.emailVerifiedAt).toISOString() : null,
+      createdAt: user.createdAt?.toISOString(),
+      orderCount: isCustomer ? spending.get(userId)?.orderCount ?? 0 : undefined,
+      totalSpent: isCustomer ? spending.get(userId)?.totalSpent ?? 0 : undefined,
+      defaultAddress: address ? {
+        id: String(address._id), receiver: address.receiver, phone: address.phone,
+        line1: String(loc['line1'] ?? ''), ward: String(loc['ward'] ?? ''),
+        district: String(loc['district'] ?? ''), province: String(loc['province'] ?? ''),
+        note: address.note ?? undefined,
+      } : null,
+      recentOrders: recent.map((row) => ({ ...serializeOrder(row), itemCount: row.items?.length ?? 0 })),
     };
   }
 

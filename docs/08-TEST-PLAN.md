@@ -33,6 +33,7 @@
 | UC26–29 | VietQR/GPM Pay/SePay webhook tiền vào, refund QR/chuyển khoản thủ công | HMAC/API Key sai, `SIMULATED` GPM Pay prod, sai provider/mã/tiền/tài khoản, SePay tiền ra cần review | duplicate `(provider,eventId)`, retry/out-of-order, expiry race, một event gắn một refund, không hoàn lặp |
 | UC30–32 | RBAC/config/report | last Admin lock, cross scope | simultaneous role change |
 | UC33–37 | email/notifications | SendGrid 4xx/5xx, private recipient | dedup event, retry, mark-read repeat |
+| Chat hỗ trợ (mở rộng) | khách tạo → nhân sự trả lời → thông báo `SUPPORT_REPLY` → khách đọc → giải quyết → khách mở lại → đóng | khách khác 404, Staff không `order.read` 403, Staff ASSIGNED ngoài phiếu được giao 404, phiếu `CLOSED` 409, vượt 20 tin/phút hoặc 5 phiếu/giờ 429 | polling `after` không trùng tin; claim lần hai 409; đóng lặp lại không lỗi |
 
 ## 4. Quality gates
 
@@ -58,3 +59,9 @@ Mỗi testcase cần `TC-UCxx-nn`, precondition/setup, steps, expected API+DB+no
 5. GET `/api/v1/auth/me` không token trả 401, token không hợp lệ trả 401.
 6. POST `/api/v1/products` không token trả 401, Customer token trả 403.
 7. POST `/api/v1/storage/presign` có token nhưng thiếu R2 secrets không tạo URL và báo lỗi cấu hình.
+
+## 8. Kiểm thử Chat hỗ trợ
+
+- **Backend:** `apps/api/src/modules/support/support.service.spec.ts` (nghiệp vụ, phạm vi, rate limit, toàn luồng với kho dữ liệu giả), `support.dto.spec.ts` (validate), `support.access.spec.ts` (vai trò được phép gọi từng route: API khách chỉ `CUSTOMER`, API quản trị không mở cho khách, phân công chỉ `ADMIN`).
+- **Frontend:** `apps/web/src/app/pages/support-chat.spec.ts` (polling dùng `after`, bỏ qua khi tab ẩn và dừng khi rời trang; gửi lỗi giữ nội dung ô soạn; phiếu `CLOSED` không gửi và không dựng ô soạn) cho cả trang khách và nhân sự.
+- **Thủ công (chưa tự động hóa):** đi lại toàn luồng với 3 tài khoản (khách, Admin, Staff ASSIGNED) và mobile 390 px; kiểm tra số chưa đọc trên menu; trang giỏ hàng, đơn hàng, admin đơn hàng không đổi hành vi. Chưa có integration test HTTP/MongoDB riêng cho support.

@@ -36,23 +36,46 @@ export class SalesReportService {
       ? await this.orders.find({ _id: { $in: orderIds.map((id) => new Types.ObjectId(id)) } }).lean().exec()
       : [];
 
+    const paidByOrder = new Map<string, number>();
+    for (const payment of payments) {
+      const key = String(payment.orderId);
+      paidByOrder.set(key, (paidByOrder.get(key) ?? 0) + Number(payment.expectedAmount ?? 0));
+    }
+
     const productQty = new Map<string, number>();
+    const productRevenue = new Map<string, number>();
     const productNames = new Map<string, string>();
+    const productSkus = new Map<string, Set<string>>();
     for (const order of orders) {
       if (order.state === 'CANCELLED' || order.state === 'CANCEL_PENDING_REFUND') continue;
-      const lines = (order.items as OrderLineSnapshot[]) ?? [];
+      const lines = ((order.items as OrderLineSnapshot[]) ?? []).filter((line) => line?.productId);
+      // Doanh thu sản phẩm = tổng tiền dòng hàng, co lại nếu số đã thu của đơn nhỏ hơn (để tổng không vượt doanh thu đã thu).
+      const linesTotal = lines.reduce((sum, line) => sum + Number(line.lineTotal ?? 0), 0);
+      const paid = paidByOrder.get(String(order._id)) ?? 0;
+      const ratio = linesTotal > 0 ? Math.min(1, paid / linesTotal) : 0;
       for (const line of lines) {
-        if (!line?.productId) continue;
         const key = String(line.productId);
         productQty.set(key, (productQty.get(key) ?? 0) + Number(line.quantity ?? 0));
+        productRevenue.set(key, (productRevenue.get(key) ?? 0) + Number(line.lineTotal ?? 0) * ratio);
         if (line.productName) productNames.set(key, line.productName);
+        if (line.sku) productSkus.set(key, (productSkus.get(key) ?? new Set<string>()).add(line.sku));
       }
     }
 
     const topProducts = [...productQty.entries()]
       .sort((a, b) => b[1] - a[1])
       .slice(0, 10)
-      .map(([productId, quantity]) => ({ productId, productName: productNames.get(productId) ?? productId, quantity }));
+      .map(([productId, quantity]) => {
+        const skus = productSkus.get(productId);
+        return {
+          productId,
+          productName: productNames.get(productId) ?? productId,
+          quantity,
+          revenue: Math.floor(productRevenue.get(productId) ?? 0),
+          // Chỉ có mã SKU khi mọi dòng của sản phẩm cùng một mã; nhiều biến thể thì không xác định được.
+          ...(skus && skus.size === 1 ? { sku: [...skus][0] } : {}),
+        };
+      });
 
     const dayKey = (date: Date) => new Intl.DateTimeFormat('en-CA', {
       timeZone: REPORT_TIMEZONE, year: 'numeric', month: '2-digit', day: '2-digit',

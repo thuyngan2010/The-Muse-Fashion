@@ -21,6 +21,13 @@ export class UsersService {
     @Optional() private readonly moduleRef?: ModuleRef,
   ) {}
   findByEmail(email: string) { return this.model.findOne({ email: email.toLowerCase().trim() }).select('+passwordHash +verificationTokenHash').exec(); }
+  /** Tên hiển thị (họ tên) theo id, dùng để gắn tên người thực hiện vào danh sách quản trị. Không trả email hay dữ liệu nhạy cảm. */
+  async displayNames(ids: Array<string | null | undefined>): Promise<Map<string, string>> {
+    const valid = [...new Set(ids.filter((id): id is string => !!id && Types.ObjectId.isValid(id)).map(String))];
+    if (!valid.length) return new Map();
+    const rows = await this.model.find({ _id: { $in: valid } }).select('fullName').lean().exec();
+    return new Map(rows.map((row) => [String(row._id), row.fullName]));
+  }
   findById(id: string) { return Types.ObjectId.isValid(id) ? this.model.findById(id).exec() : Promise.resolve(null); }
 
   listActiveCustomerIds(limit: number, afterId?: string) {
@@ -54,7 +61,7 @@ export class UsersService {
 
   private profile(user: UserDocument) {
     return { id: String(user._id), email: user.email, fullName: user.fullName, role: user.role,
-      status: user.status, phone: user.phone ?? null, avatarMediaId: user.avatarMediaId ?? null,
+      status: user.status, phone: user.phone ?? null, avatarMediaId: user.avatarMediaId ?? null, hasPassword: user.hasPassword !== false,
       createdAt: user.get('createdAt') };
   }
 

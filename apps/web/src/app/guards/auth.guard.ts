@@ -22,24 +22,28 @@ export const authGuard: CanActivateFn = (_route, state) => {
   return false;
 };
 
-export const adminGuard: CanActivateFn = (_route, _state) => {
+export const adminGuard: CanActivateFn = (_route, state) => {
   const auth = inject(AuthService);
   const router = inject(Router);
 
-  if (auth.isAdmin()) {
-    return true;
-  }
+  if (auth.isAdmin()) return true;
+  if (!auth.isAuthenticated()) return router.createUrlTree(['/admin/login'], { queryParams: { returnUrl: state.url } });
+  if (auth.isStaff()) return router.createUrlTree(['/forbidden']);
 
   router.navigate(['/']);
   return false;
 };
 
-export const staffGuard: CanActivateFn = (_route, _state) => {
+export const staffGuard: CanActivateFn = (_route, state) => {
   const auth = inject(AuthService);
   const router = inject(Router);
 
   if (auth.isStaff()) {
     return true;
+  }
+
+  if (!auth.isAuthenticated()) {
+    return router.createUrlTree(['/admin/login'], { queryParams: { returnUrl: state.url } });
   }
 
   router.navigate(['/']);

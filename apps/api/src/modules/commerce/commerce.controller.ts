@@ -111,7 +111,7 @@ export class AdminOrdersController {
 
   @Get()
   list(@Req() req: AuthenticatedRequest, @Query() query: AdminOrdersQueryDto) {
-    return this.orders.listAdminOrders(req.user, query.state, query.page ?? 1, query.limit ?? 20);
+    return this.orders.listAdminOrders(req.user, query.state, query.page ?? 1, query.limit ?? 20, { q: query.q, customerId: query.customerId });
   }
 
   @Roles('ADMIN')

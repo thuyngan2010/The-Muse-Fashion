@@ -20,7 +20,11 @@ export class AdminController {
   ) {}
 
   @Get('users') listUsers(@Query() query: AdminUsersQueryDto) {
-    return this.admin.listUsers(query.page ?? 1, query.limit ?? 20, query.role);
+    return this.admin.listUsers(query.page ?? 1, query.limit ?? 20, query.role, { status: query.status, q: query.q });
+  }
+
+  @Get('users/:userId') getUser(@Param('userId') userId: string) {
+    return this.admin.getUserDetail(userId);
   }
 
   @Post('staff') createStaff(@Req() req: AuthenticatedRequest, @Body() dto: CreateStaffDto) {

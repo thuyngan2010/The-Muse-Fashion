@@ -8,8 +8,10 @@
 |---|---|---|---|---|
 | GET | `/health` | Public | health probe | Implemented |
 | POST | `/auth/register` | Public | register Customer, gửi SendGrid verification | Partial UC01 |
+| GET | `/auth/registration-status?token=` | Public | tab đăng ký hỏi `PENDING`/`VERIFIED`/`EXPIRED`; 60 lần/phút/IP, không trả email | Partial UC01 |
 | POST | `/auth/verify-email` | Public | sử dụng token một lần | Partial UC01 |
 | POST | `/auth/login` | Public | JWT access token | Partial UC02 |
+| POST | `/auth/google` | Public | đăng nhập/đăng ký bằng Google ID token; trả phiên như `/auth/login` | Partial UC01/02 |
 | GET | `/auth/me` | Bearer | principal | Implemented |
 | GET | `/products?q=&page=&limit=` | Public | danh sách published, search name, paging | Partial UC07 |
 | GET | `/products/:slug` | Public | chi tiết published | Partial UC08 |
@@ -66,8 +68,15 @@
 | internal | `order.status.changed` event | UC35 | notification owner |
 | internal | `community.event` | UC36 | notification/consent |
 | GET/PATCH | `/notifications` | UC37 | own read state |
+| POST/GET | `/support/tickets` | Chat hỗ trợ | Customer tạo phiếu (kèm tin đầu, `orderId` phải là đơn của chính khách; tối đa 5 phiếu/giờ) và xem phiếu của mình |
+| GET | `/support/tickets/:id`, `/support/tickets/:id/messages?after=&limit=` | Chat hỗ trợ | chi tiết phiếu của mình; tin nhắn tăng dần, `after` (ISO-8601) chỉ trả tin mới hơn để polling 5 giây |
+| POST | `/support/tickets/:id/messages`, `/support/tickets/:id/read`, `/support/tickets/:id/close` | Chat hỗ trợ | gửi tin (tối đa 20 tin/phút; phiếu `RESOLVED` được mở lại, `CLOSED` trả 409), đánh dấu đã đọc, tự đóng phiếu |
+| GET | `/admin/support/tickets`, `/admin/support/tickets/:id`, `/admin/support/tickets/:id/messages`, `/admin/support/stats` | Chat hỗ trợ | Admin hoặc Staff có `order.read`; phạm vi GLOBAL thấy tất cả, ASSIGNED chỉ thấy phiếu giao cho mình |
+| POST/PATCH | `/admin/support/tickets/:id/messages`, `/claim`, `/assign`, `/status`, `/read` | Chat hỗ trợ | trả lời (tạo thông báo `SUPPORT_REPLY` cho khách), nhận phiếu (Admin/GLOBAL), phân công (chỉ Admin), đổi trạng thái, đánh dấu đã đọc; phân công/nhận/đổi trạng thái ghi audit `support_ticket` |
 
 Các route phục vụ giao diện quản trị và đối soát đã bổ sung: `GET /admin/orders`, `PATCH /admin/orders/:id/assign`, `GET /admin/products`, `GET /admin/lookbooks`, `GET /admin/refunds`, `GET /admin/inventory/ledger`, `GET /admin/moderation`, `GET /admin/payment-events`, `PATCH /admin/payment-events/:id/review`, `POST /admin/staff`, `GET /ai/jobs` và `GET /reviews?productId=...`. Xem [OpenAPI](openapi.yaml) để có danh sách method/path đầy đủ.
+
+**Chat hỗ trợ.** Phiếu có mã `TKT-xxxxxx`, loại `ORDER | SIZE | PAYMENT_REFUND | PRODUCT | ACCOUNT | OTHER`, trạng thái `OPEN → IN_PROGRESS → RESOLVED → CLOSED`. Nội dung tin nhắn là chữ thuần 1–2000 ký tự (client hiển thị bằng nội suy, không render HTML); chưa hỗ trợ tệp đính kèm. Cập nhật mới bằng polling 5 giây phía client, không dùng WebSocket. `POST .../messages` trả về tin nhắn vừa lưu. Phía khách chỉ thấy tên hiển thị của nhân viên, không thấy email nội bộ. Vượt hạn mức trả `429` với `code=RATE_LIMITED` và thông báo tiếng Việt.
 
 ## 3. Request samples
 
@@ -80,7 +89,7 @@ Content-Type: application/json
 {"fullName":"Nguyen Van A","email":"customer@example.com","password":"ExampleSecure123"}
 ```
 
-`201 Created`: `{"id":"...","message":"Verification email queued"}`. Email được đưa vào queue để worker gửi; phản hồi này chưa xác nhận SendGrid đã nhận email.
+`201 Created`: `{"id":"...","message":"Verification email queued","registrationToken":"<64 hex>"}`. `registrationToken` (32 byte ngẫu nhiên, lưu dạng băm SHA-256, hiệu lực 24 giờ) chỉ trả ở đây; client dùng nó gọi `GET /auth/registration-status?token=...` để biết đã xác thực chưa. Token sai hoặc hết hạn đều trả `EXPIRED`. Email được đưa vào queue để worker gửi; phản hồi này chưa xác nhận SendGrid đã nhận email.
 
 ### Login
 
@@ -91,7 +100,25 @@ Content-Type: application/json
 {"email":"customer@example.com","password":"ExampleSecure123"}
 ```
 
-`201` trả body `{"accessToken":"...","tokenType":"Bearer","expiresIn":3600,"user":{"id":"...","email":"customer@example.com","fullName":"Nguyen Van A","role":"CUSTOMER","status":"ACTIVE"}}` và đặt refresh token bằng cookie `HttpOnly; Secure; SameSite=Lax` trong production. Không đăng nhập được nếu email chưa xác minh.
+`201` trả body `{"accessToken":"...","tokenType":"Bearer","expiresIn":3600,"user":{"id":"...","email":"customer@example.com","fullName":"Nguyen Van A","role":"CUSTOMER","status":"ACTIVE"}}` và đặt refresh token bằng cookie `HttpOnly; Secure; SameSite=Lax` trong production. Nếu mật khẩu đúng nhưng email chưa xác minh, API trả `401` với `code: "EMAIL_NOT_VERIFIED"` và thông báo tiếng Việt; mật khẩu sai vẫn trả `INVALID_CREDENTIALS` nên không lộ email nào đã đăng ký.
+
+### Đăng nhập bằng Google
+
+```http
+POST /api/v1/auth/google
+Content-Type: application/json
+
+{"credential":"<Google ID token>","remember":true}
+```
+
+Backend xác minh ID token với `audience = GOOGLE_CLIENT_ID` và bắt buộc `email_verified = true`, rồi cấp phiên bằng đúng hàm của `/auth/login` (`201`, cùng body, cùng cookie refresh).
+
+- Đã có user với `googleSub` này: đăng nhập user đó.
+- Chưa có nhưng có user `CUSTOMER` cùng email: liên kết `googleSub`; nếu đang `PENDING_VERIFICATION` thì kích hoạt (Google đã xác minh email) và thay mật khẩu đã đặt lúc đăng ký bằng chuỗi ngẫu nhiên (`hasPassword=false`).
+- Không có user nào: tạo `CUSTOMER` `ACTIVE` với `hasPassword=false`.
+- `STAFF`/`ADMIN`: `403` "Tài khoản quản trị chỉ đăng nhập bằng mật khẩu". `SUSPENDED`: `401` như đăng nhập thường. Chưa cấu hình `GOOGLE_CLIENT_ID`: `503` "Đăng nhập Google chưa được cấu hình". Giới hạn 30 lần/15 phút/IP.
+
+Tài khoản `hasPassword=false` gọi `POST /auth/change-password` nhận `400` "Tài khoản chưa có mật khẩu, vui lòng dùng Quên mật khẩu để đặt mật khẩu."; đặt lại mật khẩu thành công thì `hasPassword=true`.
 
 ### Presigned upload
 

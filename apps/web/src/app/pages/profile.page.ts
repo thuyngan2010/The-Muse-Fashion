@@ -1,6 +1,6 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { ActivatedRoute, Router } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { map, switchMap } from 'rxjs';
 import { AccountSidebarComponent } from '../components/account-sidebar.component';
@@ -11,7 +11,7 @@ import { STORE_PROFILE_CONTENT } from '../shared/store-content';
 
 @Component({
   standalone: true,
-  imports: [FormsModule, AccountSidebarComponent],
+  imports: [FormsModule, RouterLink, AccountSidebarComponent],
   template: `
     <main class="profile-shell">
       <fc-account-sidebar />
@@ -92,6 +92,13 @@ import { STORE_PROFILE_CONTENT } from '../shared/store-content';
 
         @if (isPasswordTab()) {
         <section class="password-layout" id="change-password">
+          @if (auth.currentUser()?.hasPassword === false) {
+          <div class="password-card google-account">
+            <header><span>{{ policy.googleAccount.eyebrow }}</span><h2>{{ policy.googleAccount.title }}</h2></header>
+            <p>{{ policy.googleAccount.text }}</p>
+            <div class="password-actions"><a routerLink="/forgot-password" [state]="{ email: auth.currentUser()?.email }" class="button button-black">{{ policy.googleAccount.cta }}</a></div>
+          </div>
+          } @else {
           <form (ngSubmit)="changePassword()" class="password-card">
             <header><span>BẢO MẬT</span><h2>Cập nhật mật khẩu</h2></header>
             @if (passwordError()) { <p class="form-error" role="alert">{{ passwordError() }}</p> }
@@ -111,6 +118,7 @@ import { STORE_PROFILE_CONTENT } from '../shared/store-content';
             <label class="form-field"><span>XÁC NHẬN MẬT KHẨU MỚI <b aria-hidden="true">*</b></span><input type="password" [(ngModel)]="confirmPassword" name="confirmPassword" required autocomplete="new-password" /></label>
             <div class="password-actions"><button type="submit" class="button button-black" [disabled]="savingPassword()">{{ savingPassword() ? 'ĐANG CẬP NHẬT...' : 'CẬP NHẬT MẬT KHẨU' }}</button></div>
           </form>
+          }
 
           <aside class="security-note">
             <span>LƯU Ý BẢO MẬT</span>
@@ -153,6 +161,7 @@ import { STORE_PROFILE_CONTENT } from '../shared/store-content';
     .strength-bars { display:grid; grid-template-columns:repeat(4,1fr); gap:6px; margin:10px 0 13px; } .strength-bars span { height:3px; background:#d9d5d5; } .strength-bars span.active { background:#000; }
     .password-strength ul { margin:0; padding:0; display:grid; grid-template-columns:repeat(2,1fr); gap:7px 18px; list-style:none; } .password-strength li { color:#777; font-size:10px; } .password-strength li::before { content:'○'; margin-right:7px; } .password-strength li.met { color:#266246; } .password-strength li.met::before { content:'✓'; }
     .security-note { margin-top:24px; padding:24px; border:1px solid #e3e2e2; background:#f5f3f3; } .security-note > span { font-size:10px; font-weight:600; letter-spacing:1.2px; } .security-note ul { margin:16px 0 0; padding-left:18px; color:#555; font:300 12px/1.7 'Outfit',sans-serif; } .security-note li + li { margin-top:8px; }
+    .google-account p { margin:0; color:#444748; font-size:14px; line-height:1.65; } .google-account .button { display:inline-flex; align-items:center; justify-content:center; text-decoration:none; }
     @media (max-width:980px) { .profile-shell { width:min(100% - 32px,760px); grid-template-columns:1fr; } .password-layout { grid-template-columns:1fr; } }
     @media (max-width:640px) { .profile-shell { width:100%; padding:20px 16px 64px; } .page-header h1 { font-size:34px; } .avatar-section,.profile-form,.password-card { padding:24px 20px; } .divider { margin:0 20px; } .avatar-row { align-items:flex-start; flex-direction:column; } .large-avatar { width:88px; height:88px; } .form-actions { flex-direction:column; } .form-actions .button { width:100%; } .password-strength ul { grid-template-columns:1fr; } }
   `],

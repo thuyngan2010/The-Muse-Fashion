@@ -447,7 +447,7 @@ import { PageStateComponent } from '../components/page-state.component';
       font-weight: 700;
     }
     .p-title {
-      font-family: Georgia, serif;
+      font-family: Georgia, "Times New Roman", serif;
       font-size: 2.5rem;
       font-weight: 500;
       margin: 0;
@@ -618,7 +618,7 @@ import { PageStateComponent } from '../components/page-state.component';
       padding-top: 60px;
     }
     .reviews-header h2 {
-      font-family: Georgia, serif;
+      font-family: Georgia, "Times New Roman", serif;
       font-size: 1.8rem;
       font-weight: 500;
       margin: 6px 0 30px;

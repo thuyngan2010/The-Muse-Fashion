@@ -68,7 +68,7 @@ export class AiWorkerService implements OnModuleInit, OnModuleDestroy {
           { state: 'PENDING', $or: [{ nextAttemptAt: null }, { nextAttemptAt: { $lte: now } }] },
           { state: 'PROCESSING', leaseUntil: { $lte: now } },
         ] },
-        { $set: { state: 'PROCESSING', leaseUntil: new Date(Date.now() + leaseMs), leaseId }, $inc: { attempts: 1 } },
+        { $set: { state: 'PROCESSING', leaseUntil: new Date(Date.now() + leaseMs), leaseId }, $min: { startedAt: new Date() }, $inc: { attempts: 1 } },
         { new: true },
       ).exec();
       if (!claimed) continue;

@@ -44,7 +44,7 @@ describe('database migrations', () => {
     await db.collection('schema_migrations').deleteOne({ _id: '202610270001_review_query_indexes' as never });
     const upgraded = await run(); expect(upgraded.stdout).toContain('202610270001_review_query_indexes completed');
     await migrations.at(-1)!.verify(db);
-    expect(await db.collection('schema_migrations').countDocuments({ status: 'COMPLETED' })).toBe(3);
+    expect(await db.collection('schema_migrations').countDocuments({ status: 'COMPLETED' })).toBe(migrations.length);
   });
   it('apply on an empty database, verify every declared index and re-run idempotently', async () => {
     const db = await freshDb();

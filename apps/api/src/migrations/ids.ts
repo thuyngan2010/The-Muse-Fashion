@@ -1,1 +1,1 @@
-export const MIGRATION_IDS = ['202610240001_baseline', '202610240002_integrity', '202610270001_review_query_indexes'] as const;
+export const MIGRATION_IDS = ['202610240001_baseline', '202610240002_integrity', '202610270001_review_query_indexes', '202611180001_support_chat_indexes', '202611180002_google_login_indexes'] as const;

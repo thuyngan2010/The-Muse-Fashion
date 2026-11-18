@@ -46,7 +46,7 @@ function make<T>(Type: new (...args: any[]) => T, api: any = {}, auth: any = {},
   const injector = Injector.create({ providers: [
     { provide: ApiService, useValue: api }, { provide: AuthService, useValue: auth },
     { provide: ToastService, useValue: toast }, { provide: Router, useValue: { url: '/', navigate: vi.fn() } },
-    { provide: ActivatedRoute, useValue: { snapshot: { paramMap: { get: () => id }, queryParamMap: { get: () => null } } } },
+    { provide: ActivatedRoute, useValue: { snapshot: { paramMap: { get: () => id }, queryParamMap: { get: () => null } }, queryParamMap: of({ get: () => null }) } },
     { provide: CartService, useValue: {} }, ...extra,
   ] });
   return runInInjectionContext(injector, () => new Type());
@@ -101,17 +101,17 @@ describe('Audit: FE/API contracts', () => {
     const grants=[{permission:'order.read',scope:'ASSIGNED'}];
     controller.grantPermission({user:{sub:'admin'}} as any,id,{grants} as any);
     expect(grantStaffPermissions).toHaveBeenCalledWith('admin',id,grants);
-    const page=make(AdminUsersPage,{adminGetStaffPermissions:()=>of({staffId:id,grants})});page.openPermissionsModal(staff as any);
-    expect(page.permState['order.read']).toMatchObject({enabled:true,scope:'ASSIGNED'});
+    const page=make(AdminUsersPage,{adminGetStaffPermissions:()=>of({staffId:id,grants})});page.openPermissions(staff as any);
+    expect(page.perm()['order.read']).toMatchObject({enabled:true,scope:'ASSIGNED'});
   });
 
   it('edits draft variants from the protected product detail without inventing attributes', () => {
     const variant={id,sku:'SKU',size:'L',color:'Blue',price:150000,status:'INACTIVE'};
     const adminUpdateVariant=vi.fn(()=>EMPTY);
-    const page=make(AdminProductsPage,{adminGetProduct:()=>of({id,variants:[variant]}),adminUpdateVariant});
-    page.openManageVariantsModal({id,name:'Draft Product',slug:'draft',price:200000,status:'DRAFT'} as any);
-    page.startEditVariant(page.currentVariants()[0]);page.submitUpdateVariant();
-    expect(adminUpdateVariant.mock.calls[0][2]).toMatchObject({size:'L',color:'Blue',price:150000,status:'INACTIVE'});
+    const page=make(AdminProductsPage,{adminGetProduct:()=>of({id,variants:[variant]}),adminUpdateVariant,adminUpdateProduct:()=>of({id})});
+    page.openEditProduct({id,name:'Draft Product',slug:'draft',price:200000,status:'DRAFT',categoryId:id,images:[]} as any);
+    page.variantEdits[id].price=160000;page.saveProduct();
+    expect(adminUpdateVariant.mock.calls[0][2]).toMatchObject({sku:'SKU',size:'L',color:'Blue',price:160000,status:'INACTIVE'});
   });
 
   it('restores submitted review IDs after reloading order details', () => {
@@ -219,7 +219,7 @@ describe('Audit: backend data integrity and boundaries', () => {
       const model = { find: () => query, countDocuments: () => q(4) };
       let result: any;
       if (endpoint === 'ai/jobs') result = await new AiService(model as any, ...Array(8).fill({}) as any).listJobs(id, 1, 1);
-      if (endpoint === 'admin/inventory/ledger') result = await new InventoryService(connection, {} as any, {} as any, model as any, {} as any, {} as any).listLedger(undefined, 1, 1);
+      if (endpoint === 'admin/inventory/ledger') result = await new InventoryService(connection, {} as any, {} as any, model as any, {} as any, {} as any, { displayNames: async () => new Map() } as any).listLedger(undefined, 1, 1);
       if (endpoint === 'reviews') result = await new ReviewsService(model as any, {} as any, {} as any, {} as any).listPublic(id, 1, 1);
       if (endpoint === 'admin/orders') {
         const service = new (OrderService as any)(connection, model, ...Array(14).fill({}));

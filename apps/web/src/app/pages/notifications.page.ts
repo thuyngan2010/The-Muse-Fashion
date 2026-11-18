@@ -1,5 +1,5 @@
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
-import { RouterLink } from '@angular/router';
+import { Router } from '@angular/router';
 import type { NotificationItem } from '@fashion/contracts';
 import { AccountSidebarComponent } from '../components/account-sidebar.component';
 import { PaginationState } from '../components/pagination.component';
@@ -8,7 +8,7 @@ import { ToastService } from '../services/toast.service';
 import { STORE_NOTIFICATIONS_CONTENT } from '../shared/store-content';
 import { PageStateComponent } from '../components/page-state.component';
 
-type NotificationKind = 'order' | 'payment' | 'refund' | 'ai' | 'community' | 'lookbook' | 'general';
+type NotificationKind = 'order' | 'payment' | 'refund' | 'ai' | 'community' | 'lookbook' | 'support' | 'general';
 
 const KIND_LABEL: Record<NotificationKind, string> = {
   order: 'ĐƠN HÀNG',
@@ -17,12 +17,13 @@ const KIND_LABEL: Record<NotificationKind, string> = {
   ai: 'AI STUDIO',
   community: 'CỘNG ĐỒNG',
   lookbook: 'LOOKBOOK',
+  support: 'HỖ TRỢ',
   general: 'THÔNG BÁO',
 };
 
 @Component({
   standalone: true,
-  imports: [PageStateComponent, RouterLink, AccountSidebarComponent],
+  imports: [PageStateComponent, AccountSidebarComponent],
   template: `
     <main class="account-shell">
       <fc-account-sidebar activeItem="notifications" />
@@ -61,7 +62,7 @@ const KIND_LABEL: Record<NotificationKind, string> = {
         } @else {
           <div class="feed" role="list">
             @for (n of visibleNotifications(); track n.id) {
-              <article class="item" role="listitem" tabindex="0" [class.unread]="!n.readAt" (click)="markRead(n)" (keydown.enter)="markRead(n)">
+              <article class="item" role="listitem" tabindex="0" [class.unread]="!n.readAt" (click)="open(n)" (keydown.enter)="open(n)">
                 <span class="icon-box" aria-hidden="true">
                   @switch (kindOf(n.type)) {
                     @case ('order') { <svg viewBox="0 0 24 24" fill="none"><path d="M3 8h18v12H3zM3 8l2-4h14l2 4M12 8v12M9 13h6"/></svg> }
@@ -70,6 +71,7 @@ const KIND_LABEL: Record<NotificationKind, string> = {
                     @case ('ai') { <svg viewBox="0 0 24 24" fill="none"><path d="m12 3 1.600 5.400L19 10l-5.400 1.600L12 17l-1.600-5.400L5 10l5.400-1.600L12 3ZM19 16l.7 2.300L22 19l-2.300.7L19 22l-.7-2.300L16 19l2.300-.7L19 16Z"/></svg> }
                     @case ('community') { <svg viewBox="0 0 24 24" fill="none"><path d="M4 5h16v11H9l-5 4V5Z"/></svg> }
                     @case ('lookbook') { <svg viewBox="0 0 24 24" fill="none"><path d="M3 5h8v14H3zM11 5h6l3 1-2 13-7-1"/></svg> }
+                    @case ('support') { <svg viewBox="0 0 24 24" fill="none"><path d="M4 5h16v11H9l-5 4V5Z"/><path d="M8.500 9.500h7M8.500 12.500h4"/></svg> }
                     @default { <svg viewBox="0 0 24 24" fill="none"><path d="M6 17h12l-1.500-2.500V9a4.500 4.500 0 0 0-9 0v5.500L6 17Z"/><path d="M10 20h4"/></svg> }
                   }
                 </span>
@@ -156,6 +158,7 @@ export class NotificationsPage implements OnInit {
 
   private readonly api = inject(ApiService);
   private readonly toast = inject(ToastService);
+  private readonly router = inject(Router);
   readonly content = STORE_NOTIFICATIONS_CONTENT;
 
   readonly notifications = signal<NotificationItem[]>([]);
@@ -204,6 +207,15 @@ export class NotificationsPage implements OnInit {
     });
   }
 
+  /** Đánh dấu đã đọc; thông báo hỗ trợ còn mở thẳng phiếu liên quan. */
+  open(n: NotificationItem): void {
+    this.markRead(n);
+    const ticketId = n.reference?.['ticketId'];
+    if (this.kindOf(n.type) === 'support' && typeof ticketId === 'string' && ticketId) {
+      void this.router.navigate(['/support'], { queryParams: { ticketId } });
+    }
+  }
+
   markRead(n: NotificationItem): void {
     if (n.readAt) return;
     this.api.markNotificationRead(n.id).subscribe({
@@ -239,6 +251,7 @@ export class NotificationsPage implements OnInit {
     if (t.startsWith('ai')) return 'ai';
     if (t.startsWith('post') || t.startsWith('comment') || t.startsWith('community')) return 'community';
     if (t.startsWith('lookbook')) return 'lookbook';
+    if (t.startsWith('support')) return 'support';
     return 'general';
   }
 

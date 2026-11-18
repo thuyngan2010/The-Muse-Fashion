@@ -1,4 +1,15 @@
 @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&family=Playfair+Display:wght@400;500;600;700&display=swap');
+
+/* Georgia không có glyph tiếng Việt chồng dấu (ầ, ễ, ...), dấu bị tách rời. Giữ nguyên Georgia cho
+   mọi ký tự khác; chỉ các ký tự Việt chồng dấu lấy từ font tương thích. */
+@font-face { font-family: Georgia; font-style: normal; font-weight: 400; src: local("Georgia"); unicode-range: U+0000-019F,U+01B1-1E9F,U+1EFA-10FFFF; }
+@font-face { font-family: Georgia; font-style: normal; font-weight: 400; src: local("Times New Roman"), local("Liberation Serif"), local("Noto Serif"); unicode-range: U+01A0-01B0,U+1EA0-1EF9; }
+@font-face { font-family: Georgia; font-style: normal; font-weight: 700; src: local("Georgia Bold"); unicode-range: U+0000-019F,U+01B1-1E9F,U+1EFA-10FFFF; }
+@font-face { font-family: Georgia; font-style: normal; font-weight: 700; src: local("Times New Roman Bold"), local("Liberation Serif"), local("Noto Serif"); unicode-range: U+01A0-01B0,U+1EA0-1EF9; }
+@font-face { font-family: Georgia; font-style: italic; font-weight: 400; src: local("Georgia Italic"); unicode-range: U+0000-019F,U+01B1-1E9F,U+1EFA-10FFFF; }
+@font-face { font-family: Georgia; font-style: italic; font-weight: 400; src: local("Times New Roman Italic"), local("Liberation Serif"), local("Noto Serif"); unicode-range: U+01A0-01B0,U+1EA0-1EF9; }
+@font-face { font-family: Georgia; font-style: italic; font-weight: 700; src: local("Georgia Bold Italic"); unicode-range: U+0000-019F,U+01B1-1E9F,U+1EFA-10FFFF; }
+@font-face { font-family: Georgia; font-style: italic; font-weight: 700; src: local("Times New Roman Bold Italic"), local("Liberation Serif"), local("Noto Serif"); unicode-range: U+01A0-01B0,U+1EA0-1EF9; }
 :root {
   --color-text: #24211e;
   --color-muted: #6e665e;

@@ -22,6 +22,12 @@ if (!allowed) {
   throw new Error('PUBLIC_API_BASE_URL must be an absolute HTTP(S) URL or a root-relative path, without credentials, query, or fragment');
 }
 
+// Google OAuth Client ID (tùy chọn). Để trống thì không ghi vào cấu hình và web ẩn nút Google.
+const googleClientId = process.env.PUBLIC_GOOGLE_CLIENT_ID?.trim();
+if (googleClientId && !/^[A-Za-z0-9._-]+\.apps\.googleusercontent\.com$/.test(googleClientId)) {
+  throw new Error('PUBLIC_GOOGLE_CLIENT_ID must end with .apps.googleusercontent.com');
+}
+
 const output = resolve(import.meta.dirname, '..', 'apps', 'web', 'public', 'runtime-config.js');
-writeFileSync(output, `window.__FASHION_CONFIG__ = Object.freeze(${JSON.stringify({ apiBaseUrl })});\n`, 'utf8');
+writeFileSync(output, `window.__FASHION_CONFIG__ = Object.freeze(${JSON.stringify({ apiBaseUrl, ...(googleClientId ? { googleClientId } : {}) })});\n`, 'utf8');
 console.log(`Wrote web runtime config for ${apiBaseUrl}`);

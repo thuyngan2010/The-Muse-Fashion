@@ -29,6 +29,8 @@ export class AiJob {
   @Prop({ type: Date }) leaseUntil?: Date;
   @Prop({ type: String }) leaseId?: string;
   @Prop({ type: String }) errorMessage?: string;
+  /** Lần đầu worker nhận tác vụ; dùng để tính thời gian xử lý. */
+  @Prop({ type: Date }) startedAt?: Date;
   @Prop({ type: Date }) terminalAt?: Date;
   @Prop({ type: Date, index: true }) expiresAt?: Date;
   @Prop({ type: Boolean, default: false }) inputCleanupDone!: boolean;

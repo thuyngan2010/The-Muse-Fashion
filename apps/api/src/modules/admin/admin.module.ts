@@ -4,7 +4,7 @@ import { Order, OrderSchema } from '../commerce/commerce.schemas.js';
 import { PaymentAttempt, PaymentAttemptSchema, Refund, RefundSchema } from '../payments/payment.schemas.js';
 import { OperationsModule } from '../operations/operations.module.js';
 import { User, UserSchema } from '../users/user.schema.js';
-import { EmailToken, EmailTokenSchema, StaffPermission, StaffPermissionSchema } from '../users/identity.schemas.js';
+import { Address, AddressSchema, EmailToken, EmailTokenSchema, StaffPermission, StaffPermissionSchema } from '../users/identity.schemas.js';
 import { MailModule } from '../mail/mail.module.js';
 import { AdminConfigService } from './admin-config.service.js';
 import { AdminController } from './admin.controller.js';
@@ -24,6 +24,7 @@ import { SalesReportService } from './sales-report.service.js';
       { name: PaymentAttempt.name, schema: PaymentAttemptSchema },
       { name: Refund.name, schema: RefundSchema },
       { name: Order.name, schema: OrderSchema },
+      { name: Address.name, schema: AddressSchema },
     ]),
   ],
   providers: [AdminService, AdminConfigService, SalesReportService],

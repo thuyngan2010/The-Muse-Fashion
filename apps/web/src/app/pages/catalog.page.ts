@@ -174,7 +174,7 @@ type CatalogProduct = ProductSummary & { compareAtPrice?: number; originalPrice?
     :host { display: block; }
     .catalog-container { max-width: 1184px; margin: 0 auto; padding: 56px 24px 72px; }
     .catalog-header { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; padding-bottom: 12px; border-bottom: 1px solid #c4c7c7; }
-    .page-title { margin: 0; font: 400 40px/48px 'Playfair Display', Georgia, serif; letter-spacing: -1px; color: #000; }
+    .page-title { margin: 0; font: 400 40px/48px var(--font-serif); letter-spacing: -1px; color: #000; }
     .page-desc { margin: 4px 0 0; color: #444748; font-size: 14px; line-height: 22px; }
     .total-count { color: #444748; font-size: 12px; letter-spacing: .6px; white-space: nowrap; }
     .category-row { display: flex; flex-wrap: wrap; align-items: center; gap: 0 34px; margin-top: 32px; padding-bottom: 0; border-bottom: 1px solid #e9e8e7; }

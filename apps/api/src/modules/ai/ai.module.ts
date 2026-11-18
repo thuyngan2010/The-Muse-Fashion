@@ -6,6 +6,9 @@ import { MediaObject, MediaObjectSchema } from '../storage/media-object.schema.j
 import { StorageModule } from '../storage/storage.module.js';
 import { AiCleanupWorker } from './ai-cleanup.worker.js';
 import { AiController } from './ai.controller.js';
+import { AdminAiController } from './ai-admin.controller.js';
+import { AiAdminService } from './ai-admin.service.js';
+import { User, UserSchema } from '../users/user.schema.js';
 import { AiProviderService } from './ai-provider.service.js';
 import { AiQuotaService } from './ai-quota.service.js';
 import { AiWorkerService } from './ai-worker.service.js';
@@ -22,13 +25,14 @@ import { OutboxEvent, OutboxEventSchema } from '../operations/outbox-event.schem
       { name: AiQuota.name, schema: AiQuotaSchema },
       { name: AiConsent.name, schema: AiConsentSchema },
       { name: Product.name, schema: ProductSchema },
+      { name: User.name, schema: UserSchema },
       { name: MediaObject.name, schema: MediaObjectSchema },
       { name: SystemSetting.name, schema: SystemSettingSchema },
       { name: OutboxEvent.name, schema: OutboxEventSchema },
     ]),
   ],
-  controllers: [AiController],
-  providers: [AiService, AiQuotaService, AiProviderService, AiFashionPlannerService, AiWorkerService, AiCleanupWorker],
+  controllers: [AiController, AdminAiController],
+  providers: [AiAdminService, AiService, AiQuotaService, AiProviderService, AiFashionPlannerService, AiWorkerService, AiCleanupWorker],
   exports: [MongooseModule, AiService],
 })
 export class AiModule {}

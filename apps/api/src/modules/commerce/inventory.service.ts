@@ -9,6 +9,7 @@ import type { InventoryAdjustDto } from './commerce.dto.js';
 import { withCommerceTransaction } from '../../common/mongo-transaction.util.js';
 import { assertSameRequest, requestHash, requireIdempotencyKey } from '../../common/idempotency.util.js';
 import { AuditService } from '../operations/audit.service.js';
+import { UsersService } from '../users/users.service.js';
 
 @Injectable()
 export class InventoryService {
@@ -19,6 +20,7 @@ export class InventoryService {
     @InjectModel(InventoryLedger.name) private readonly ledger: Model<InventoryLedger>,
     private readonly pricing: PricingService,
     private readonly audit: AuditService,
+    private readonly users: UsersService,
   ) {}
 
   async list() {
@@ -53,10 +55,11 @@ export class InventoryService {
       this.ledger.find(filter).sort({ createdAt: -1 }).skip((safePage - 1) * safeLimit).limit(safeLimit).lean().exec(),
       this.ledger.countDocuments(filter).exec(),
     ]);
+    const names = await this.users.displayNames(rows.map((row) => String(row.actorId)));
     return { page: safePage, limit: safeLimit, total, items: rows.map((row) => ({
       id: String(row._id), variantId: row.variantId ? String(row.variantId) : null,
       orderId: row.orderId ? String(row.orderId) : null, type: row.type, quantity: row.quantity,
-      eventKey: row.eventKey, actorId: String(row.actorId), reason: row.reason,
+      eventKey: row.eventKey, actorId: String(row.actorId), actorName: names.get(String(row.actorId)) ?? null, reason: row.reason,
     })) };
   }
 

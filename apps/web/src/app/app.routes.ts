@@ -19,12 +19,15 @@ import { ProfilePage } from './pages/profile.page';
 import { AccountPage } from './pages/account.page';
 import { AddressesPage } from './pages/addresses.page';
 import { NotificationsPage } from './pages/notifications.page';
+import { SupportPage } from './pages/support.page';
 import { VerifyPage } from './pages/verify.page';
 
 import { AiTryOnPage } from './pages/ai-try-on.page';
 import { AiMixMatchPage } from './pages/ai-mix-match.page';
 import { AiHistoryPage } from './pages/ai-history.page';
 
+import { AdminLoginPage } from './pages/admin/admin-login.page';
+import { AdminDashboardPage } from './pages/admin/admin-dashboard.page';
 import { AdminLayoutComponent } from './pages/admin/admin-layout.component';
 import { AdminLookbooksPage } from './pages/admin/admin-lookbooks.page';
 import { AdminReportsPage } from './pages/admin/admin-reports.page';
@@ -32,10 +35,13 @@ import { AdminOrdersPage } from './pages/admin/admin-orders.page';
 import { AdminProductsPage } from './pages/admin/admin-products.page';
 import { AdminInventoryPage } from './pages/admin/admin-inventory.page';
 import { AdminVouchersPage } from './pages/admin/admin-vouchers.page';
+import { AdminCustomersPage } from './pages/admin/admin-customers.page';
+import { AdminSupportPage } from './pages/admin/admin-support.page';
 import { AdminRefundsPage } from './pages/admin/admin-refunds.page';
 import { AdminModerationPage } from './pages/admin/admin-moderation.page';
 import { AdminUsersPage } from './pages/admin/admin-users.page';
 import { AdminSettingsPage } from './pages/admin/admin-settings.page';
+import { AdminAiPage } from './pages/admin/admin-ai.page';
 
 export const routes: Routes = [
   // Storefront & Catalog
@@ -64,6 +70,7 @@ export const routes: Routes = [
   { path: 'profile', component: ProfilePage, canActivate: [authGuard], title: 'Hồ sơ cá nhân | Fashion Commerce' },
   { path: 'addresses', component: AddressesPage, canActivate: [commerceGuard], title: 'Sổ địa chỉ | Fashion Commerce' },
   { path: 'notifications', component: NotificationsPage, canActivate: [authGuard], title: 'Hộp thư thông báo | Fashion Commerce' },
+  { path: 'support', component: SupportPage, canActivate: [commerceGuard], title: 'Hỗ trợ khách hàng | Fashion Commerce' },
   { path: 'verify-email', component: VerifyPage, title: 'Xác minh Email | Fashion Commerce' },
 
   // AI Experiences
@@ -72,12 +79,14 @@ export const routes: Routes = [
   { path: 'ai/mix-match', component: AiMixMatchPage, canActivate: [commerceGuard], title: 'Gợi ý phối đồ AI Mix & Match | Fashion Commerce' },
 
   // Operations & Admin (Staff & Admin)
+  { path: 'admin/login', component: AdminLoginPage, title: 'Đăng nhập quản trị | Fashion Admin' },
   {
     path: 'admin',
     component: AdminLayoutComponent,
     canActivate: [staffGuard],
     children: [
       { path: '', component: AdminLandingPage, pathMatch: 'full', title: 'Quản trị | Fashion Admin' },
+      { path: 'dashboard', component: AdminDashboardPage, canActivate: [adminGuard], title: 'Dashboard | Fashion Admin' },
       { path: 'reports', component: AdminReportsPage, canActivate: [adminGuard], title: 'Báo cáo doanh thu | Fashion Admin' },
       { path: 'orders', canActivate: [permissionGuard], data: { permission: 'order.read' }, component: AdminOrdersPage, title: 'Quản lý đơn hàng | Fashion Admin' },
       { path: 'products', canActivate: [permissionGuard], data: { permission: 'catalog.manage' }, component: AdminProductsPage, title: 'Quản lý sản phẩm | Fashion Admin' },
@@ -86,7 +95,11 @@ export const routes: Routes = [
       { path: 'vouchers', component: AdminVouchersPage, canActivate: [adminGuard], title: 'Mã giảm giá Voucher | Fashion Admin' },
       { path: 'refunds', canActivate: [permissionGuard], data: { permission: 'refund.propose', alternativeGlobalPermission: 'payment.read' }, component: AdminRefundsPage, title: 'Hoàn tiền & Đối soát | Fashion Admin' },
       { path: 'moderation', canActivate: [permissionGuard], data: { permission: 'content.moderate' }, component: AdminModerationPage, title: 'Kiểm duyệt nội dung | Fashion Admin' },
+      { path: 'customers', component: AdminCustomersPage, canActivate: [adminGuard], title: 'Khách hàng | Fashion Admin' },
+      { path: 'support', canActivate: [permissionGuard], data: { permission: 'order.read' }, component: AdminSupportPage, title: 'Trung tâm hỗ trợ | Fashion Admin' },
       { path: 'users', component: AdminUsersPage, canActivate: [adminGuard], title: 'Người dùng & Nhân sự | Fashion Admin' },
+      { path: 'audit', component: AdminSettingsPage, canActivate: [adminGuard], data: { view: 'audit' }, title: 'Nhật ký hoạt động | Fashion Admin' },
+      { path: 'ai', component: AdminAiPage, canActivate: [adminGuard], title: 'AI Workflow | Fashion Admin' },
       { path: 'settings', component: AdminSettingsPage, canActivate: [adminGuard], title: 'Cấu hình hệ thống | Fashion Admin' },
     ],
   },
