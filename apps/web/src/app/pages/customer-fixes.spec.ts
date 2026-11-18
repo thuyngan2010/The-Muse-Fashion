@@ -17,3 +17,10 @@ describe('Home page links', () => {
     expect(home).toContain('<a routerLink="/community" class="btn-outline">{{ content.craft.secondary }}</a>');
   });
 });
+
+describe('Home new arrivals', () => {
+  it('"XEM TẤT CẢ" of BỘ SƯU TẬP MỚI goes to the collections page', () => {
+    const home = source('./home.page.ts');
+    expect(home).toContain('<a class="btn-outline" routerLink="/lookbooks">{{ content.newArrivals.viewAll }}');
+  });
+});

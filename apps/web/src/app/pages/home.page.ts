@@ -78,7 +78,7 @@ type CategoryTile = { category: Category; image: string; count: number | null };
           }
         </div>
         <div class="more">
-          <a class="btn-outline" routerLink="/products" [queryParams]="{ sort: 'newest' }">{{ content.newArrivals.viewAll }} <span aria-hidden="true">→</span></a>
+          <a class="btn-outline" routerLink="/lookbooks">{{ content.newArrivals.viewAll }} <span aria-hidden="true">→</span></a>
         </div>
       }
     </section>
