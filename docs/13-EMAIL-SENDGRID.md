@@ -40,7 +40,47 @@ Mẫu `.env`: `apps/api/.env.example`. API chỉ xác nhận email đã được
 - Link dùng `PUBLIC_WEB_URL` allowlist, token ngắn hạn, không đưa token ra logs.
 - Không gửi thông tin thẻ, password, R2 private signed URLs dài hạn trong email.
 
-## 5. Thực trạng code
+## 5. Mẫu email
+
+Mỗi email gửi cả HTML và bản chữ thuần (`text`). Mã nguồn nằm ở `apps/api/src/modules/mail/templates/`: `layout.ts` (khung chung), `components.ts` (nút, bảng thông tin, khung nhắc nhở), `escape.ts` (escape HTML, định dạng tiền `1.250.000đ`, ngày giờ `dd/MM/yyyy HH:mm` giờ Việt Nam), `account-templates.ts` (các mẫu tài khoản) và `index.ts` (`buildEmailMessage`).
+
+| Mẫu | Tiêu đề thư | Nút → đường dẫn |
+|---|---|---|
+| `user.verify_email` | Xác thực email để kích hoạt tài khoản MUSE | XÁC THỰC EMAIL → `/verify-email?token=` |
+| `user.reset_password` | Đặt lại mật khẩu tài khoản MUSE | ĐẶT MẬT KHẨU MỚI → `/reset-password?token=` |
+| `staff.invite` | Lời mời tham gia hệ thống quản trị MUSE | ĐẶT MẬT KHẨU & KÍCH HOẠT → `/reset-password?token=`; nhắc đăng nhập tại `/admin/login` |
+| `user.password_changed` | Mật khẩu tài khoản MUSE vừa được thay đổi | ĐẶT LẠI MẬT KHẨU → `/forgot-password`; LIÊN HỆ HỖ TRỢ → `mailto:` (chỉ khi có `MAIL_SUPPORT_EMAIL`) |
+| mẫu khác / mặc định | Thông báo từ MUSE | MỞ MUSE → trang chủ |
+
+Email đơn hàng và thanh toán (`templates/order-templates.ts`):
+
+| Mẫu | Tiêu đề thư | Nội dung chính / nút |
+|---|---|---|
+| `order.created` | MUSE đã nhận đơn hàng #<mã> | bảng mã đơn/ngày đặt/trạng thái, danh sách sản phẩm, tạm tính, phí ship ("Miễn phí" khi 0), voucher, TỔNG THANH TOÁN, địa chỉ giao. Đơn chờ thanh toán: khung nhắc VietQR, nút THANH TOÁN NGAY → `/payment/<id>` và XEM ĐƠN HÀNG → `/orders/<id>`; trạng thái khác chỉ có XEM ĐƠN HÀNG |
+| `order.status_changed` | theo trạng thái mới: "Đơn #<mã> đã được xác nhận", "MUSE đang chuẩn bị đơn #<mã>", "Đơn #<mã> đang trên đường giao đến bạn", "Đơn #<mã> đã giao thành công", "Đơn #<mã> đã được hủy", "Đơn #<mã> đang chờ hoàn tiền" | thanh tiến trình 5 bước (hủy/chờ hoàn tiền dùng khung thông báo kèm lý do), đơn vị vận chuyển và mã vận đơn khi đang giao, nút ĐÁNH GIÁ SẢN PHẨM → `/orders/<id>?action=review` khi đã giao |
+| `payment.succeeded` | Thanh toán thành công cho đơn #<mã> | dấu tích xanh, số tiền, "Chuyển khoản VietQR", thời gian, mã đơn |
+| `refund.succeeded` | MUSE đã hoàn tiền cho đơn #<mã> | số tiền hoàn, mã tham chiếu ngân hàng, thời gian, ghi chú 1–3 ngày làm việc |
+
+Dữ liệu: payload của event chỉ có mã, số tiền, trạng thái. Khi gửi, `EmailDispatchService` **đọc thêm** (không ghi) đơn `orders`, `shipments`, `product_variants` (màu/size) và `order_events` (lý do hủy) theo `orderId`. Không tìm thấy đơn hoặc đọc lỗi thì email vẫn gửi bằng dữ liệu trong payload (phần thiếu bị ẩn; thiếu mã đơn thì dùng 8 ký tự cuối của `orderId`). Ảnh sản phẩm 64px chỉ hiện khi có URL `https://` công khai. Nhãn trạng thái tiếng Việt nằm ở `templates/escape.ts` (khớp `apps/web/src/app/shared/labels.ts`); trạng thái lạ hiện "Đang cập nhật", không lộ mã tiếng Anh.
+
+Quy tắc:
+
+- Khung bằng `<table role="presentation">` rộng tối đa 600px, CSS inline; `<style>` trong `<head>` chỉ có media query mobile (dưới 600px) và dark mode. Không flex, grid, position, JavaScript, ảnh nền. Có `meta color-scheme = light only` và preheader ẩn.
+- Mọi dữ liệu động đi qua `escapeHtml`; link chỉ tạo từ `PUBLIC_WEB_URL` và `encodeURIComponent(token)`. Token và link có token không bao giờ được ghi log.
+- Thiếu dữ liệu trong payload (tên, thời điểm...) thì phần đó bị ẩn, email vẫn gửi được.
+- Logo ảnh `PUBLIC_WEB_URL/assets/brand/muse-logo-black.png` chỉ dùng khi `PUBLIC_WEB_URL` bắt đầu bằng `https://`; ngược lại hiện chữ MUSE.
+- Chân thư lấy liên hệ từ `MAIL_SUPPORT_EMAIL`, `MAIL_SUPPORT_PHONE`, `MAIL_ADDRESS` (đều tùy chọn; để trống thì bỏ dòng tương ứng).
+- Lời mời nhân viên dùng mẫu `staff.invite` nhưng vẫn xử lý token như `user.reset_password`. Email `user.reset_password` cũ còn chờ gửi vẫn gửi bình thường.
+
+Xem trước (không gửi email, không cần MongoDB):
+
+```bash
+npm run email:preview --workspace @fashion/api
+```
+
+Lệnh ghi HTML và TXT của mọi mẫu (dữ liệu giả, có tên dài và ký tự `< > &`) vào `apps/api/.email-preview/` và tạo `index.html` hiển thị từng mẫu ở độ rộng desktop và mobile. Thư mục này nằm trong `.gitignore`. Đặt `PUBLIC_WEB_URL=https://...` trong `.env` để xem cả ảnh logo.
+
+## 6. Thực trạng code
 
 `EmailDispatchService` xử lý các template xác minh, reset, đổi mật khẩu, đơn hàng, thanh toán và hoàn tiền qua outbox. Nếu cấu hình từng thiếu trong phiên bản cũ, worker tự đưa các event không chứa token có `lastError = "SendGrid is not configured"` từ `PERMANENT_FAILURE` về `PENDING` khi cấu hình được khôi phục và event còn hạn. Event xác minh/reset cũ đã xóa `tokenCiphertext` không thể phát lại: người dùng cần gọi resend verification hoặc forgot password để nhận token mới. Không requeue mù các lỗi 4xx khác; xác minh nguyên nhân với SendGrid trước.
 

@@ -77,4 +77,4 @@ local-emails/
 apps/api/ai-e2e-*.json
 apps/api/ai-e2e-*-out.png
 apps/api/ai-probe-body.json
-
+apps/api/.email-preview/
