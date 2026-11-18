@@ -1,3 +1,4 @@
+import '../common/mongo-dns.js';
 import mongoose from 'mongoose';
 import { Product, ProductSchema } from '../modules/catalog/product.schema.js';
 import { Category, CategorySchema, ProductVariant, ProductVariantSchema } from '../modules/catalog/catalog.schemas.js';
