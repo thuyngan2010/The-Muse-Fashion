@@ -254,7 +254,7 @@ export class AdminService {
     ).exec();
     const [setup] = await this.emailTokens.create([{ userId, purpose: 'RESET_PASSWORD',
       tokenHash: createHash('sha256').update(token).digest('hex'), expiresAt: new Date(Date.now() + INVITATION_TTL_MS) }], { session });
-    await this.email.enqueue('user.reset_password', email, `staff.invite:${userId}:${String(setup._id)}`, { token }, session);
+    await this.email.enqueue('staff.invite', email, `staff.invite:${userId}:${String(setup._id)}`, { token }, session);
   }
 
   private async ensureActiveAdminsLock(): Promise<void> {

@@ -1,11 +1,16 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model, type ClientSession } from 'mongoose';
+import { Model, Types, type ClientSession } from 'mongoose';
 import { randomUUID } from 'node:crypto';
 import sgMail from '@sendgrid/mail';
 import { AppConfig } from '../../common/app-config.js';
 import { EmailEvent } from './email-event.schema.js';
 import { decryptEmailToken, encryptEmailToken } from './email-token-crypto.util.js';
+import { Order, OrderEvent, Shipment } from '../commerce/commerce.schemas.js';
+import { ProductVariant } from '../catalog/catalog.schemas.js';
+import {
+  buildEmailMessage, createMailContext, mapOrderDocument, ORDER_DATA_TEMPLATES, TOKEN_TEMPLATES, type OrderEmailData,
+} from './templates/index.js';
 
 const RETRY_DELAYS_MS = [60_000, 5 * 60_000, 30 * 60_000, 2 * 60 * 60_000];
 const MAX_ATTEMPTS = 5;
@@ -16,7 +21,14 @@ const REQUEUEABLE_TEMPLATES = ['user.password_changed', 'order.created', 'order.
 export class EmailDispatchService {
   private readonly logger = new Logger(EmailDispatchService.name);
 
-  constructor(@InjectModel(EmailEvent.name) private readonly events: Model<EmailEvent>) {}
+  constructor(
+    @InjectModel(EmailEvent.name) private readonly events: Model<EmailEvent>,
+    // Chỉ để ĐỌC dữ liệu đơn khi dựng nội dung email; thiếu thì email dùng dữ liệu trong payload.
+    @Optional() @InjectModel(Order.name) private readonly orders?: Model<Order>,
+    @Optional() @InjectModel(Shipment.name) private readonly shipments?: Model<Shipment>,
+    @Optional() @InjectModel(OrderEvent.name) private readonly orderEvents?: Model<OrderEvent>,
+    @Optional() @InjectModel(ProductVariant.name) private readonly variants?: Model<ProductVariant>,
+  ) {}
 
   async enqueue(
     template: string,
@@ -101,13 +113,14 @@ export class EmailDispatchService {
     }
 
     try {
-      const { subject, text } = this.buildMessage(claimed.template, claimed.payload ?? {});
+      const { subject, text, html } = await this.buildMessage(claimed.template, claimed.payload ?? {}, claimed.to);
       sgMail.setApiKey(key);
       const [response] = await sgMail.send({
         to: claimed.to,
         from: { email: from, name: process.env.SENDGRID_FROM_NAME || 'Fashion Commerce' },
         subject,
         text,
+        html,
         trackingSettings: {
           clickTracking: { enable: false },
           openTracking: { enable: false },
@@ -143,60 +156,39 @@ export class EmailDispatchService {
     }).exec();
   }
 
-  private buildMessage(template: string, payload: Record<string, unknown>): { subject: string; text: string } {
-    const baseUrl = AppConfig.require('PUBLIC_WEB_URL').replace(/\/$/, '');
-    if (template === 'user.verify_email') {
-      const token = this.tokenFromPayload(payload);
-      const url = `${baseUrl}/verify-email?token=${encodeURIComponent(token)}`;
-      return {
-        subject: 'Xác minh email tài khoản',
-        text: `Vui lòng truy cập đường dẫn để xác minh email: ${url}\nĐường dẫn chỉ sử dụng một lần và có thời hạn.`,
-      };
+  private async buildMessage(template: string, payload: Record<string, unknown>, to?: string): Promise<{ subject: string; text: string; html: string }> {
+    const ctx = createMailContext(AppConfig.require('PUBLIC_WEB_URL'), (name) => AppConfig.optional(name));
+    const input = TOKEN_TEMPLATES.has(template) ? { ...payload, token: this.tokenFromPayload(payload) } : payload;
+    const order = ORDER_DATA_TEMPLATES.has(template) ? await this.loadOrderData(payload) : undefined;
+    return buildEmailMessage(template, input, ctx, to, order);
+  }
+
+  /** Đọc (không ghi) đơn hàng để làm giàu email. Lỗi hoặc không tìm thấy thì trả undefined. */
+  private async loadOrderData(payload: Record<string, unknown>): Promise<OrderEmailData | undefined> {
+    const orderId = payload.orderId ? String(payload.orderId) : '';
+    if (!this.orders || !Types.ObjectId.isValid(orderId)) return undefined;
+    try {
+      const order = await this.orders.findById(orderId).lean().exec() as unknown as Record<string, unknown> | null;
+      if (!order) return undefined;
+      const variantIds = (Array.isArray(order.items) ? order.items as Array<Record<string, unknown>> : [])
+        .map((item) => String(item.variantId ?? '')).filter((id) => Types.ObjectId.isValid(id));
+      const to = payload.to ? String(payload.to) : '';
+      const [variantRows, shipment, event] = await Promise.all([
+        this.variants && variantIds.length
+          ? this.variants.find({ _id: { $in: variantIds } }).select('color size').lean().exec() : Promise.resolve([]),
+        this.shipments ? this.shipments.findOne({ orderId }).select('carrier trackingCode').lean().exec() : Promise.resolve(null),
+        this.orderEvents && to ? this.orderEvents.findOne({ orderId, to }).sort({ createdAt: -1 }).select('reason').lean().exec() : Promise.resolve(null),
+      ]);
+      const variants = new Map((variantRows as Array<{ _id: unknown; color?: string; size?: string }>)
+        .map((row) => [String(row._id), { color: row.color, size: row.size }]));
+      return mapOrderDocument(order, {
+        variants,
+        shipment: shipment as { carrier?: string; trackingCode?: string } | null,
+        reason: (event as { reason?: string } | null)?.reason,
+      });
+    } catch {
+      return undefined;
     }
-    if (template === 'user.reset_password') {
-      const token = this.tokenFromPayload(payload);
-      const url = `${baseUrl}/reset-password?token=${encodeURIComponent(token)}`;
-      return {
-        subject: 'Khôi phục mật khẩu',
-        text: `Bạn đã yêu cầu đặt lại mật khẩu. Truy cập: ${url}\nNếu không phải bạn, hãy bỏ qua email này.`,
-      };
-    }
-    if (template === 'user.password_changed') {
-      return {
-        subject: 'Mật khẩu đã được thay đổi',
-        text: 'Mật khẩu tài khoản của bạn vừa được thay đổi. Nếu không phải bạn, hãy liên hệ hỗ trợ ngay.',
-      };
-    }
-    if (template === 'order.created') {
-      const code = String(payload.code ?? payload.orderId ?? '');
-      const total = Number(payload.payableTotal ?? 0).toLocaleString('vi-VN');
-      return {
-        subject: `Xác nhận đơn hàng ${code}`,
-        text: `Đơn ${code} đã được tạo với tổng thanh toán ${total} VND.\nXem đơn: ${baseUrl}/account/orders/${String(payload.orderId ?? '')}`,
-      };
-    }
-    if (template === 'order.status_changed') {
-      const code = String(payload.code ?? payload.orderId ?? '');
-      return {
-        subject: `Cập nhật đơn ${code}`,
-        text: `Đơn ${code} chuyển từ ${String(payload.from ?? '-')} sang ${String(payload.to ?? '-')}.\nXem chi tiết: ${baseUrl}/account/orders/${String(payload.orderId ?? '')}`,
-      };
-    }
-    if (template === 'payment.succeeded') {
-      const amount = Number(payload.amount ?? 0).toLocaleString('vi-VN');
-      return {
-        subject: 'Thanh toán đơn hàng thành công',
-        text: `Thanh toán ${amount} VND đã được ghi nhận cho đơn ${String(payload.orderId ?? '')}.`,
-      };
-    }
-    if (template === 'refund.succeeded') {
-      const amount = Number(payload.amount ?? 0).toLocaleString('vi-VN');
-      return {
-        subject: 'Hoàn tiền đã được ghi nhận',
-        text: `Khoản hoàn ${amount} VND đã được xử lý. Mã tham chiếu ngân hàng: ${String(payload.bankReference ?? 'N/A')}.`,
-      };
-    }
-    return { subject: 'Thông báo', text: 'Bạn có thông báo mới từ Fashion Commerce.' };
   }
 
   private tokenFromPayload(payload: Record<string, unknown>): string {

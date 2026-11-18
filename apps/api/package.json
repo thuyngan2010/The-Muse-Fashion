@@ -9,6 +9,7 @@
     "start": "node dist/main.js",
     "build": "tsc -p tsconfig.build.json",
     "ai:mock": "node --import=tsx src/scripts/ai-mock-provider.ts",
+    "email:preview": "node --env-file-if-exists=.env --import=tsx src/scripts/email-preview.ts",
     "test": "vitest run",
     "test:integration": "vitest run --config vitest.integration.config.ts",
     "seed": "node --env-file=.env --import=tsx src/scripts/seed.ts",
