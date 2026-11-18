@@ -1,302 +1,223 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
-import { CurrencyPipe, DatePipe } from '@angular/common';
+import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import type { Voucher } from '@fashion/contracts';
 import { ApiService } from '../../services/api.service';
 import { ToastService } from '../../services/toast.service';
 import { ModalComponent } from '../../components/modal.component';
+import { AdminDrawerComponent } from '../../components/admin-drawer.component';
+import { AdminPromoTabsComponent } from '../../components/admin-promo-tabs.component';
+import { voucherStatusLabel, voucherTypeLabel } from '../../shared/labels';
+
+function csvCell(value: string | number): string {
+  let text = String(value ?? '');
+  if (/^[=+\-@\t\r]/.test(text)) text = `'${text}`;
+  return `"${text.replace(/"/g, '""')}"`;
+}
 
 @Component({
   standalone: true,
-  imports: [CurrencyPipe, DatePipe, FormsModule, ModalComponent],
+  imports: [FormsModule, ModalComponent, AdminDrawerComponent, AdminPromoTabsComponent],
   template: `
-    <div class="admin-vouchers-container">
-      <header class="page-header">
+    <div class="av">
+      <fc-admin-promo-tabs active="vouchers" />
+
+      <header class="head">
         <div>
-          <h1 class="page-title">Mã giảm giá & Vouchers</h1>
-          <p class="page-desc">Thiết lập các chương trình khuyến mãi, ưu đãi tỷ lệ phần trăm hoặc giảm tiền cố định.</p>
+          <h1 class="title">Khuyến mãi và Đánh giá</h1>
+          <p class="sub">Quản trị mã giảm giá và kiểm duyệt nội dung khách hàng đăng tải.</p>
         </div>
-        <button type="button" class="btn-primary" (click)="openCreateModal()">+ Tạo mã Voucher mới</button>
+        <div class="head-actions">
+          <button type="button" class="btn-outline" [disabled]="visible().length === 0" (click)="exportCsv()">Xuất dữ liệu</button>
+          <button type="button" class="btn-primary" (click)="openCreateModal()">+ Tạo mã voucher mới</button>
+        </div>
       </header>
 
-      @if (loading()) {
-        <div class="loading-box">
-          <div class="spinner"></div>
-          <p>Đang tải danh sách voucher...</p>
+      <section class="kpis" aria-label="Chỉ số voucher">
+        <div class="kpi">
+          <span class="kpi-label">Voucher đang chạy</span>
+          <span class="kpi-value">{{ loaded() ? runningCount() : '—' }}</span>
+          <span class="kpi-note">Mã đang bật và còn hạn</span>
         </div>
-      } @else if (vouchers().length === 0) {
-        <div class="empty-state">
-          <p>Chưa có mã ưu đãi nào được tạo.</p>
+        <div class="kpi">
+          <span class="kpi-label">Voucher ngưng dùng</span>
+          <span class="kpi-value">{{ loaded() ? stoppedCount() : '—' }}</span>
+          <span class="kpi-note">Mã đã vô hiệu hóa hoặc hết hạn</span>
         </div>
-      } @else {
-        <div class="table-card">
-          <div class="table-header">
-            <span>Mã Voucher</span>
-            <span>Loại</span>
-            <span>Giá trị giảm</span>
-            <span>Đơn tối thiểu</span>
-            <span>Lượt dùng</span>
-            <span>Hạn dùng</span>
-            <span>Trạng thái</span>
-            <span>Thao tác</span>
-          </div>
+        <div class="kpi">
+          <span class="kpi-label">Tổng lượt đã dùng</span>
+          <span class="kpi-value">{{ loaded() ? totalUsed().toLocaleString('vi-VN') : '—' }}</span>
+          <span class="kpi-note">Cộng dồn trên {{ vouchers().length }} mã</span>
+        </div>
+      </section>
 
-          @for (v of vouchers(); track v.id) {
-            <div class="table-row">
-              <span class="code-badge">{{ v.code }}</span>
-              <span>{{ v.type === 'PERCENT' ? 'Phần trăm (%)' : 'Số tiền cố định' }}</span>
-              <strong class="value-cell">
-                {{ v.type === 'PERCENT' ? v.value + '%' : (v.value | currency:'VND':'symbol':'1.0-0') }}
-              </strong>
-              <span>{{ v.minimumSubtotal | currency:'VND':'symbol':'1.0-0' }}</span>
-              <span>{{ v.usedCount ?? 0 }} / {{ v.usageLimit }}</span>
-              <span class="date-cell">{{ v.validTo | date:'dd/MM/yyyy' }}</span>
-              <div>
-                <span class="status-badge" [class.active]="v.status === 'ACTIVE'">{{ v.status }}</span>
-              </div>
-              <div class="actions-cell">
-                <button type="button" class="btn-action edit" (click)="openEditModal(v)">Sửa</button>
-                <button type="button" class="btn-action del" (click)="deleteVoucher(v.id)">Xóa</button>
-              </div>
-            </div>
-          }
+      <div class="filters">
+        <label class="sr-only" for="vc-search">Tìm theo mã voucher</label>
+        <input id="vc-search" type="search" class="f-input" [ngModel]="search()" (ngModelChange)="search.set($event)" name="vcsearch" placeholder="Tìm theo mã voucher…" autocomplete="off" />
+        <label class="sr-only" for="vc-type">Lọc loại giảm</label>
+        <select id="vc-type" class="f-input" [ngModel]="typeFilter()" (ngModelChange)="typeFilter.set($event)" name="vctype">
+          <option value="">Tất cả loại giảm</option>
+          <option value="PERCENT">Phần trăm</option>
+          <option value="FIXED">Số tiền cố định</option>
+        </select>
+        @if (loaded()) { <span class="note">Hiển thị {{ visible().length }} trên {{ vouchers().length }} mã</span> }
+      </div>
+
+      @if (loading() && !loaded()) {
+        <div class="state-box" role="status"><span class="spinner"></span><p>Đang tải danh sách voucher…</p></div>
+      } @else if (error()) {
+        <div class="state-box" role="alert"><p>{{ error() }}</p><button type="button" class="btn-outline" (click)="load()">Thử lại</button></div>
+      } @else if (visible().length === 0) {
+        <div class="state-box"><p>{{ vouchers().length === 0 ? 'Chưa có mã ưu đãi nào được tạo.' : 'Không có mã nào khớp bộ lọc.' }}</p></div>
+      } @else {
+        <div class="table-wrap">
+          <table class="tbl">
+            <thead>
+              <tr>
+                <th>Mã voucher</th><th>Loại giảm</th><th>Giá trị giảm</th><th class="c-num">Đơn tối thiểu</th>
+                <th>Thời hạn áp dụng</th><th>Đã dùng / giới hạn</th><th>Trạng thái</th><th class="c-act">Thao tác</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (v of visible(); track v.id) {
+                <tr [class.dim]="isStopped(v)">
+                  <td><span class="code">{{ v.code }}</span></td>
+                  <td>{{ typeLabel(v.type) }}</td>
+                  <td>
+                    <strong>{{ v.type === 'PERCENT' ? v.value + '%' : money(v.value) }}</strong>
+                    @if (v.type === 'PERCENT' && v.maxDiscount) { <span class="sub-line">Tối đa {{ money(v.maxDiscount) }}</span> }
+                  </td>
+                  <td class="c-num nowrap">{{ money(v.minimumSubtotal) }}</td>
+                  <td class="nowrap">{{ fmtDate(v.validFrom) }} – {{ fmtDate(v.validTo) }}</td>
+                  <td>
+                    <span class="usage"><strong>{{ (v.usedCount ?? 0).toLocaleString('vi-VN') }}</strong> / {{ v.usageLimit.toLocaleString('vi-VN') }} lượt</span>
+                    <span class="bar" aria-hidden="true"><span class="bar-fill" [style.width.%]="usagePercent(v)"></span></span>
+                  </td>
+                  <td><span class="badge" [class]="'vs-' + stateOf(v)">{{ stateLabel(v) }}</span></td>
+                  <td class="c-act">
+                    <div class="acts">
+                      <button type="button" class="link-btn" (click)="openEditModal(v)">Sửa</button>
+                      <button type="button" class="link-btn" [disabled]="busyId() === v.id" (click)="toggleStatus(v)">{{ v.status === 'ACTIVE' ? 'Vô hiệu hóa' : 'Kích hoạt' }}</button>
+                      <button type="button" class="link-btn danger" (click)="deleteTarget.set(v)">Xóa</button>
+                    </div>
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
         </div>
       }
     </div>
 
-    <!-- Create / Edit Voucher Modal (POST /admin/vouchers & PATCH /admin/vouchers/:voucherId) -->
-    <fc-modal
-      [isOpen]="voucherModalOpen()"
-      [title]="editingVoucherId ? 'Chỉnh sửa mã voucher' : 'Tạo mã voucher khuyến mãi mới'"
-      (close)="voucherModalOpen.set(false)"
-    >
-      <form (ngSubmit)="saveVoucher()" class="modal-form">
-        <div class="form-row">
-          <label>
-            Mã voucher (In hoa, không dấu) *
-            <input
-              type="text"
-              [(ngModel)]="formCode"
-              [readonly]="!!editingVoucherId"
-              name="code"
-              placeholder="VD: SUMMER20"
-              required
-              style="text-transform: uppercase;"
-            />
-          </label>
-          <label>
-            Loại giảm giá *
-            <select [(ngModel)]="formType" name="type">
-              <option value="PERCENT">Giảm theo % (PERCENT)</option>
-              <option value="FIXED">Giảm số tiền cố định (FIXED VND)</option>
-            </select>
-          </label>
-        </div>
-
-        <div class="form-row">
-          <label>
-            Giá trị giảm ({{ formType === 'PERCENT' ? '%' : 'VND' }}) *
+    <!-- Tạo / sửa voucher (POST /admin/vouchers, PATCH /admin/vouchers/:voucherId) -->
+    <fc-admin-drawer [isOpen]="drawerOpen()" eyebrow="Mã giảm giá" [title]="editingVoucherId ? 'Chỉnh sửa mã voucher' : 'Tạo mã voucher mới'" width="520px" (close)="drawerOpen.set(false)">
+      <form id="voucher-form" (ngSubmit)="saveVoucher()" class="dform" autocomplete="off">
+        <label>Mã voucher (in hoa, không dấu) *
+          <input type="text" [(ngModel)]="formCode" [readonly]="!!editingVoucherId" name="code" placeholder="VD: SUMMER20" required style="text-transform: uppercase;" />
+        </label>
+        <label>Loại giảm giá *
+          <select [(ngModel)]="formType" name="type">
+            <option value="PERCENT">Giảm theo phần trăm</option>
+            <option value="FIXED">Giảm số tiền cố định (đ)</option>
+          </select>
+        </label>
+        <div class="row2">
+          <label>Giá trị giảm ({{ formType === 'PERCENT' ? '%' : 'đ' }}) *
             <input type="number" [(ngModel)]="formValue" name="value" required min="1" />
           </label>
-          <label>
-            Đơn tối thiểu (VND) *
+          <label>Đơn tối thiểu (đ) *
             <input type="number" [(ngModel)]="formMinSubtotal" name="minSubtotal" required min="0" step="10000" />
           </label>
         </div>
-
-        <div class="form-row">
-          <label>
-            Giảm tối đa (đối với %)
+        <div class="row2">
+          <label>Giảm tối đa (với loại %)
             <input type="number" [(ngModel)]="formMaxDiscount" name="maxDiscount" placeholder="Để trống nếu không giới hạn" />
           </label>
-          <label>
-            Giới hạn lượt dùng *
+          <label>Giới hạn lượt dùng *
             <input type="number" [(ngModel)]="formUsageLimit" name="usageLimit" required min="1" />
           </label>
         </div>
-
-        <div class="form-row">
-          <label>
-            Hiệu lực từ ngày *
+        <div class="row2">
+          <label>Hiệu lực từ ngày *
             <input type="date" [(ngModel)]="formValidFrom" name="validFrom" required />
           </label>
-          <label>
-            Đến hết ngày *
+          <label>Đến hết ngày *
             <input type="date" [(ngModel)]="formValidTo" name="validTo" required />
           </label>
         </div>
-
         @if (editingVoucherId) {
-          <div class="form-row">
-            <label>
-              Trạng thái voucher *
-              <select [(ngModel)]="formStatus" name="status">
-                <option value="ACTIVE">ACTIVE (Đang hoạt động)</option>
-                <option value="DISABLED">DISABLED (Tạm dừng)</option>
-              </select>
-            </label>
-          </div>
+          <label>Trạng thái voucher *
+            <select [(ngModel)]="formStatus" name="status">
+              <option value="ACTIVE">Đang chạy</option>
+              <option value="DISABLED">Ngưng</option>
+            </select>
+          </label>
         }
-
-        <div class="modal-actions">
-          <button type="button" class="btn-outline" (click)="voucherModalOpen.set(false)">Hủy</button>
-          <button type="submit" class="btn-primary" [disabled]="saving() || !formCode.trim()">
-            {{ saving() ? 'Đang lưu...' : (editingVoucherId ? 'Cập nhật voucher' : 'Tạo mã voucher') }}
-          </button>
-        </div>
       </form>
+      <div drawer-footer>
+        <button type="button" class="btn-outline" (click)="drawerOpen.set(false)">Hủy</button>
+        <button type="submit" form="voucher-form" class="btn-primary" [disabled]="saving() || !formCode.trim()">
+          {{ saving() ? 'Đang lưu…' : (editingVoucherId ? 'Cập nhật voucher' : 'Tạo mã voucher') }}
+        </button>
+      </div>
+    </fc-admin-drawer>
+
+    <fc-modal [isOpen]="!!deleteTarget()" title="Xóa mã voucher" maxWidth="440px" (close)="deleteTarget.set(null)">
+      @if (deleteTarget(); as t) {
+        <p class="confirm-text">Bạn chắc chắn muốn xóa mã <strong>{{ t.code }}</strong>? Thao tác này không thể hoàn tác.</p>
+        <div class="modal-actions">
+          <button type="button" class="btn-outline" (click)="deleteTarget.set(null)">Hủy</button>
+          <button type="button" class="btn-primary" [disabled]="saving()" (click)="confirmDelete()">{{ saving() ? 'Đang xóa…' : 'Xóa voucher' }}</button>
+        </div>
+      }
     </fc-modal>
   `,
   styles: [`
-    .admin-vouchers-container {
-      display: flex;
-      flex-direction: column;
-      gap: 24px;
-    }
-    .page-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: flex-end;
-      flex-wrap: wrap;
-      gap: 16px;
-    }
-    .page-title {
-      font-family: Georgia, serif;
-      font-size: 1.8rem;
-      margin: 0 0 6px;
-      font-weight: 500;
-    }
-    .page-desc {
-      color: var(--color-muted);
-      font-size: 0.9rem;
-      margin: 0;
-    }
-    .table-card {
-      background: var(--color-surface);
-      border: 1px solid var(--color-divider);
-      border-radius: var(--radius-card);
-      overflow: hidden;
-      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.02);
-    }
-    .table-header {
-      display: grid;
-      grid-template-columns: 1.5fr 1.3fr 1.3fr 1.4fr 1.1fr 1.2fr 1fr 110px;
-      padding: 12px 16px;
-      background: var(--color-canvas);
-      font-size: 0.8rem;
-      font-weight: 600;
-      color: var(--color-muted);
-      border-bottom: 1px solid var(--color-divider);
-      text-transform: uppercase;
-      letter-spacing: 0.04em;
-    }
-    .table-row {
-      display: grid;
-      grid-template-columns: 1.5fr 1.3fr 1.3fr 1.4fr 1.1fr 1.2fr 1fr 110px;
-      padding: 14px 16px;
-      border-bottom: 1px solid #f6f5f2;
-      align-items: center;
-      font-size: 0.88rem;
-    }
-    .code-badge {
-      font-family: monospace;
-      font-weight: 700;
-      color: var(--color-accent);
-      background: var(--color-canvas);
-      border: 1px dashed #c9ab8d;
-      padding: 4px 8px;
-      border-radius: var(--radius-control);
-      display: inline-block;
-      width: fit-content;
-    }
-    .value-cell {
-      color: #2e7d32;
-    }
-    .date-cell {
-      font-size: 0.82rem;
-      color: var(--color-muted);
-    }
-    .status-badge {
-      font-size: 0.72rem;
-      padding: 3px 8px;
-      border-radius: 10px;
-      background: #eee;
-      color: var(--color-muted);
-      font-weight: 600;
-    }
-    .status-badge.active {
-      background: #e8f5e9;
-      color: #2e7d32;
-    }
-    .actions-cell {
-      display: flex;
-      gap: 6px;
-      align-items: center;
-    }
-    .btn-action {
-      background: none;
-      border: 0;
-      font-size: 0.8rem;
-      cursor: pointer;
-      padding: 4px 6px;
-      border-radius: var(--radius-control);
-    }
-    .btn-action.edit {
-      color: #1565c0;
-    }
-    .btn-action.edit:hover {
-      text-decoration: underline;
-    }
-    .btn-action.del {
-      color: #c62828;
-    }
-    .btn-action.del:hover {
-      text-decoration: underline;
-    }
-    .modal-form {
-      display: flex;
-      flex-direction: column;
-      gap: 14px;
-    }
-    .form-row {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 14px;
-    }
-    .modal-form label {
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-      font-size: 0.85rem;
-      color: #444;
-    }
-    .modal-form input, .modal-form select {
-      border: 1px solid var(--color-border);
-      border-radius: var(--radius-control);
-      padding: 10px;
-      font-size: 0.9rem;
-    }
-    .modal-actions {
-      display: flex;
-      justify-content: flex-end;
-      gap: 10px;
-      margin-top: 10px;
-    }
-    .loading-box, .empty-state {
-      text-align: center;
-      padding: 60px 0;
-      color: var(--color-muted);
-    }
-    .spinner {
-      width: 36px;
-      height: 36px;
-      border: 3px solid var(--color-divider);
-      border-top-color: var(--color-text);
-      border-radius: 50%;
-      animation: spin 0.8s linear infinite;
-      margin: 0 auto 16px;
-    }
+    :host { display: block; }
+    .av { display: flex; flex-direction: column; gap: 16px; }
+    .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+    .head { display: flex; justify-content: space-between; align-items: flex-end; flex-wrap: wrap; gap: 16px; }
+    .title { margin: 0; font: 500 32px/40px var(--font-serif); }
+    .sub { margin: 4px 0 0; font-size: 13px; color: var(--ui-ink-soft); }
+    .head-actions { display: flex; gap: 12px; flex-wrap: wrap; }
+    .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; }
+    .kpi { background: var(--ui-bg); border: 1px solid var(--admin-line); padding: 16px 18px; display: flex; flex-direction: column; gap: 6px; }
+    .kpi-label { font: 700 11px/16px var(--font-sans); letter-spacing: .5px; text-transform: uppercase; color: var(--ui-ink-soft); }
+    .kpi-value { font: 500 26px/32px var(--font-serif); }
+    .kpi-note, .note { margin: 0; font-size: 12px; line-height: 16px; color: var(--ui-subtle); }
+    .filters { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
+    .f-input, .dform input, .dform select { box-sizing: border-box; padding: 10px 12px; border: 1px solid var(--ui-line); border-radius: 2px; background: var(--ui-bg); font: 400 14px/20px var(--font-sans); color: var(--ui-ink); }
+    .f-input { min-width: 220px; }
+    .table-wrap { overflow-x: auto; border: 1px solid var(--admin-line); background: var(--ui-bg); }
+    .tbl { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 1000px; }
+    .tbl th { text-align: left; padding: 12px 14px; background: var(--ui-bg-soft); font: 700 11px/16px var(--font-sans); letter-spacing: .4px; text-transform: uppercase; color: var(--ui-ink-soft); border-bottom: 1px solid var(--admin-line); white-space: nowrap; }
+    .tbl td { padding: 12px 14px; border-bottom: 1px solid var(--admin-line-soft); vertical-align: middle; }
+    .tbl tbody tr:last-child td { border-bottom: 0; }
+    .c-num { text-align: right; } .c-act { text-align: right; } .nowrap { white-space: nowrap; }
+    .sub-line { display: block; margin-top: 2px; font-size: 12px; color: var(--ui-subtle); }
+    .code { display: inline-block; padding: 3px 8px; background: var(--ui-bg-soft); border: 1px solid var(--admin-line); font: 700 12px/16px ui-monospace, monospace; letter-spacing: .3px; }
+    .dim td { opacity: .55; }
+    .dim .code { text-decoration: line-through; }
+    .dim td:last-child { opacity: 1; }
+    .usage { display: block; font-size: 12px; color: var(--ui-ink-soft); }
+    .bar { display: block; height: 4px; margin-top: 6px; background: var(--ui-bg-soft); border-radius: 2px; overflow: hidden; min-width: 110px; }
+    .bar-fill { display: block; height: 100%; background: var(--ui-accent); }
+    .badge { display: inline-block; padding: 3px 10px; border-radius: 999px; font: 600 11px/16px var(--font-sans); white-space: nowrap; }
+    .vs-running { background: var(--ui-success-bg); color: var(--ui-success); }
+    .vs-disabled { background: var(--ui-bg-soft); color: var(--ui-ink-soft); }
+    .vs-expired { background: var(--ui-warning-bg); color: var(--ui-warning); }
+    .acts { display: flex; gap: 4px; justify-content: flex-end; flex-wrap: wrap; }
+    .link-btn { background: none; border: 0; padding: 4px 6px; color: var(--ui-accent); font: 700 12px/16px var(--font-sans); cursor: pointer; text-decoration: underline; }
+    .link-btn.danger { color: var(--ui-danger); }
+    .link-btn:disabled { opacity: .5; cursor: default; }
+    .state-box { text-align: center; padding: 56px 16px; color: var(--ui-ink-soft); display: flex; flex-direction: column; align-items: center; gap: 12px; }
+    .spinner { width: 30px; height: 30px; border: 3px solid var(--ui-line-soft); border-top-color: var(--ui-ink); border-radius: 50%; animation: spin .8s linear infinite; }
     @keyframes spin { to { transform: rotate(360deg); } }
+    .dform { display: flex; flex-direction: column; gap: 14px; }
+    .dform label { display: flex; flex-direction: column; gap: 4px; font: 600 12px/16px var(--font-sans); color: var(--ui-ink-soft); }
+    .dform input, .dform select { width: 100%; }
+    .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .confirm-text { margin: 0 0 16px; font-size: 14px; line-height: 22px; }
+    .modal-actions { display: flex; justify-content: flex-end; gap: 12px; }
   `],
 })
 export class AdminVouchersPage implements OnInit {
@@ -304,10 +225,15 @@ export class AdminVouchersPage implements OnInit {
   private readonly toast = inject(ToastService);
 
   readonly vouchers = signal<Voucher[]>([]);
-  readonly loading = signal<boolean>(true);
-
-  readonly voucherModalOpen = signal<boolean>(false);
-  readonly saving = signal<boolean>(false);
+  readonly loading = signal(true);
+  readonly loaded = signal(false);
+  readonly error = signal('');
+  readonly search = signal('');
+  readonly typeFilter = signal('');
+  readonly drawerOpen = signal(false);
+  readonly saving = signal(false);
+  readonly busyId = signal<string | null>(null);
+  readonly deleteTarget = signal<Voucher | null>(null);
 
   editingVoucherId: string | null = null;
   formCode = '';
@@ -320,21 +246,59 @@ export class AdminVouchersPage implements OnInit {
   formValidTo = '';
   formStatus: 'ACTIVE' | 'DISABLED' = 'ACTIVE';
 
-  ngOnInit(): void {
-    this.loadVouchers();
-  }
+  readonly visible = computed(() => {
+    const q = this.search().trim().toLowerCase();
+    const type = this.typeFilter();
+    return this.vouchers().filter(v => (!q || v.code.toLowerCase().includes(q)) && (!type || v.type === type));
+  });
+  readonly runningCount = computed(() => this.vouchers().filter(v => !this.isStopped(v)).length);
+  readonly stoppedCount = computed(() => this.vouchers().filter(v => this.isStopped(v)).length);
+  readonly totalUsed = computed(() => this.vouchers().reduce((sum, v) => sum + (v.usedCount ?? 0), 0));
 
-  loadVouchers(): void {
+  ngOnInit(): void { this.load(); }
+
+  load(): void {
     this.loading.set(true);
+    this.error.set('');
     this.api.adminListVouchers().subscribe({
-      next: (res) => {
+      next: res => {
         this.vouchers.set(res.items);
+        this.loaded.set(true);
         this.loading.set(false);
       },
-      error: () => this.loading.set(false),
+      error: err => {
+        this.error.set(err?.error?.message || 'Không thể tải danh sách voucher.');
+        this.loading.set(false);
+      },
     });
   }
 
+  // --- Trạng thái hiển thị ---
+  isExpired(v: Voucher): boolean {
+    const end = new Date(v.validTo).getTime();
+    return !Number.isNaN(end) && Date.now() > end;
+  }
+  isStopped(v: Voucher): boolean { return v.status !== 'ACTIVE' || this.isExpired(v); }
+  stateOf(v: Voucher): 'running' | 'disabled' | 'expired' {
+    if (v.status !== 'ACTIVE') return 'disabled';
+    return this.isExpired(v) ? 'expired' : 'running';
+  }
+  stateLabel(v: Voucher): string { return this.stateOf(v) === 'expired' ? 'Hết hạn' : voucherStatusLabel(v.status); }
+  typeLabel(type: string): string { return voucherTypeLabel(type); }
+  usagePercent(v: Voucher): number {
+    if (!v.usageLimit) return 0;
+    return Math.min(100, Math.round(((v.usedCount ?? 0) / v.usageLimit) * 100));
+  }
+  money(value: number): string { return `${Math.round(value).toLocaleString('vi-VN')}đ`; }
+  fmtDate(value?: string | null): string {
+    if (!value) return '—';
+    const d = new Date(value);
+    if (Number.isNaN(d.getTime())) return '—';
+    const p = (n: number) => String(n).padStart(2, '0');
+    return `${p(d.getDate())}/${p(d.getMonth() + 1)}/${d.getFullYear()}`;
+  }
+
+  // --- Form tạo / sửa ---
   openCreateModal(): void {
     this.editingVoucherId = null;
     this.formCode = '';
@@ -344,16 +308,11 @@ export class AdminVouchersPage implements OnInit {
     this.formMaxDiscount = null;
     this.formUsageLimit = 100;
     this.formStatus = 'ACTIVE';
-
-    const today = new Date();
-    const nextMonth = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
-    this.formValidFrom = today.toISOString().slice(0, 10);
-    this.formValidTo = nextMonth.toISOString().slice(0, 10);
-
-    this.voucherModalOpen.set(true);
+    this.formValidFrom = new Date().toISOString().slice(0, 10);
+    this.formValidTo = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    this.drawerOpen.set(true);
   }
 
-  // --- PATCH /admin/vouchers/:voucherId ---
   openEditModal(v: Voucher): void {
     this.editingVoucherId = v.id;
     this.formCode = v.code;
@@ -365,13 +324,11 @@ export class AdminVouchersPage implements OnInit {
     this.formStatus = (v.status as 'ACTIVE' | 'DISABLED') || 'ACTIVE';
     this.formValidFrom = v.validFrom ? new Date(v.validFrom).toISOString().slice(0, 10) : '';
     this.formValidTo = v.validTo ? new Date(v.validTo).toISOString().slice(0, 10) : '';
-
-    this.voucherModalOpen.set(true);
+    this.drawerOpen.set(true);
   }
 
   saveVoucher(): void {
     if (!this.formCode.trim()) return;
-
     this.saving.set(true);
     const payload = {
       code: this.formCode.trim().toUpperCase(),
@@ -384,17 +341,16 @@ export class AdminVouchersPage implements OnInit {
       validTo: new Date(this.formValidTo).toISOString(),
       status: this.formStatus,
     };
-
     if (this.editingVoucherId) {
       // PATCH /admin/vouchers/:voucherId
       this.api.adminUpdateVoucher(this.editingVoucherId, payload).subscribe({
         next: () => {
           this.saving.set(false);
-          this.voucherModalOpen.set(false);
+          this.drawerOpen.set(false);
           this.toast.success('Cập nhật mã voucher thành công.');
-          this.loadVouchers();
+          this.load();
         },
-        error: (err) => {
+        error: err => {
           this.saving.set(false);
           this.toast.error(err.error?.message || 'Không thể cập nhật voucher.');
         },
@@ -404,11 +360,11 @@ export class AdminVouchersPage implements OnInit {
       this.api.adminCreateVoucher(payload).subscribe({
         next: () => {
           this.saving.set(false);
-          this.voucherModalOpen.set(false);
+          this.drawerOpen.set(false);
           this.toast.success('Đã tạo mã giảm giá voucher thành công.');
-          this.loadVouchers();
+          this.load();
         },
-        error: (err) => {
+        error: err => {
           this.saving.set(false);
           this.toast.error(err.error?.message || 'Không thể tạo voucher.');
         },
@@ -416,16 +372,66 @@ export class AdminVouchersPage implements OnInit {
     }
   }
 
-  deleteVoucher(id: string): void {
-    if (!confirm('Bạn có chắc chắn muốn xóa mã voucher này?')) return;
-    this.api.adminDeleteVoucher(id).subscribe({
+  // --- Vô hiệu hóa / kích hoạt: PATCH status ---
+  toggleStatus(v: Voucher): void {
+    const next: 'ACTIVE' | 'DISABLED' = v.status === 'ACTIVE' ? 'DISABLED' : 'ACTIVE';
+    this.busyId.set(v.id);
+    this.api.adminUpdateVoucher(v.id, {
+      code: v.code, type: v.type, value: v.value, minimumSubtotal: v.minimumSubtotal,
+      maxDiscount: v.maxDiscount ?? null, usageLimit: v.usageLimit,
+      validFrom: new Date(v.validFrom).toISOString(), validTo: new Date(v.validTo).toISOString(),
+      status: next,
+    }).subscribe({
       next: () => {
-        this.toast.success('Đã xóa voucher.');
-        this.loadVouchers();
+        this.busyId.set(null);
+        this.toast.success(next === 'DISABLED' ? 'Đã vô hiệu hóa voucher.' : 'Đã kích hoạt voucher.');
+        this.load();
       },
-      error: () => {
-        this.toast.error('Không thể xóa voucher.');
+      error: err => {
+        this.busyId.set(null);
+        this.toast.error(err.error?.message || 'Không thể cập nhật trạng thái voucher.');
       },
     });
+  }
+
+  confirmDelete(): void {
+    const v = this.deleteTarget();
+    if (!v || this.saving()) return;
+    this.saving.set(true);
+    this.api.adminDeleteVoucher(v.id).subscribe({
+      next: () => {
+        this.saving.set(false);
+        this.deleteTarget.set(null);
+        this.toast.success('Đã xóa voucher.');
+        this.load();
+      },
+      error: err => {
+        this.saving.set(false);
+        this.toast.error(err?.error?.message || 'Không thể xóa voucher.');
+      },
+    });
+  }
+
+  // --- Xuất CSV các mã đang hiển thị ---
+  exportCsv(): void {
+    const rows = this.visible();
+    if (rows.length === 0) return;
+    const header = ['Mã', 'Loại giảm', 'Giá trị', 'Giảm tối đa (đ)', 'Đơn tối thiểu (đ)', 'Từ ngày', 'Đến ngày', 'Đã dùng', 'Giới hạn', 'Trạng thái'];
+    const lines = [header.map(csvCell).join(',')];
+    for (const v of rows) {
+      lines.push([
+        v.code, voucherTypeLabel(v.type), v.value, v.maxDiscount ?? '', v.minimumSubtotal,
+        this.fmtDate(v.validFrom), this.fmtDate(v.validTo), v.usedCount ?? 0, v.usageLimit, this.stateLabel(v),
+      ].map(csvCell).join(','));
+    }
+    const blob = new Blob(['﻿' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `voucher-${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
 }

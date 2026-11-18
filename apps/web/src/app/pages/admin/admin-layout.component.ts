@@ -1,13 +1,15 @@
 import { NgTemplateOutlet } from '@angular/common';
-import { Component, computed, inject, signal } from '@angular/core';
+import { Component, OnDestroy, OnInit, computed, inject, signal } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { NavigationEnd, Router, RouterLink, RouterOutlet } from '@angular/router';
 import { filter, map, startWith } from 'rxjs';
 import { ModalComponent } from '../../components/modal.component';
+import { ApiService } from '../../services/api.service';
 import { AuthService } from '../../services/auth.service';
+import { SUPPORT_UNREAD_EVENT } from '../../components/admin-customer-tabs.component';
 
 type NavIcon = 'dashboard' | 'catalog' | 'orders' | 'customers' | 'promo' | 'ai' | 'reports' | 'settings';
-type NavItem = { key: string; label: string; icon: NavIcon; link: string; match: string[] };
+type NavItem = { key: string; label: string; icon: NavIcon; link: string; match: string[]; badge?: number };
 
 const WEEKDAYS = ['Chủ Nhật', 'Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy'];
 
@@ -59,6 +61,7 @@ const WEEKDAYS = ['Chủ Nhật', 'Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ N
               <li><a [routerLink]="item.link" class="menu-item" [class.active]="isActive(item)" [attr.aria-current]="isActive(item) ? 'page' : null" (click)="mobileNavOpen.set(false)">
                 <ng-container [ngTemplateOutlet]="navIcon" [ngTemplateOutletContext]="{ $implicit: item.icon }" />
                 <span>{{ item.label }}</span>
+                @if (item.badge) { <span class="nav-badge" [attr.aria-label]="item.badge + ' phiếu hỗ trợ chưa đọc'">{{ item.badge > 99 ? '99+' : item.badge }}</span> }
               </a></li>
             }
           </ul>
@@ -132,6 +135,8 @@ const WEEKDAYS = ['Chủ Nhật', 'Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ N
     .menu-item:hover { background: var(--admin-nav-hover-bg, #f5f3f3); }
     .menu-item.active { padding-left: 10px; border-left-color: var(--admin-nav-active-edge, #805159); background: var(--admin-nav-active-bg, #f4b8c1); font-weight: 700; }
     .menu-item--store span { flex: 1; }
+    .menu-item span:first-of-type { flex: 1; min-width: 0; }
+    .nav-badge { min-width: 20px; height: 20px; padding: 0 6px; display: inline-flex; align-items: center; justify-content: center; border-radius: 10px; background: var(--ui-danger, #b3261e); color: #fff; font: 700 11px/1 var(--font-sans); }
     .menu-item--store .store-arrow { width: 12px; height: 12px; }
     .sidebar-footer { flex-shrink: 0; padding: 13px 12px 12px; border-top: 1px solid var(--admin-line, #e5e5e5); }
     .user-card { display: flex; align-items: center; gap: 8px; min-width: 0; }
@@ -167,11 +172,17 @@ const WEEKDAYS = ['Chủ Nhật', 'Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ N
     @media (max-width: 480px) { .topbar-user .user-meta { display: none; } }
   `],
 })
-export class AdminLayoutComponent {
+export class AdminLayoutComponent implements OnInit, OnDestroy {
   readonly auth = inject(AuthService);
+  private readonly api = inject(ApiService);
   private readonly router = inject(Router);
   readonly mobileNavOpen = signal(false);
   readonly today = formatToday();
+  /** Số phiếu có tin chưa đọc phía nhân sự (từ /admin/support/stats). */
+  readonly supportUnread = signal(0);
+  private unreadTimer?: ReturnType<typeof setInterval>;
+  private readonly onVisible = (): void => { if (document.visibilityState === 'visible') this.refreshSupportUnread(); };
+  private readonly onUnreadChanged = (): void => this.refreshSupportUnread();
 
   private readonly url = toSignal(
     this.router.events.pipe(filter((event): event is NavigationEnd => event instanceof NavigationEnd), map(event => event.urlAfterRedirects), startWith(this.router.url)),
@@ -190,11 +201,13 @@ export class AdminLayoutComponent {
     if (catalogLink) items.push({ key: 'catalog', label: 'Sản phẩm & Kho hàng', icon: 'catalog', link: catalogLink, match: ['/admin/products', '/admin/inventory', '/admin/lookbooks'] });
     const orderLink = a.can('order.read') ? '/admin/orders' : (a.can('refund.propose') || a.canGlobal('payment.read')) ? '/admin/refunds' : null;
     if (orderLink) items.push({ key: 'orders', label: 'Đơn hàng', icon: 'orders', link: orderLink, match: ['/admin/orders', '/admin/refunds'] });
-    if (a.isAdmin() && this.hasRoute('customers')) items.push({ key: 'customers', label: 'Khách hàng', icon: 'customers', link: '/admin/customers', match: ['/admin/customers'] });
+    if (a.can('order.read') && this.hasRoute(a.isAdmin() ? 'customers' : 'support')) {
+      items.push({ key: 'customers', label: 'Khách hàng & Hỗ trợ', icon: 'customers', link: a.isAdmin() ? '/admin/customers' : '/admin/support', match: ['/admin/customers', '/admin/support'], badge: this.supportUnread() });
+    }
     const promoLink = a.isAdmin() ? '/admin/vouchers' : a.can('content.moderate') ? '/admin/moderation' : null;
     if (promoLink) items.push({ key: 'promo', label: 'Khuyến mãi & Đánh giá', icon: 'promo', link: promoLink, match: ['/admin/vouchers', '/admin/moderation'] });
     if (a.isAdmin() && this.hasRoute('ai')) items.push({ key: 'ai', label: 'AI Workflow', icon: 'ai', link: '/admin/ai', match: ['/admin/ai'] });
-    if (a.isAdmin()) items.push({ key: 'reports', label: 'Báo cáo & Phân quyền', icon: 'reports', link: '/admin/reports', match: ['/admin/reports', '/admin/users'] });
+    if (a.isAdmin()) items.push({ key: 'reports', label: 'Báo cáo & Phân quyền', icon: 'reports', link: '/admin/reports', match: ['/admin/reports', '/admin/users', '/admin/audit'] });
     return items;
   });
 
@@ -210,6 +223,24 @@ export class AdminLayoutComponent {
   private hasRoute(path: string): boolean {
     const admin = this.router.config.find(route => route.path === 'admin');
     return !!admin?.children?.some(child => child.path === path);
+  }
+
+  ngOnInit(): void {
+    this.refreshSupportUnread();
+    this.unreadTimer = setInterval(() => { if (document.visibilityState === 'visible') this.refreshSupportUnread(); }, 30_000);
+    document.addEventListener('visibilitychange', this.onVisible);
+    window.addEventListener(SUPPORT_UNREAD_EVENT, this.onUnreadChanged);
+  }
+
+  ngOnDestroy(): void {
+    clearInterval(this.unreadTimer);
+    document.removeEventListener('visibilitychange', this.onVisible);
+    window.removeEventListener(SUPPORT_UNREAD_EVENT, this.onUnreadChanged);
+  }
+
+  private refreshSupportUnread(): void {
+    if (!this.auth.can('order.read')) { this.supportUnread.set(0); return; }
+    this.api.adminSupportStats().subscribe({ next: stats => this.supportUnread.set(stats.unreadForStaff), error: () => undefined });
   }
 
   logout(): void {

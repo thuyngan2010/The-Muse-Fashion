@@ -46,7 +46,7 @@ function make<T>(Type: new (...args: any[]) => T, api: any = {}, auth: any = {},
   const injector = Injector.create({ providers: [
     { provide: ApiService, useValue: api }, { provide: AuthService, useValue: auth },
     { provide: ToastService, useValue: toast }, { provide: Router, useValue: { url: '/', navigate: vi.fn() } },
-    { provide: ActivatedRoute, useValue: { snapshot: { paramMap: { get: () => id }, queryParamMap: { get: () => null } } } },
+    { provide: ActivatedRoute, useValue: { snapshot: { paramMap: { get: () => id }, queryParamMap: { get: () => null } }, queryParamMap: of({ get: () => null }) } },
     { provide: CartService, useValue: {} }, ...extra,
   ] });
   return runInInjectionContext(injector, () => new Type());

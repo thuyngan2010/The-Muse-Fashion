@@ -1,680 +1,583 @@
-import { PaginationComponent, PaginationState } from '../../components/pagination.component';
-import { Component, OnInit, inject, signal } from '@angular/core';
-import { CurrencyPipe } from '@angular/common';
+import { Component, OnDestroy, OnInit, computed, inject, signal } from '@angular/core';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { toSignal } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
-import type { ProductSummary, Category, ProductVariant } from '@fashion/contracts';
+import { Subject, Subscription, catchError, debounceTime, distinctUntilChanged, forkJoin, map, of } from 'rxjs';
+import type { Category, InventoryItem, ProductDetail, ProductSummary, ProductVariant } from '@fashion/contracts';
 import { ApiService } from '../../services/api.service';
+import { AuthService } from '../../services/auth.service';
 import { ToastService } from '../../services/toast.service';
 import { ModalComponent } from '../../components/modal.component';
+import { AdminDrawerComponent } from '../../components/admin-drawer.component';
+import { AdminCatalogTabsComponent } from '../../components/admin-catalog-tabs.component';
+import { PaginationComponent } from '../../components/pagination.component';
+import { categoryStatusLabel, productStatusLabel, variantStatusLabel } from '../../shared/labels';
+
+type StockFilter = 'all' | 'in' | 'low' | 'out';
+type SortKey = 'default' | 'name' | 'priceAsc' | 'priceDesc' | 'stockAsc' | 'stockDesc';
+type VariantEdit = { sku: string; size: string; color: string; price: number; status: 'ACTIVE' | 'INACTIVE' };
+type ProductRow = {
+  product: ProductSummary;
+  detail: ProductDetail | null;
+  minPrice: number;
+  maxPrice: number;
+  available: number | null;
+  colors: string[];
+  sizes: string[];
+};
+
+const MAX_IMAGES = 10;
+const DEFAULT_LOW_STOCK = 10;
+
+const COLOR_HEX: Record<string, string> = {
+  'đen': '#171717', 'trắng': '#ffffff', 'be': '#e5d8c3', 'kem': '#f3ead7', 'nâu': '#7a5638',
+  'xám': '#8b8f91', 'ghi': '#9aa0a2', 'đỏ': '#c52929', 'hồng': '#f4b8c1', 'cam': '#e2762f',
+  'vàng': '#e6c54a', 'xanh lá': '#4f8a5b', 'xanh rêu': '#5b6b3a', 'xanh dương': '#3f6fb0',
+  'xanh navy': '#1f2d4d', 'xanh': '#3f6fb0', 'tím': '#7a5a9a', 'bạc': '#c4c7c7',
+};
 
 @Component({
   standalone: true,
-  imports: [PaginationComponent, CurrencyPipe, FormsModule, ModalComponent],
+  imports: [FormsModule, RouterLink, ModalComponent, AdminDrawerComponent, AdminCatalogTabsComponent, PaginationComponent],
   template: `
-    <div class="admin-products-container">
-      <header class="page-header">
-        <div>
-          <h1 class="page-title">Sản phẩm & Danh mục</h1>
-          <p class="page-desc">Quản lý catalog thời trang, cấu trúc phân loại, giá cả và biến thể SKU.</p>
-        </div>
-        <div class="header-btns">
-          @if (activeTab() === 'products') {
-            <button type="button" class="btn-primary" (click)="openCreateProductModal()">+ Thêm sản phẩm mới</button>
-          } @else {
-            <button type="button" class="btn-primary" (click)="openCreateCategoryModal()">+ Thêm danh mục mới</button>
-          }
-        </div>
-      </header>
-
-      <!-- Tab Navigation -->
-      <div class="tab-nav">
-        <button
-          type="button"
-          class="tab-btn"
-          [class.active]="activeTab() === 'products'"
-          (click)="activeTab.set('products')"
-        >
-          📦 Sản phẩm ({{ products().length }})
-        </button>
-        <button
-          type="button"
-          class="tab-btn"
-          [class.active]="activeTab() === 'categories'"
-          (click)="activeTab.set('categories')"
-        >
-          📂 Danh mục phân loại ({{ categories().length }})
-        </button>
-      </div>
-
-      <!-- PRODUCTS TAB -->
-      @if (activeTab() === 'products') {
-        @if (loading()) {
-          <div class="loading-box">
-            <div class="spinner"></div>
-            <p>Đang tải danh sách sản phẩm...</p>
-          </div>
-        } @else if (products().length === 0) {
-          <div class="empty-state">
-            <p>Chưa có sản phẩm nào. Hãy tạo sản phẩm đầu tiên!</p>
-          </div>
-        } @else {
-          <div class="products-table-card">
-            <div class="table-header">
-              <span>Sản phẩm</span>
-              <span>Đường dẫn (Slug)</span>
-              <span>Giá cơ sở</span>
-              <span>Trạng thái</span>
-              <span>Thao tác</span>
-            </div>
-
-            @for (prod of products(); track prod.id) {
-              <div class="table-row">
-                <div class="prod-cell">
-                  <div class="thumb">
-                    @if (prod.images && prod.images.length > 0) {
-                      <img [src]="prod.images[0]" [alt]="prod.name" />
-                    }
-                  </div>
-                  <strong>{{ prod.name }}</strong>
-                </div>
-                <span class="slug-cell">{{ prod.slug }}</span>
-                <strong class="price-cell">{{ prod.price | currency:'VND':'symbol':'1.0-0' }}</strong>
-                <div>
-                  <span class="status-badge" [class]="'status-' + (prod.status || 'PUBLISHED').toLowerCase()">
-                    {{ prod.status || 'PUBLISHED' }}
-                  </span>
-                </div>
-                <div class="actions-cell">
-                  <button type="button" class="btn-action" (click)="openEditProductModal(prod)">Sửa</button>
-                  <button type="button" class="btn-action btn-action-accent" (click)="openManageVariantsModal(prod)">⚙ Biến thể</button>
-                </div>
-              </div>
-            }
-          </div>
+    <div class="ap">
+      <fc-admin-catalog-tabs [active]="activeTab()">
+        @if (auth.can('inventory.manage')) {
+          <a class="btn-outline" routerLink="/admin/inventory">Điều chỉnh tồn kho</a>
         }
-      }
-
-      <!-- CATEGORIES TAB -->
-      @if (activeTab() === 'categories') {
-        @if (loadingCats()) {
-          <div class="loading-box">
-            <div class="spinner"></div>
-            <p>Đang tải danh mục...</p>
-          </div>
-        } @else if (categories().length === 0) {
-          <div class="empty-state">
-            <p>Chưa có danh mục nào. Hãy tạo danh mục đầu tiên!</p>
-          </div>
+        @if (activeTab() === 'products') {
+          <button type="button" class="btn-primary" (click)="openCreateProduct()">+ Thêm sản phẩm</button>
         } @else {
-          <div class="products-table-card">
-            <div class="table-header cat-grid">
-              <span>Tên danh mục</span>
-              <span>Đường dẫn (Slug)</span>
-              <span>Danh mục cha</span>
-              <span>Trạng thái</span>
-              <span>Thao tác</span>
-            </div>
+          <button type="button" class="btn-primary" (click)="openCreateCategory()">+ Thêm danh mục</button>
+        }
+      </fc-admin-catalog-tabs>
 
-            @for (cat of categories(); track cat.id) {
-              <div class="table-row cat-grid">
-                <div class="cat-cell">
-                  <strong>{{ cat.name }}</strong>
-                </div>
-                <span class="slug-cell">{{ cat.slug }}</span>
-                <span class="parent-cell">{{ getParentName(cat.parentId) }}</span>
-                <div>
-                  <span class="status-badge" [class]="cat.status === 'ACTIVE' ? 'status-published' : 'status-archived'">
-                    {{ cat.status }}
-                  </span>
-                </div>
-                <div class="actions-cell">
-                  <button type="button" class="btn-action" (click)="openEditCategoryModal(cat)">Chỉnh sửa</button>
-                </div>
-              </div>
-            }
+      @if (activeTab() === 'products') {
+        <!-- KPI -->
+        <section class="kpis" aria-label="Chỉ số sản phẩm và kho">
+          <article class="kpi">
+            <span class="kpi-label">Tổng mã đang bán</span>
+            <strong class="kpi-value">{{ publishedTotal() ?? '—' }}</strong>
+            <span class="kpi-note">Sản phẩm trạng thái Đang bán</span>
+          </article>
+          <article class="kpi">
+            <span class="kpi-label">Cảnh báo tồn thấp</span>
+            <strong class="kpi-value">{{ lowCount() ?? '—' }}</strong>
+            <span class="kpi-note">Tồn khả dụng ≤ {{ effectiveThreshold() }} · {{ stockScope() }}</span>
+          </article>
+          <article class="kpi">
+            <span class="kpi-label">Hết hàng</span>
+            <strong class="kpi-value">{{ outCount() ?? '—' }}</strong>
+            <span class="kpi-note">Tồn khả dụng bằng 0 · {{ stockScope() }}</span>
+          </article>
+          <article class="kpi">
+            <span class="kpi-label">Giá trị kho</span>
+            <strong class="kpi-value">{{ stockValue() === null ? '—' : money(stockValue()!) }}</strong>
+            <span class="kpi-note">Tồn khả dụng × giá, trên {{ detailCount() }} sản phẩm của trang này</span>
+          </article>
+        </section>
+
+        <!-- Bộ lọc -->
+        <section class="filters">
+          <label class="f-search">
+            <span class="sr-only">Tìm sản phẩm</span>
+            <input type="search" [ngModel]="query()" (ngModelChange)="onSearch($event)" name="q" placeholder="Tìm theo tên hoặc SKU" />
+          </label>
+          <label class="f-sel">Trạng thái
+            <select [ngModel]="statusFilter()" (ngModelChange)="setStatusFilter($event)" name="status">
+              <option value="">Tất cả</option>
+              <option value="PUBLISHED">{{ productStatusLabel('PUBLISHED') }}</option>
+              <option value="DRAFT">{{ productStatusLabel('DRAFT') }}</option>
+              <option value="ARCHIVED">{{ productStatusLabel('ARCHIVED') }}</option>
+            </select>
+          </label>
+          <label class="f-sel">Danh mục
+            <select [ngModel]="categoryFilter()" (ngModelChange)="setCategoryFilter($event)" name="categoryFilter">
+              <option value="">Tất cả</option>
+              @for (cat of categories(); track cat.id) { <option [value]="cat.id">{{ cat.name }}</option> }
+            </select>
+          </label>
+          <label class="f-sel">Tồn kho
+            <select [ngModel]="stockFilter()" (ngModelChange)="stockFilter.set($event)" name="stock">
+              <option value="all">Tất cả</option>
+              <option value="in">Còn hàng</option>
+              <option value="low">Tồn thấp</option>
+              <option value="out">Hết hàng</option>
+            </select>
+          </label>
+          <label class="f-sel">Sắp xếp
+            <select [ngModel]="sortKey()" (ngModelChange)="sortKey.set($event)" name="sort">
+              <option value="default">Mặc định</option>
+              <option value="name">Tên A → Z</option>
+              <option value="priceAsc">Giá thấp → cao</option>
+              <option value="priceDesc">Giá cao → thấp</option>
+              <option value="stockAsc">Tồn ít → nhiều</option>
+              <option value="stockDesc">Tồn nhiều → ít</option>
+            </select>
+          </label>
+          <label class="f-sel">Hiển thị
+            <select [ngModel]="pageSize()" (ngModelChange)="setPageSize($event)" name="size">
+              <option [ngValue]="10">10 dòng mỗi trang</option>
+              <option [ngValue]="20">20 dòng mỗi trang</option>
+              <option [ngValue]="50">50 dòng mỗi trang</option>
+            </select>
+          </label>
+        </section>
+        <p class="scope-note">Lọc tồn kho và sắp xếp chỉ áp dụng cho {{ products().length }} sản phẩm của trang đang xem. Tìm kiếm, danh mục và trạng thái lọc trên toàn bộ danh sách.</p>
+
+        @if (loading()) {
+          <div class="state-box"><div class="spinner"></div><p>Đang tải danh sách sản phẩm…</p></div>
+        } @else if (loadError()) {
+          <div class="state-box"><p>{{ loadError() }}</p><button type="button" class="btn-outline" (click)="loadProducts()">Thử lại</button></div>
+        } @else if (rows().length === 0) {
+          <div class="state-box"><p>{{ products().length === 0 ? (hasServerFilter() ? 'Không tìm thấy sản phẩm khớp tìm kiếm hoặc bộ lọc.' : 'Chưa có sản phẩm nào.') : 'Không có sản phẩm khớp bộ lọc tồn kho trên trang này.' }}</p></div>
+        } @else {
+          <div class="table-wrap">
+            <table class="tbl">
+              <thead>
+                <tr>
+                  <th class="c-img"><span class="sr-only">Ảnh</span></th>
+                  <th>Sản phẩm</th><th>Danh mục</th><th>Giá</th><th>Biến thể</th><th class="c-num">Tồn khả dụng</th><th>Trạng thái</th><th class="c-act">Thao tác</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (row of rows(); track row.product.id) {
+                  <tr>
+                    <td class="c-img">
+                      <div class="thumb">@if (row.product.images.length > 0) { <img [src]="row.product.images[0]" [alt]="row.product.name" /> }</div>
+                    </td>
+                    <td>
+                      <strong class="p-name">{{ row.product.name }}</strong>
+                      <span class="p-sub">{{ row.product.material || '—' }}</span>
+                    </td>
+                    <td>{{ categoryName(row.product.categoryId) }}</td>
+                    <td class="c-price">
+                      @if (row.detail === null) { {{ money(row.product.price) }} }
+                      @else if (row.minPrice === row.maxPrice) { {{ money(row.minPrice) }} }
+                      @else { {{ money(row.minPrice) }} – {{ money(row.maxPrice) }} }
+                    </td>
+                    <td>
+                      @if (row.detail === null) { <span class="muted">{{ detailsLoading() ? 'Đang tải…' : '—' }}</span> }
+                      @else if (row.detail.variants.length === 0) { <span class="muted">Chưa có biến thể</span> }
+                      @else {
+                        <div class="dots">
+                          @for (c of row.colors; track c) { <span class="dot" [style.background]="colorHex(c)" [title]="c"></span> }
+                          <span class="muted">{{ row.colors.length }} màu</span>
+                        </div>
+                        <span class="p-sub">{{ row.sizes.join(', ') }}</span>
+                      }
+                    </td>
+                    <td class="c-num">
+                      @if (row.available === null) { <span class="muted">—</span> }
+                      @else { <span [class.stock-low]="row.available > 0 && row.available <= effectiveThreshold()" [class.stock-out]="row.available === 0">{{ row.available }}</span> }
+                    </td>
+                    <td><span class="badge" [class]="'badge s-' + row.product.status.toLowerCase()">{{ productStatusLabel(row.product.status) }}</span></td>
+                    <td class="c-act">
+                      <a class="icon-btn" [href]="'/products/' + row.product.slug" target="_blank" rel="noopener" [attr.aria-label]="'Xem ' + row.product.name + ' trên cửa hàng'" title="Xem trên cửa hàng">
+                        <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg>
+                      </a>
+                      <button type="button" class="icon-btn" (click)="openEditProduct(row.product)" [attr.aria-label]="'Sửa ' + row.product.name" title="Sửa">
+                        <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+                      </button>
+                      @if (row.product.status !== 'ARCHIVED') {
+                        <button type="button" class="icon-btn" (click)="askArchive(row.product)" [attr.aria-label]="'Lưu trữ ' + row.product.name" title="Lưu trữ">
+                          <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="4" rx="1"/><path d="M5 8v11a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8M10 12h4"/></svg>
+                        </button>
+                      }
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+          <fc-pagination [page]="page()" [total]="total()" [limit]="pageSize()" [loading]="loading()" label="sản phẩm" (pageChange)="goToPage($event)" />
+        }
+      } @else {
+        <!-- TAB DANH MỤC -->
+        @if (loadingCats()) {
+          <div class="state-box"><div class="spinner"></div><p>Đang tải danh mục…</p></div>
+        } @else if (categories().length === 0) {
+          <div class="state-box"><p>Chưa có danh mục nào. Hãy tạo danh mục đầu tiên.</p></div>
+        } @else {
+          <div class="table-wrap">
+            <table class="tbl">
+              <thead><tr><th>Tên danh mục</th><th>Đường dẫn</th><th>Danh mục cha</th><th>Trạng thái</th><th class="c-act">Thao tác</th></tr></thead>
+              <tbody>
+                @for (cat of categories(); track cat.id) {
+                  <tr>
+                    <td><strong class="p-name">{{ cat.name }}</strong></td>
+                    <td class="mono">{{ cat.slug }}</td>
+                    <td>{{ parentName(cat.parentId) }}</td>
+                    <td><span class="badge" [class]="cat.status === 'HIDDEN' ? 'badge s-archived' : 'badge s-published'">{{ categoryStatusLabel(cat.status ?? 'ACTIVE') }}</span></td>
+                    <td class="c-act">
+                      <button type="button" class="icon-btn" (click)="openEditCategory(cat)" [attr.aria-label]="'Sửa danh mục ' + cat.name" title="Sửa">
+                        <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+                      </button>
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
           </div>
         }
       }
     </div>
 
-    <!-- Product Modal (Create/Edit Product) -->
-    <fc-modal
-      [isOpen]="productModalOpen()"
-      [title]="editingProductId ? 'Chỉnh sửa sản phẩm' : 'Thêm sản phẩm mới'"
-      maxWidth="680px"
-      (close)="productModalOpen.set(false)"
-    >
-      <form (ngSubmit)="saveProduct()" class="modal-form">
-        <div class="form-row">
-          <label>
-            Tên sản phẩm *
-            <input type="text" [(ngModel)]="prodName" name="name" (input)="autoSlug()" required />
+    <!-- Drawer sản phẩm -->
+    <fc-admin-drawer [isOpen]="productDrawerOpen()" [eyebrow]="editingProductId ? 'Chỉnh sửa' : 'Tạo mới'"
+      [title]="editingProductId ? 'Chỉnh sửa sản phẩm' : 'Thêm sản phẩm'" [subtitle]="editingProductId ? prodName : ''" width="640px"
+      (close)="closeProductDrawer()">
+      <form class="dform" (ngSubmit)="saveProduct()" autocomplete="off">
+        <label>Tên sản phẩm *
+          <input type="text" name="name" [(ngModel)]="prodName" (input)="autoSlug()" required maxlength="200" />
+        </label>
+        <div class="two">
+          <label>Đường dẫn (slug) *
+            <input type="text" name="slug" [(ngModel)]="prodSlug" required />
           </label>
-          <label>
-            Đường dẫn Slug *
-            <input type="text" [(ngModel)]="prodSlug" name="slug" required />
-          </label>
-        </div>
-
-        <div class="form-row">
-          <label>
-            Danh mục *
-            <select [(ngModel)]="prodCategoryId" name="categoryId" required>
-              @for (cat of categories(); track cat.id) {
-                <option [value]="cat.id">{{ cat.name }}</option>
-              }
-            </select>
-          </label>
-          <label>
-            Giá cơ sở (VND) *
-            <input type="number" [(ngModel)]="prodPrice" name="price" required min="0" step="1000" />
-          </label>
-        </div>
-
-        <div class="form-row">
-          <label>
-            Chất liệu
-            <input type="text" [(ngModel)]="prodMaterial" name="material" placeholder="100% Cotton, Linen, Silk..." />
-          </label>
-          <label>
-            Trạng thái
-            <select [(ngModel)]="prodStatus" name="status">
-              <option value="DRAFT">DRAFT (Bản nháp)</option>
-              <option value="PUBLISHED">PUBLISHED (Công khai)</option>
-              <option value="ARCHIVED">ARCHIVED (Lưu trữ)</option>
+          <label>Danh mục *
+            <select name="categoryId" [(ngModel)]="prodCategoryId" required>
+              <option value="">Chọn danh mục</option>
+              @for (cat of categories(); track cat.id) { <option [value]="cat.id">{{ cat.name }}</option> }
             </select>
           </label>
         </div>
-
-        <label>
-          Mô tả sản phẩm
-          <textarea [(ngModel)]="prodDescription" name="description" rows="3" placeholder="Mô tả chi tiết form dáng, kiểu cách..."></textarea>
-        </label>
-
-        <label>
-          URL Hình ảnh (phân tách bởi dấu phẩy)
-          <input type="text" [(ngModel)]="prodImagesInput" name="images" placeholder="https://..., https://..." />
-        </label>
-
-        <div class="modal-actions">
-          <button type="button" class="btn-outline" (click)="productModalOpen.set(false)">Hủy</button>
-          <button type="submit" class="btn-primary" [disabled]="saving()">
-            {{ saving() ? 'Đang lưu...' : editingProductId ? 'Lưu thay đổi' : 'Tạo sản phẩm' }}
-          </button>
-        </div>
-      </form>
-    </fc-modal>
-
-    <!-- Category Modal (POST /categories, PATCH /categories/:categoryId) -->
-    <fc-modal
-      [isOpen]="categoryModalOpen()"
-      [title]="editingCategoryId ? 'Chỉnh sửa danh mục' : 'Thêm danh mục mới'"
-      maxWidth="540px"
-      (close)="categoryModalOpen.set(false)"
-    >
-      <form (ngSubmit)="saveCategory()" class="modal-form">
-        <label>
-          Tên danh mục *
-          <input type="text" [(ngModel)]="catName" name="catName" (input)="autoCategorySlug()" placeholder="Áo sơ mi, Đầm dạ tiệc..." required />
-        </label>
-
-        <label>
-          Đường dẫn Slug *
-          <input type="text" [(ngModel)]="catSlug" name="catSlug" placeholder="ao-so-mi" required />
-        </label>
-
-        <div class="form-row">
-          <label>
-            Trạng thái *
-            <select [(ngModel)]="catStatus" name="catStatus">
-              <option value="ACTIVE">ACTIVE (Hiển thị)</option>
-              <option value="HIDDEN">HIDDEN (Ẩn)</option>
-            </select>
+        <div class="two">
+          <label>Chất liệu
+            <input type="text" name="material" [(ngModel)]="prodMaterial" placeholder="Cotton, lụa, linen…" />
           </label>
-
-          <label>
-            Danh mục cha
-            <select [(ngModel)]="catParentId" name="catParentId">
-              <option [value]="null">-- Không có (Danh mục gốc) --</option>
-              @for (cat of categories(); track cat.id) {
-                @if (cat.id !== editingCategoryId) {
-                  <option [value]="cat.id">{{ cat.name }}</option>
-                }
-              }
-            </select>
+          <label>Giá cơ sở (đ) *
+            <input type="number" name="price" [(ngModel)]="prodPrice" required min="0" step="1000" />
           </label>
         </div>
+        <label>Mô tả
+          <textarea name="description" rows="3" [(ngModel)]="prodDescription" placeholder="Form dáng, chất vải, cách phối…"></textarea>
+        </label>
 
-        <div class="modal-actions">
-          <button type="button" class="btn-outline" (click)="categoryModalOpen.set(false)">Hủy</button>
-          <button type="submit" class="btn-primary" [disabled]="savingCat()">
-            {{ savingCat() ? 'Đang lưu...' : editingCategoryId ? 'Cập nhật danh mục' : 'Tạo danh mục' }}
-          </button>
-        </div>
-      </form>
-    </fc-modal>
-
-    <!-- Manage Variants Modal (PATCH /admin/products/:productId/variants/:variantId & Add Variant) -->
-    <fc-modal
-      [isOpen]="variantsManagerOpen()"
-      [title]="'Quản lý biến thể: ' + (selectedProduct()?.name || '')"
-      maxWidth="760px"
-      (close)="variantsManagerOpen.set(false)"
-    >
-      <div class="variants-manager-body">
-        <div class="variants-header-row">
-          <h4>Danh sách biến thể hiện tại</h4>
-          <button type="button" class="btn-action btn-action-accent" (click)="showAddVariantForm.set(!showAddVariantForm())">
-            {{ showAddVariantForm() ? '✕ Đóng form thêm' : '+ Thêm biến thể mới' }}
-          </button>
-        </div>
-
-        @if (showAddVariantForm()) {
-          <!-- Add Variant Form -->
-          <form (ngSubmit)="saveNewVariant()" class="sub-form-card">
-            <h5>Thêm biến thể mới</h5>
-            <div class="form-row">
-              <label>
-                Mã SKU *
-                <input type="text" [(ngModel)]="varSku" name="sku" placeholder="VD: DR-01-S-BLK" required />
-              </label>
-              <label>
-                Giá bán (VND) *
-                <input type="number" [(ngModel)]="varPrice" name="price" required min="0" step="1000" />
-              </label>
-            </div>
-            <div class="form-row">
-              <label>
-                Size / Kích cỡ *
-                <input type="text" [(ngModel)]="varSize" name="size" placeholder="S, M, L..." required />
-              </label>
-              <label>
-                Màu sắc *
-                <input type="text" [(ngModel)]="varColor" name="color" placeholder="Đen, Trắng, Be..." required />
-              </label>
-            </div>
-            <label>
-              Số lượng tồn kho ban đầu *
-              <input type="number" [(ngModel)]="varStock" name="stock" required min="0" />
-            </label>
-            <div class="modal-actions">
-              <button type="button" class="btn-outline" (click)="showAddVariantForm.set(false)">Hủy</button>
-              <button type="submit" class="btn-primary" [disabled]="savingVariant()">
-                {{ savingVariant() ? 'Đang lưu...' : 'Thêm biến thể' }}
-              </button>
-            </div>
-          </form>
-        }
-
-        <!-- Edit Variant Form (PATCH /admin/products/:productId/variants/:variantId) -->
-        @if (editingVariantId()) {
-          <form (ngSubmit)="submitUpdateVariant()" class="sub-form-card edit-card">
-            <h5>Chỉnh sửa biến thể (SKU: {{ varEditSku }})</h5>
-            <div class="form-row">
-              <label>
-                Mã SKU *
-                <input type="text" [(ngModel)]="varEditSku" name="editSku" required />
-              </label>
-              <label>
-                Giá bán (VND) *
-                <input type="number" [(ngModel)]="varEditPrice" name="editPrice" required min="0" step="1000" />
-              </label>
-            </div>
-            <div class="form-row">
-              <label>
-                Size *
-                <input type="text" [(ngModel)]="varEditSize" name="editSize" required />
-              </label>
-              <label>
-                Màu sắc *
-                <input type="text" [(ngModel)]="varEditColor" name="editColor" required />
-              </label>
-            </div>
-            <label>
-              Trạng thái biến thể
-              <select [(ngModel)]="varEditStatus" name="editStatus">
-                <option value="ACTIVE">ACTIVE (Đang kinh doanh)</option>
-                <option value="INACTIVE">INACTIVE (Ngừng bán)</option>
-              </select>
-            </label>
-            <div class="modal-actions">
-              <button type="button" class="btn-outline" (click)="cancelEditVariant()">Hủy sửa</button>
-              <button type="submit" class="btn-primary" [disabled]="savingVariant()">
-                {{ savingVariant() ? 'Đang cập nhật...' : 'Cập nhật biến thể' }}
-              </button>
-            </div>
-          </form>
-        }
-
-        <!-- Variants Table -->
-        @if (loadingVariants()) {
-          <div class="loading-box">
-            <div class="spinner"></div>
-            <p>Đang tải thông tin biến thể...</p>
-          </div>
-        } @else if (currentVariants().length === 0) {
-          <div class="empty-state">
-            <p>Sản phẩm này chưa có biến thể nào được tạo.</p>
-          </div>
-        } @else {
-          <div class="variants-table">
-            <div class="v-head">
-              <span>SKU</span>
-              <span>Size</span>
-              <span>Màu</span>
-              <span>Giá bán</span>
-              <span>Trạng thái</span>
-              <span>Thao tác</span>
-            </div>
-            @for (v of currentVariants(); track v.id) {
-              <div class="v-row">
-                <code class="v-sku">{{ v.sku }}</code>
-                <span>{{ v.size }}</span>
-                <span>{{ v.color }}</span>
-                <strong>{{ v.price | currency:'VND':'symbol':'1.0-0' }}</strong>
-                <div>
-                  <span class="status-badge" [class]="v.status === 'ACTIVE' ? 'status-published' : 'status-archived'">
-                    {{ v.status }}
-                  </span>
-                </div>
-                <div>
-                  <button type="button" class="btn-action" (click)="startEditVariant(v)">Sửa</button>
+        <!-- Hình ảnh -->
+        <fieldset class="block">
+          <legend>Hình ảnh <span class="muted">({{ prodImages().length }}/10 · ảnh đầu tiên là ảnh bìa)</span></legend>
+          <div class="imgs">
+            @for (url of prodImages(); track url; let i = $index) {
+              <div class="img-item">
+                <img [src]="url" [alt]="'Ảnh sản phẩm ' + (i + 1)" />
+                @if (i === 0) { <span class="cover-tag">Ảnh bìa</span> }
+                <div class="img-tools">
+                  @if (i > 0) { <button type="button" (click)="makeCover(i)" title="Đặt làm ảnh bìa">Đặt bìa</button> }
+                  <button type="button" (click)="removeImage(i)" title="Xóa ảnh" [attr.aria-label]="'Xóa ảnh ' + (i + 1)">Xóa</button>
                 </div>
               </div>
             }
+            @if (prodImages().length < 10) {
+              <label class="img-add" [class.disabled]="uploading()">
+                <input type="file" accept="image/jpeg,image/png,image/webp" [disabled]="uploading()" (change)="uploadImage($event)" />
+                <span>{{ uploading() ? 'Đang tải…' : '+ Thêm ảnh' }}</span>
+              </label>
+            }
           </div>
-        }
+          <span class="hint">JPEG, PNG hoặc WebP, tối đa 10 MB mỗi ảnh.</span>
+        </fieldset>
+
+        <!-- Biến thể -->
+        <fieldset class="block">
+          <legend>Biến thể (màu · size)</legend>
+          @if (!editingProductId) {
+            <p class="hint">Lưu sản phẩm trước, sau đó thêm biến thể tại đây.</p>
+          } @else if (loadingVariants()) {
+            <p class="hint">Đang tải biến thể…</p>
+          } @else {
+            @for (v of variants(); track v.id) {
+              <div class="variant">
+                <label>Màu<input type="text" [name]="'vc' + v.id" [(ngModel)]="variantEdits[v.id].color" /></label>
+                <label>Size<input type="text" [name]="'vs' + v.id" [(ngModel)]="variantEdits[v.id].size" /></label>
+                <label>Giá (đ)<input type="number" [name]="'vp' + v.id" [(ngModel)]="variantEdits[v.id].price" min="0" step="1000" /></label>
+                <label>SKU<input type="text" [name]="'vk' + v.id" [(ngModel)]="variantEdits[v.id].sku" /></label>
+                <label>Trạng thái
+                  <select [name]="'vt' + v.id" [(ngModel)]="variantEdits[v.id].status">
+                    <option value="ACTIVE">{{ variantStatusLabel('ACTIVE') }}</option>
+                    <option value="INACTIVE">{{ variantStatusLabel('INACTIVE') }}</option>
+                  </select>
+                </label>
+                <div class="v-stock">
+                  <span class="v-stock-label">Tồn kho</span>
+                  <strong>{{ v.available }}</strong>
+                  <span class="muted">(chỉ xem)</span>
+                  @if (auth.can('inventory.manage')) {
+                    <a class="link" routerLink="/admin/inventory" [queryParams]="{ adjust: v.id }">Điều chỉnh</a>
+                  }
+                </div>
+              </div>
+            } @empty {
+              <p class="hint">Sản phẩm chưa có biến thể.</p>
+            }
+
+            @if (showAddVariant()) {
+              <div class="variant add">
+                <label>Màu<input type="text" name="nvColor" [ngModelOptions]="{ standalone: true }" [(ngModel)]="varColor" /></label>
+                <label>Size<input type="text" name="nvSize" [ngModelOptions]="{ standalone: true }" [(ngModel)]="varSize" /></label>
+                <label>Giá (đ)<input type="number" name="nvPrice" [ngModelOptions]="{ standalone: true }" [(ngModel)]="varPrice" min="0" step="1000" /></label>
+                <label>SKU<input type="text" name="nvSku" [ngModelOptions]="{ standalone: true }" [(ngModel)]="varSku" /></label>
+                <label>Tồn ban đầu<input type="number" name="nvStock" [ngModelOptions]="{ standalone: true }" [(ngModel)]="varStock" min="0" /></label>
+                <div class="v-actions">
+                  <button type="button" class="btn-outline" (click)="showAddVariant.set(false)">Hủy</button>
+                  <button type="button" class="btn-primary" [disabled]="savingVariant()" (click)="addVariant()">{{ savingVariant() ? 'Đang thêm…' : 'Thêm biến thể' }}</button>
+                </div>
+              </div>
+            } @else {
+              <button type="button" class="btn-outline" (click)="startAddVariant()">+ Thêm biến thể</button>
+            }
+          }
+        </fieldset>
+
+        <!-- Hiển thị website -->
+        <div class="visibility">
+          <label class="switch">
+            <input type="checkbox" name="visible" [checked]="prodStatus === 'PUBLISHED'" (change)="toggleVisible($event)" />
+            <span class="track" aria-hidden="true"></span>
+            <span><strong>Đang hiển thị trên website</strong>
+              <small>{{ prodStatus === 'PUBLISHED' ? 'Khách hàng nhìn thấy và mua được sản phẩm.' : prodStatus === 'ARCHIVED' ? 'Sản phẩm đang được lưu trữ. Bật để đưa lên website trở lại.' : 'Đang ở dạng bản nháp, khách hàng chưa thấy.' }}</small>
+            </span>
+          </label>
+        </div>
+
+        <div class="threshold">
+          <span>Ngưỡng cảnh báo hết hàng</span>
+          <strong>{{ settingsThreshold() === null ? '—' : settingsThreshold() + ' sản phẩm' }}</strong>
+          <small>Dùng chung cho toàn hệ thống.</small>
+          @if (auth.isAdmin()) { <a class="link" routerLink="/admin/settings">Đổi trong Cài đặt</a> }
+        </div>
+      </form>
+      <div drawer-footer>
+        <button type="button" class="btn-outline" (click)="closeProductDrawer()">Hủy</button>
+        <button type="button" class="btn-primary" [disabled]="saving() || uploading()" (click)="saveProduct()">{{ saving() ? 'Đang lưu…' : editingProductId ? 'Lưu thay đổi' : 'Tạo sản phẩm' }}</button>
+      </div>
+    </fc-admin-drawer>
+
+    <!-- Drawer danh mục -->
+    <fc-admin-drawer [isOpen]="categoryDrawerOpen()" [eyebrow]="editingCategoryId ? 'Chỉnh sửa' : 'Tạo mới'"
+      [title]="editingCategoryId ? 'Chỉnh sửa danh mục' : 'Thêm danh mục'" width="480px" (close)="categoryDrawerOpen.set(false)">
+      <form class="dform" (ngSubmit)="saveCategory()" autocomplete="off">
+        <label>Tên danh mục *
+          <input type="text" name="catName" [(ngModel)]="catName" (input)="autoCategorySlug()" placeholder="Áo sơ mi, Đầm dạ tiệc…" required />
+        </label>
+        <label>Đường dẫn (slug) *
+          <input type="text" name="catSlug" [(ngModel)]="catSlug" placeholder="ao-so-mi" required />
+        </label>
+        <label>Trạng thái
+          <select name="catStatus" [(ngModel)]="catStatus">
+            <option value="ACTIVE">{{ categoryStatusLabel('ACTIVE') }}</option>
+            <option value="HIDDEN">{{ categoryStatusLabel('HIDDEN') }}</option>
+          </select>
+        </label>
+        <label>Danh mục cha
+          <select name="catParent" [(ngModel)]="catParentId">
+            <option [ngValue]="null">Không có (danh mục gốc)</option>
+            @for (cat of categories(); track cat.id) {
+              @if (cat.id !== editingCategoryId) { <option [ngValue]="cat.id">{{ cat.name }}</option> }
+            }
+          </select>
+        </label>
+      </form>
+      <div drawer-footer>
+        <button type="button" class="btn-outline" (click)="categoryDrawerOpen.set(false)">Hủy</button>
+        <button type="button" class="btn-primary" [disabled]="savingCat()" (click)="saveCategory()">{{ savingCat() ? 'Đang lưu…' : editingCategoryId ? 'Lưu thay đổi' : 'Tạo danh mục' }}</button>
+      </div>
+    </fc-admin-drawer>
+
+    <!-- Xác nhận lưu trữ -->
+    <fc-modal [isOpen]="archiveTarget() !== null" title="Lưu trữ sản phẩm?" maxWidth="460px" (close)="archiveTarget.set(null)">
+      <p class="confirm-text">“{{ archiveTarget()?.name }}” sẽ chuyển sang trạng thái Đã lưu trữ và không còn hiển thị trên website. Bạn có thể bật hiển thị lại trong màn hình chỉnh sửa.</p>
+      <div class="confirm-actions">
+        <button type="button" class="btn-outline" (click)="archiveTarget.set(null)">Hủy</button>
+        <button type="button" class="btn-primary" [disabled]="archiving()" (click)="confirmArchive()">{{ archiving() ? 'Đang lưu trữ…' : 'Lưu trữ' }}</button>
       </div>
     </fc-modal>
-
-    @if (activeTab() === 'products') {<fc-pagination label="Phân trang" [page]="pagination.page()" [total]="pagination.total()" [limit]="pagination.limit" [loading]="loading()" (pageChange)="paginationChanged($event)" />}
-`,
+  `,
   styles: [`
-    .admin-products-container {
-      display: flex;
-      flex-direction: column;
-      gap: 20px;
+    :host { display: block; }
+    .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+    .muted { color: var(--ui-subtle); font-size: 12px; }
+    .kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 24px; }
+    .kpi { background: var(--ui-bg); border: 1px solid var(--admin-line); padding: 18px 20px; display: flex; flex-direction: column; gap: 6px; }
+    .kpi-label { font: 700 11px/16px var(--font-sans); letter-spacing: .5px; text-transform: uppercase; color: var(--ui-ink-soft); }
+    .kpi-value { font: 500 30px/36px var(--font-serif); color: var(--ui-ink); overflow-wrap: anywhere; }
+    .kpi-note { font-size: 11px; line-height: 16px; color: var(--ui-subtle); }
+    .filters { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; }
+    .f-search { flex: 1 1 240px; }
+    .f-search input, .f-sel select, .dform input, .dform select, .dform textarea {
+      width: 100%; box-sizing: border-box; padding: 10px 12px; border: 1px solid var(--ui-line); border-radius: 2px;
+      background: var(--ui-bg); font: 400 14px/20px var(--font-sans); color: var(--ui-ink);
     }
-    .page-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: flex-end;
-      flex-wrap: wrap;
-      gap: 16px;
-    }
-    .page-title {
-      font-family: Georgia, serif;
-      font-size: 1.8rem;
-      margin: 0 0 6px;
-      font-weight: 500;
-    }
-    .page-desc {
-      color: var(--color-muted);
-      font-size: 0.9rem;
-      margin: 0;
-    }
-    .tab-nav {
-      display: flex;
-      gap: 12px;
-      border-bottom: 1px solid var(--color-divider);
-      padding-bottom: 10px;
-    }
-    .tab-btn {
-      background: none;
-      border: 0;
-      padding: 8px 16px;
-      font-size: 0.92rem;
-      font-weight: 500;
-      color: var(--color-muted);
-      border-radius: var(--radius-control);
-      cursor: pointer;
-      transition: all 0.15s;
-    }
-    .tab-btn.active {
-      background: var(--color-text);
-      color: var(--color-surface);
-      font-weight: 600;
-    }
-    .products-table-card {
-      background: var(--color-surface);
-      border: 1px solid var(--color-divider);
-      border-radius: var(--radius-card);
-      overflow: hidden;
-      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.02);
-    }
-    .table-header {
-      display: grid;
-      grid-template-columns: 2.2fr 1.6fr 1.2fr 1.2fr 1.4fr;
-      padding: 12px 16px;
-      background: var(--color-canvas);
-      font-size: 0.8rem;
-      font-weight: 600;
-      color: var(--color-muted);
-      border-bottom: 1px solid var(--color-divider);
-      text-transform: uppercase;
-      letter-spacing: 0.04em;
-    }
-    .cat-grid {
-      grid-template-columns: 2fr 1.8fr 1.5fr 1fr 1fr !important;
-    }
-    .table-row {
-      display: grid;
-      grid-template-columns: 2.2fr 1.6fr 1.2fr 1.2fr 1.4fr;
-      padding: 14px 16px;
-      border-bottom: 1px solid #f6f5f2;
-      align-items: center;
-      font-size: 0.88rem;
-    }
-    .prod-cell {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-    }
-    .thumb {
-      width: 40px;
-      height: 48px;
-      background: #eee;
-      border-radius: var(--radius-control);
-      overflow: hidden;
-      flex-shrink: 0;
-    }
-    .thumb img {
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-    }
-    .slug-cell {
-      font-family: monospace;
-      color: var(--color-muted);
-      font-size: 0.82rem;
-    }
-    .price-cell {
-      color: var(--color-accent);
-    }
-    .parent-cell {
-      color: var(--color-muted);
-      font-size: 0.84rem;
-    }
-    .status-badge {
-      font-size: 0.72rem;
-      padding: 3px 8px;
-      border-radius: 12px;
-      font-weight: 600;
-    }
-    .status-published { background: #e8f5e9; color: #2e7d32; }
-    .status-draft { background: #fff8e1; color: var(--color-warning); }
-    .status-archived { background: #f5f5f5; color: #999; }
-
-    .actions-cell {
-      display: flex;
-      gap: 8px;
-    }
-    .btn-action {
-      background: var(--color-canvas);
-      border: 1px solid var(--color-border);
-      padding: 5px 10px;
-      border-radius: var(--radius-control);
-      font-size: 0.78rem;
-      cursor: pointer;
-      transition: background 0.15s;
-    }
-    .btn-action:hover {
-      background: var(--color-divider);
-    }
-    .btn-action-accent {
-      background: #f4efe9;
-      border-color: #dfd4c5;
-      color: #745136;
-      font-weight: 500;
-    }
-    .btn-action-accent:hover {
-      background: #e9decb;
-    }
-    .modal-form {
-      display: flex;
-      flex-direction: column;
-      gap: 14px;
-    }
-    .form-row {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 14px;
-    }
-    .modal-form label, .sub-form-card label {
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-      font-size: 0.85rem;
-      color: #444;
-    }
-    .modal-form input, .modal-form select, .modal-form textarea,
-    .sub-form-card input, .sub-form-card select {
-      border: 1px solid var(--color-border);
-      border-radius: var(--radius-control);
-      padding: 9px 12px;
-      font-size: 0.88rem;
-      outline: none;
-    }
-    .modal-actions {
-      display: flex;
-      justify-content: flex-end;
-      gap: 10px;
-      margin-top: 10px;
-    }
-    .loading-box, .empty-state {
-      text-align: center;
-      padding: 50px 0;
-      color: var(--color-muted);
-    }
-    .spinner {
-      width: 32px;
-      height: 32px;
-      border: 3px solid var(--color-divider);
-      border-top-color: var(--color-text);
-      border-radius: 50%;
-      animation: spin 0.8s linear infinite;
-      margin: 0 auto 12px;
-    }
+    .f-sel { display: flex; flex-direction: column; gap: 4px; font: 600 11px/14px var(--font-sans); color: var(--ui-ink-soft); min-width: 150px; }
+    .scope-note { margin: 10px 0 16px; font-size: 12px; color: var(--ui-subtle); }
+    .table-wrap { overflow-x: auto; border: 1px solid var(--admin-line); background: var(--ui-bg); }
+    .tbl { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 880px; }
+    .tbl th { text-align: left; padding: 12px 14px; background: var(--ui-bg-soft); font: 700 11px/16px var(--font-sans); letter-spacing: .4px; text-transform: uppercase; color: var(--ui-ink-soft); border-bottom: 1px solid var(--admin-line); white-space: nowrap; }
+    .tbl td { padding: 12px 14px; border-bottom: 1px solid var(--admin-line-soft); vertical-align: middle; }
+    .tbl tbody tr:last-child td { border-bottom: 0; }
+    .tbl tbody tr:hover { background: var(--admin-canvas); }
+    .c-img { width: 72px; } .c-num { text-align: right; } .c-act { text-align: right; white-space: nowrap; } .c-price { white-space: nowrap; font-weight: 600; }
+    .thumb { width: 48px; height: 60px; background: var(--ui-bg-image); overflow: hidden; }
+    .thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .p-name { display: block; font-weight: 600; color: var(--ui-ink); overflow-wrap: anywhere; }
+    .p-sub { display: block; margin-top: 2px; font-size: 12px; color: var(--ui-subtle); }
+    .mono { font-family: ui-monospace, monospace; font-size: 12px; color: var(--ui-ink-soft); }
+    .dots { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+    .dot { width: 14px; height: 14px; border-radius: 50%; border: 1px solid var(--ui-line); }
+    .stock-low { color: var(--ui-warning); font-weight: 700; } .stock-out { color: var(--ui-danger); font-weight: 700; }
+    .badge { display: inline-block; padding: 3px 10px; border-radius: 999px; font: 600 11px/16px var(--font-sans); white-space: nowrap; }
+    .s-published { background: var(--ui-success-bg); color: var(--ui-success); }
+    .s-draft { background: var(--ui-warning-bg); color: var(--ui-warning); }
+    .s-archived { background: var(--ui-bg-soft); color: var(--ui-ink-soft); }
+    .icon-btn { display: inline-flex; align-items: center; justify-content: center; width: 36px; height: 36px; border: 1px solid transparent; border-radius: 2px; background: none; color: var(--ui-ink-soft); cursor: pointer; text-decoration: none; }
+    .icon-btn:hover { background: var(--ui-bg-soft); border-color: var(--admin-line); color: var(--ui-ink); }
+    .state-box { text-align: center; padding: 56px 16px; color: var(--ui-ink-soft); display: flex; flex-direction: column; align-items: center; gap: 12px; }
+    .spinner { width: 30px; height: 30px; border: 3px solid var(--ui-line-soft); border-top-color: var(--ui-ink); border-radius: 50%; animation: spin .8s linear infinite; }
     @keyframes spin { to { transform: rotate(360deg); } }
+    .link { color: var(--ui-accent); font-weight: 600; font-size: 12px; text-decoration: underline; }
+    .btn-outline { text-decoration: none; display: inline-flex; align-items: center; }
 
-    /* Variants Manager Styles */
-    .variants-manager-body {
-      display: flex;
-      flex-direction: column;
-      gap: 16px;
-    }
-    .variants-header-row {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding-bottom: 8px;
-      border-bottom: 1px solid var(--color-divider);
-    }
-    .variants-header-row h4 {
-      margin: 0;
-      font-size: 1rem;
-      font-weight: 600;
-    }
-    .sub-form-card {
-      background: var(--color-canvas);
-      border: 1px solid var(--color-divider);
-      border-radius: 6px;
-      padding: 16px;
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-    }
-    .sub-form-card h5 {
-      margin: 0 0 4px;
-      font-size: 0.92rem;
-      font-weight: 600;
-      color: var(--color-text);
-    }
-    .edit-card {
-      background: #fdfbf7;
-      border-color: #dfd4c5;
-    }
-    .variants-table {
-      border: 1px solid var(--color-divider);
-      border-radius: 6px;
-      overflow: hidden;
-      font-size: 0.85rem;
-    }
-    .v-head {
-      display: grid;
-      grid-template-columns: 1.8fr 1fr 1fr 1.4fr 1.2fr 1fr;
-      padding: 10px 14px;
-      background: #f8f7f4;
-      font-weight: 600;
-      color: var(--color-muted);
-      border-bottom: 1px solid var(--color-divider);
-    }
-    .v-row {
-      display: grid;
-      grid-template-columns: 1.8fr 1fr 1fr 1.4fr 1.2fr 1fr;
-      padding: 10px 14px;
-      border-bottom: 1px solid var(--color-canvas);
-      align-items: center;
-    }
-    .v-sku {
-      font-family: monospace;
-      color: #444;
-      font-size: 0.8rem;
-    }
-
-    .header-btns { display:flex; flex-wrap:wrap; gap:10px; }
-    .cat-cell { font-size:.8125rem; color:var(--color-muted); overflow-wrap:anywhere; }
-
-
+    .dform { display: flex; flex-direction: column; gap: 16px; }
+    .dform label { display: flex; flex-direction: column; gap: 6px; font: 600 12px/16px var(--font-sans); color: var(--ui-ink-soft); }
+    .two { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .block { border: 1px solid var(--admin-line); padding: 14px 16px 16px; margin: 0; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+    .block legend { padding: 0 6px; font: 700 12px/16px var(--font-sans); color: var(--ui-ink); }
+    .hint { margin: 0; font-size: 12px; color: var(--ui-subtle); }
+    .imgs { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 10px; }
+    .img-item { position: relative; aspect-ratio: 4 / 5; background: var(--ui-bg-image); overflow: hidden; }
+    .img-item img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .cover-tag { position: absolute; left: 4px; top: 4px; padding: 2px 6px; background: var(--ui-ink); color: #fff; font: 700 10px/14px var(--font-sans); }
+    .img-tools { position: absolute; inset: auto 0 0 0; display: flex; gap: 2px; background: #171717b3; }
+    .img-tools button { flex: 1; border: 0; background: none; color: #fff; padding: 5px 2px; font: 600 10px/12px var(--font-sans); cursor: pointer; }
+    .img-tools button:hover { background: #ffffff26; }
+    .img-add { display: flex; align-items: center; justify-content: center; aspect-ratio: 4 / 5; border: 1px dashed var(--ui-line); cursor: pointer; font: 600 12px var(--font-sans); color: var(--ui-ink-soft); text-align: center; }
+    .img-add input { position: absolute; width: 1px; height: 1px; opacity: 0; }
+    .img-add:hover { background: var(--ui-bg-soft); } .img-add.disabled { opacity: .6; cursor: progress; }
+    .variant { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; padding: 12px; background: var(--admin-canvas); border: 1px solid var(--admin-line-soft); }
+    .variant.add { background: var(--ui-pink-soft); border-color: var(--ui-pink); }
+    .v-stock { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; align-self: end; padding-bottom: 8px; font-size: 13px; }
+    .v-stock-label { font: 600 12px var(--font-sans); color: var(--ui-ink-soft); }
+    .v-actions { grid-column: 1 / -1; display: flex; justify-content: flex-end; gap: 10px; }
+    .visibility { border: 1px solid var(--admin-line); padding: 14px 16px; }
+    .switch { flex-direction: row !important; align-items: center; gap: 12px !important; cursor: pointer; }
+    .switch input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+    .track { position: relative; flex-shrink: 0; width: 44px; height: 24px; border-radius: 999px; background: var(--ui-line); transition: background .15s; }
+    .track::after { content: ''; position: absolute; top: 3px; left: 3px; width: 18px; height: 18px; border-radius: 50%; background: #fff; transition: transform .15s; }
+    .switch input:checked + .track { background: var(--ui-accent); }
+    .switch input:checked + .track::after { transform: translateX(20px); }
+    .switch input:focus-visible + .track { outline: 2px solid var(--ui-ink); outline-offset: 2px; }
+    .switch strong { display: block; font-size: 13px; color: var(--ui-ink); } .switch small { display: block; font-weight: 400; color: var(--ui-subtle); font-size: 12px; margin-top: 2px; }
+    .threshold { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 10px; font-size: 12px; color: var(--ui-ink-soft); }
+    .threshold small { color: var(--ui-subtle); }
+    .confirm-text { margin: 0 0 20px; font-size: 14px; line-height: 22px; color: var(--ui-ink-soft); }
+    .confirm-actions { display: flex; justify-content: flex-end; gap: 10px; }
+    @media (max-width: 980px) { .kpis { grid-template-columns: repeat(2, 1fr); } }
+    @media (max-width: 560px) { .kpis { grid-template-columns: 1fr; } .two, .variant { grid-template-columns: 1fr; } }
   `],
 })
-export class AdminProductsPage implements OnInit {
-  readonly pagination = new PaginationState(20);
-  paginationChanged(page: number): void { this.pagination.page.set(page); this.loadData(); }
-
+export class AdminProductsPage implements OnInit, OnDestroy {
+  protected readonly auth = inject(AuthService);
   private readonly api = inject(ApiService);
   private readonly toast = inject(ToastService);
+  private readonly route = inject(ActivatedRoute);
+  private readonly router = inject(Router);
 
-  readonly activeTab = signal<'products' | 'categories'>('products');
+  protected readonly productStatusLabel = productStatusLabel;
+  protected readonly categoryStatusLabel = categoryStatusLabel;
+  protected readonly variantStatusLabel = variantStatusLabel;
 
+  private readonly queryParams = toSignal(this.route.queryParamMap);
+  readonly activeTab = computed<'products' | 'categories'>(() => this.queryParams()?.get('tab') === 'categories' ? 'categories' : 'products');
+
+  // Danh sách + bộ lọc
   readonly products = signal<ProductSummary[]>([]);
+  readonly details = signal<Record<string, ProductDetail>>({});
   readonly categories = signal<Category[]>([]);
-  readonly loading = signal<boolean>(true);
-  readonly loadingCats = signal<boolean>(false);
+  readonly loading = signal(true);
+  readonly loadError = signal('');
+  readonly detailsLoading = signal(false);
+  readonly loadingCats = signal(false);
+  readonly page = signal(1);
+  readonly total = signal(0);
+  readonly pageSize = signal(20);
+  readonly statusFilter = signal('');
+  readonly stockFilter = signal<StockFilter>('all');
+  readonly sortKey = signal<SortKey>('default');
+  readonly query = signal('');
+  readonly categoryFilter = signal('');
+  readonly hasServerFilter = computed(() => !!(this.query().trim() || this.statusFilter() || this.categoryFilter()));
+  private readonly search$ = new Subject<string>();
+  private readonly subs = new Subscription();
+  private listSub?: Subscription;
+  private detailsSub?: Subscription;
 
-  readonly productModalOpen = signal<boolean>(false);
-  readonly categoryModalOpen = signal<boolean>(false);
-  readonly variantsManagerOpen = signal<boolean>(false);
+  // KPI
+  readonly publishedTotal = signal<number | null>(null);
+  readonly inventory = signal<InventoryItem[] | null>(null);
+  readonly settingsThreshold = signal<number | null>(null);
+  readonly effectiveThreshold = computed(() => this.settingsThreshold() ?? DEFAULT_LOW_STOCK);
 
-  readonly selectedProduct = signal<ProductSummary | null>(null);
-  readonly currentVariants = signal<ProductVariant[]>([]);
-  readonly loadingVariants = signal<boolean>(false);
+  private readonly stockNumbers = computed<number[] | null>(() => {
+    const inv = this.inventory();
+    if (inv) return inv.map(i => i.available);
+    const d = Object.values(this.details());
+    return d.length > 0 ? d.flatMap(p => p.variants.map(v => v.available)) : null;
+  });
+  readonly stockScope = computed(() => this.inventory() ? 'toàn kho' : 'trong trang này');
+  readonly lowCount = computed(() => { const s = this.stockNumbers(); return s ? s.filter(n => n <= this.effectiveThreshold()).length : null; });
+  readonly outCount = computed(() => { const s = this.stockNumbers(); return s ? s.filter(n => n === 0).length : null; });
+  readonly detailCount = computed(() => Object.keys(this.details()).length);
+  readonly stockValue = computed<number | null>(() => {
+    const d = Object.values(this.details());
+    if (d.length === 0) return null;
+    return d.reduce((sum, p) => sum + p.variants.reduce((s, v) => s + v.available * v.price, 0), 0);
+  });
 
-  readonly saving = signal<boolean>(false);
-  readonly savingCat = signal<boolean>(false);
-  readonly savingVariant = signal<boolean>(false);
+  readonly rows = computed<ProductRow[]>(() => {
+    const details = this.details();
+    const threshold = this.effectiveThreshold();
+    let list = this.products().map<ProductRow>(product => {
+      const detail = details[product.id] ?? null;
+      const prices = detail ? detail.variants.map(v => v.price) : [];
+      return {
+        product, detail,
+        minPrice: prices.length ? Math.min(...prices) : product.price,
+        maxPrice: prices.length ? Math.max(...prices) : product.price,
+        available: detail ? detail.variants.reduce((s, v) => s + v.available, 0) : null,
+        colors: detail ? [...new Set(detail.variants.map(v => v.color))] : [],
+        sizes: detail ? [...new Set(detail.variants.map(v => v.size))] : [],
+      };
+    });
+    const sf = this.stockFilter();
+    if (sf !== 'all') {
+      list = list.filter(r => {
+        if (r.available === null) return false;
+        if (sf === 'out') return r.available === 0;
+        if (sf === 'low') return r.available > 0 && r.available <= threshold;
+        return r.available > threshold;
+      });
+    }
+    const sk = this.sortKey();
+    const byPrice = (r: ProductRow) => r.minPrice;
+    const byStock = (r: ProductRow) => r.available ?? -1;
+    if (sk === 'name') list = [...list].sort((a, b) => a.product.name.localeCompare(b.product.name, 'vi'));
+    else if (sk === 'priceAsc') list = [...list].sort((a, b) => byPrice(a) - byPrice(b));
+    else if (sk === 'priceDesc') list = [...list].sort((a, b) => byPrice(b) - byPrice(a));
+    else if (sk === 'stockAsc') list = [...list].sort((a, b) => byStock(a) - byStock(b));
+    else if (sk === 'stockDesc') list = [...list].sort((a, b) => byStock(b) - byStock(a));
+    return list;
+  });
 
-  // Product form fields
+  // Drawer sản phẩm
+  readonly productDrawerOpen = signal(false);
+  readonly saving = signal(false);
+  readonly uploading = signal(false);
+  readonly prodImages = signal<string[]>([]);
+  readonly variants = signal<ProductVariant[]>([]);
+  readonly loadingVariants = signal(false);
+  readonly showAddVariant = signal(false);
+  readonly savingVariant = signal(false);
+  editingProductId = '';
   prodName = '';
   prodSlug = '';
   prodCategoryId = '';
@@ -682,171 +585,335 @@ export class AdminProductsPage implements OnInit {
   prodMaterial = '';
   prodStatus: 'DRAFT' | 'PUBLISHED' | 'ARCHIVED' = 'PUBLISHED';
   prodDescription = '';
-  prodImagesInput = '';
-  editingProductId = '';
+  variantEdits: Record<string, VariantEdit> = {};
+  private variantOriginals: Record<string, VariantEdit> = {};
+  varSku = '';
+  varSize = 'M';
+  varColor = '';
+  varPrice = 500000;
+  varStock = 0;
 
-  // Category form fields (POST /categories, PATCH /categories/:categoryId)
+  // Danh mục
+  readonly categoryDrawerOpen = signal(false);
+  readonly savingCat = signal(false);
+  editingCategoryId = '';
   catName = '';
   catSlug = '';
   catStatus: 'ACTIVE' | 'HIDDEN' = 'ACTIVE';
   catParentId: string | null = null;
-  editingCategoryId = '';
 
-  // New Variant form fields
-  showAddVariantForm = signal<boolean>(false);
-  varSku = '';
-  varSize = 'M';
-  varColor = 'Đen';
-  varPrice = 500000;
-  varStock = 50;
-
-  // Edit Variant form fields (PATCH /admin/products/:productId/variants/:variantId)
-  editingVariantId = signal<string>('');
-  varEditSku = '';
-  varEditSize = '';
-  varEditColor = '';
-  varEditPrice = 0;
-  varEditStatus: 'ACTIVE' | 'INACTIVE' = 'ACTIVE';
+  // Lưu trữ
+  readonly archiveTarget = signal<ProductSummary | null>(null);
+  readonly archiving = signal(false);
 
   ngOnInit(): void {
-    this.loadData();
+    const params = this.route.snapshot.queryParamMap;
+    this.query.set(params.get('q')?.trim() ?? '');
+    this.categoryFilter.set(params.get('category') ?? '');
+    // Chờ 300ms sau khi ngừng gõ, về trang 1, ghi lên URL rồi gọi API; yêu cầu cũ bị hủy trong loadProducts.
+    this.subs.add(this.search$.pipe(map(v => v.trim()), debounceTime(300), distinctUntilChanged()).subscribe(() => {
+      this.page.set(1);
+      this.syncUrl();
+      this.loadProducts();
+    }));
+    this.loadProducts();
     this.loadCategories();
+    this.api.adminListProducts('PUBLISHED', 1, 1).subscribe({ next: res => this.publishedTotal.set(res.total), error: () => this.publishedTotal.set(null) });
+    // Dữ liệu kho và ngưỡng chỉ đọc khi tài khoản có quyền; thiếu quyền thì bỏ qua êm.
+    if (this.auth.can('inventory.manage')) {
+      this.api.adminListInventory().subscribe({ next: res => this.inventory.set(res.items), error: () => this.inventory.set(null) });
+    }
+    if (this.auth.isAdmin()) {
+      this.api.adminGetSettings().subscribe({ next: s => this.settingsThreshold.set(s.lowStockThreshold), error: () => this.settingsThreshold.set(null) });
+    }
   }
 
-  loadData(): void {
+  ngOnDestroy(): void {
+    this.subs.unsubscribe();
+    this.listSub?.unsubscribe();
+    this.detailsSub?.unsubscribe();
+  }
+
+  money(value: number): string {
+    return `${Math.round(value).toLocaleString('vi-VN')}đ`;
+  }
+
+  onSearch(value: string): void {
+    this.query.set(value);
+    this.search$.next(value);
+  }
+
+  setCategoryFilter(value: string): void {
+    this.categoryFilter.set(value);
+    this.page.set(1);
+    this.syncUrl();
+    this.loadProducts();
+  }
+
+  /** Giữ ?q= và ?category= trên URL để tải lại trang vẫn còn bộ lọc; các tham số khác (tab) giữ nguyên. */
+  private syncUrl(): void {
+    void this.router.navigate([], {
+      relativeTo: this.route,
+      queryParams: { q: this.query().trim() || null, category: this.categoryFilter() || null },
+      queryParamsHandling: 'merge',
+      replaceUrl: true,
+    });
+  }
+
+  colorHex(name: string): string {
+    return COLOR_HEX[name.trim().toLowerCase()] ?? '#c4c7c7';
+  }
+
+  categoryName(id?: string | null): string {
+    if (!id) return '—';
+    return this.categories().find(c => c.id === id)?.name ?? '—';
+  }
+
+  parentName(parentId?: string | null): string {
+    return parentId ? this.categoryName(parentId) : '—';
+  }
+
+  // --- Tải dữ liệu ---
+  loadProducts(): void {
     this.loading.set(true);
-    this.pagination.load(() => this.api.adminListProducts(undefined, this.pagination.page(), this.pagination.limit), {
-      next: (res) => {
+    this.loadError.set('');
+    this.listSub?.unsubscribe();
+    this.listSub = this.api.adminListProducts(this.statusFilter() || undefined, this.page(), this.pageSize(), {
+      q: this.query().trim() || undefined, category: this.categoryFilter() || undefined,
+    }).subscribe({
+      next: res => {
         this.products.set(res.items);
+        this.total.set(res.total);
         this.loading.set(false);
+        this.loadDetails(res.items);
       },
-      error: () => this.loading.set(false),
+      error: err => {
+        this.loading.set(false);
+        this.loadError.set(err.error?.message || 'Không thể tải danh sách sản phẩm.');
+      },
+    });
+  }
+
+  /** Danh sách sản phẩm không kèm biến thể, nên lấy chi tiết từng dòng của trang hiện tại. */
+  private loadDetails(items: ProductSummary[]): void {
+    this.details.set({});
+    if (items.length === 0) return;
+    this.detailsLoading.set(true);
+    this.detailsSub?.unsubscribe();
+    this.detailsSub = forkJoin(items.map(p => this.api.adminGetProduct(p.id).pipe(catchError(() => of(null))))).subscribe(results => {
+      const map: Record<string, ProductDetail> = {};
+      for (const d of results) if (d) map[d.id] = d;
+      this.details.set(map);
+      this.detailsLoading.set(false);
     });
   }
 
   loadCategories(): void {
     this.loadingCats.set(true);
     this.api.adminCategories().subscribe({
-      next: (cats) => {
-        this.categories.set(cats);
-        this.loadingCats.set(false);
-        if (cats.length > 0 && !this.prodCategoryId) {
-          this.prodCategoryId = cats[0].id;
-        }
-      },
+      next: cats => { this.categories.set(cats); this.loadingCats.set(false); },
       error: () => this.loadingCats.set(false),
     });
   }
 
-  getParentName(parentId?: string | null): string {
-    if (!parentId) return '—';
-    const p = this.categories().find((c) => c.id === parentId);
-    return p ? p.name : '—';
+  setStatusFilter(value: string): void { this.statusFilter.set(value); this.page.set(1); this.loadProducts(); }
+  setPageSize(value: number): void { this.pageSize.set(Number(value)); this.page.set(1); this.loadProducts(); }
+  goToPage(page: number): void { this.page.set(page); this.loadProducts(); }
+
+  // --- Drawer sản phẩm ---
+  openCreateProduct(): void {
+    this.editingProductId = '';
+    this.prodName = ''; this.prodSlug = ''; this.prodDescription = ''; this.prodMaterial = '';
+    this.prodPrice = 500000; this.prodStatus = 'DRAFT'; this.prodCategoryId = '';
+    this.prodImages.set([]); this.variants.set([]); this.variantEdits = {}; this.variantOriginals = {};
+    this.showAddVariant.set(false);
+    this.productDrawerOpen.set(true);
   }
 
-  autoSlug(): void {
-    if (this.editingProductId) return;
-    this.prodSlug = this.slugify(this.prodName);
+  openEditProduct(product: ProductSummary): void {
+    this.editingProductId = product.id;
+    this.prodName = product.name; this.prodSlug = product.slug;
+    this.prodDescription = product.description || ''; this.prodMaterial = product.material || '';
+    this.prodPrice = product.price; this.prodCategoryId = product.categoryId || '';
+    this.prodStatus = product.status;
+    this.prodImages.set([...(product.images || [])]);
+    this.showAddVariant.set(false);
+    this.variants.set([]); this.variantEdits = {}; this.variantOriginals = {};
+    this.productDrawerOpen.set(true);
+    this.loadVariants();
   }
 
-  autoCategorySlug(): void {
-    if (this.editingCategoryId) return;
-    this.catSlug = this.slugify(this.catName);
+  closeProductDrawer(): void { this.productDrawerOpen.set(false); }
+
+  private loadVariants(): void {
+    if (!this.editingProductId) return;
+    this.loadingVariants.set(true);
+    this.api.adminGetProduct(this.editingProductId).subscribe({
+      next: detail => {
+        this.applyVariants(detail.variants || []);
+        this.loadingVariants.set(false);
+      },
+      error: () => {
+        this.loadingVariants.set(false);
+        this.toast.error('Không thể tải biến thể. Vui lòng thử lại.');
+      },
+    });
   }
+
+  private applyVariants(list: ProductVariant[]): void {
+    this.variants.set(list);
+    this.variantEdits = {}; this.variantOriginals = {};
+    for (const v of list) {
+      const edit: VariantEdit = { sku: v.sku, size: v.size, color: v.color, price: v.price, status: v.status || 'ACTIVE' };
+      this.variantEdits[v.id] = { ...edit };
+      this.variantOriginals[v.id] = edit;
+    }
+  }
+
+  autoSlug(): void { if (!this.editingProductId) this.prodSlug = this.slugify(this.prodName); }
+  autoCategorySlug(): void { if (!this.editingCategoryId) this.catSlug = this.slugify(this.catName); }
 
   private slugify(text: string): string {
-    return text
-      .toLowerCase()
-      .normalize('NFD')
-      .replace(/[̀-ͯ]/g, '')
-      .replace(/[đĐ]/g, 'd')
-      .replace(/[^a-z0-9\s-]/g, '')
-      .trim()
-      .replace(/\s+/g, '-');
+    return text.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[đĐ]/g, 'd')
+      .replace(/[^a-z0-9\s-]/g, '').trim().replace(/\s+/g, '-');
   }
 
-  openCreateProductModal(): void {
-    this.editingProductId = '';
-    this.prodName = '';
-    this.prodSlug = '';
-    this.prodDescription = '';
-    this.prodMaterial = '';
-    this.prodPrice = 500000;
-    this.prodStatus = 'PUBLISHED';
-    this.prodImagesInput = '';
-    this.productModalOpen.set(true);
+  toggleVisible(event: Event): void {
+    this.prodStatus = (event.target as HTMLInputElement).checked ? 'PUBLISHED' : 'DRAFT';
   }
 
-  openEditProductModal(product: ProductSummary): void {
-    this.editingProductId = product.id;
-    this.prodName = product.name;
-    this.prodSlug = product.slug;
-    this.prodDescription = product.description || '';
-    this.prodMaterial = product.material || '';
-    this.prodPrice = product.price;
-    this.prodCategoryId = product.categoryId || '';
-    this.prodStatus = product.status;
-    this.prodImagesInput = (product.images || []).join(', ');
-    this.productModalOpen.set(true);
+  uploadImage(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    input.value = '';
+    if (!file) return;
+    if (this.prodImages().length >= MAX_IMAGES) { this.toast.warning(`Tối đa 10 ảnh cho mỗi sản phẩm.`); return; }
+    this.uploading.set(true);
+    this.api.uploadImage(file, 'product').subscribe({
+      next: media => {
+        this.uploading.set(false);
+        const url = media.url; if (url) this.prodImages.update(list => [...list, url]);
+      },
+      error: err => {
+        this.uploading.set(false);
+        this.toast.error(err.error?.message || err.message || 'Không thể tải ảnh.');
+      },
+    });
+  }
+
+  removeImage(index: number): void { this.prodImages.update(list => list.filter((_, i) => i !== index)); }
+  makeCover(index: number): void {
+    this.prodImages.update(list => { const next = [...list]; const [item] = next.splice(index, 1); return [item, ...next]; });
   }
 
   saveProduct(): void {
-    if (!this.prodName || !this.prodSlug || !this.prodCategoryId) {
+    if (!this.prodName.trim() || !this.prodSlug.trim() || !this.prodCategoryId) {
       this.toast.warning('Vui lòng điền đủ tên, slug và danh mục.');
       return;
     }
-
-    this.saving.set(true);
-    const images = this.prodImagesInput
-      .split(',')
-      .map((s) => s.trim())
-      .filter(Boolean);
-
     const dto = {
-      name: this.prodName,
-      slug: this.prodSlug,
+      name: this.prodName.trim(),
+      slug: this.prodSlug.trim(),
       description: this.prodDescription,
       material: this.prodMaterial || undefined,
       price: this.prodPrice,
       categoryId: this.prodCategoryId,
       status: this.prodStatus,
-      images,
+      images: this.prodImages(),
     };
-    const request = this.editingProductId
-      ? this.api.adminUpdateProduct(this.editingProductId, dto)
-      : this.api.adminCreateProduct(dto);
-    request.subscribe({
+    this.saving.set(true);
+
+    if (!this.editingProductId) {
+      this.api.adminCreateProduct(dto).subscribe({
+        next: created => {
+          this.saving.set(false);
+          this.toast.success('Đã tạo sản phẩm. Hãy thêm biến thể cho sản phẩm.');
+          this.editingProductId = created.id;
+          this.loadProducts();
+          this.loadVariants();
+        },
+        error: err => { this.saving.set(false); this.toast.error(err.error?.message || 'Không thể lưu sản phẩm.'); },
+      });
+      return;
+    }
+
+    const changed = Object.keys(this.variantEdits).filter(id => this.isVariantChanged(id));
+    const productId = this.editingProductId;
+    const variantCalls = changed.map(id => {
+      const e = this.variantEdits[id];
+      return this.api.adminUpdateVariant(productId, id, {
+        sku: e.sku.trim(), size: e.size.trim(), color: e.color.trim(), price: Number(e.price), status: e.status,
+      });
+    });
+    forkJoin([this.api.adminUpdateProduct(productId, dto), ...variantCalls]).subscribe({
       next: () => {
         this.saving.set(false);
-        this.productModalOpen.set(false);
-        this.toast.success(this.editingProductId ? 'Đã cập nhật sản phẩm.' : 'Đã tạo sản phẩm mới.');
-        this.loadData();
+        this.productDrawerOpen.set(false);
+        this.toast.success('Đã cập nhật sản phẩm.');
+        this.loadProducts();
       },
-      error: (err) => {
-        this.saving.set(false);
-        this.toast.error(err.error?.message || 'Không thể lưu sản phẩm.');
-      },
+      error: err => { this.saving.set(false); this.toast.error(err.error?.message || 'Không thể lưu sản phẩm.'); },
     });
   }
 
-  // --- Category Actions (POST /categories, PATCH /categories/:categoryId) ---
-
-  openCreateCategoryModal(): void {
-    this.editingCategoryId = '';
-    this.catName = '';
-    this.catSlug = '';
-    this.catStatus = 'ACTIVE';
-    this.catParentId = null;
-    this.categoryModalOpen.set(true);
+  private isVariantChanged(id: string): boolean {
+    const a = this.variantEdits[id]; const b = this.variantOriginals[id];
+    return !!a && !!b && (a.sku !== b.sku || a.size !== b.size || a.color !== b.color || Number(a.price) !== b.price || a.status !== b.status);
   }
 
-  openEditCategoryModal(cat: Category): void {
-    this.editingCategoryId = cat.id;
-    this.catName = cat.name;
-    this.catSlug = cat.slug;
-    this.catStatus = cat.status || 'ACTIVE';
-    this.catParentId = cat.parentId || null;
-    this.categoryModalOpen.set(true);
+  startAddVariant(): void {
+    this.varSku = ''; this.varSize = 'M'; this.varColor = ''; this.varPrice = this.prodPrice; this.varStock = 0;
+    this.showAddVariant.set(true);
+  }
+
+  addVariant(): void {
+    if (!this.editingProductId || !this.varSku.trim() || !this.varSize.trim() || !this.varColor.trim()) {
+      this.toast.warning('Vui lòng điền đủ SKU, size và màu sắc.');
+      return;
+    }
+    this.savingVariant.set(true);
+    this.api.adminCreateVariant(this.editingProductId, {
+      sku: this.varSku.trim(), size: this.varSize.trim(), color: this.varColor.trim(),
+      price: this.varPrice, stockOnHand: this.varStock,
+    }).subscribe({
+      next: () => {
+        this.savingVariant.set(false);
+        this.showAddVariant.set(false);
+        this.toast.success('Đã thêm biến thể mới.');
+        this.loadVariants();
+        this.loadProducts();
+      },
+      error: err => { this.savingVariant.set(false); this.toast.error(err.error?.message || 'Không thể tạo biến thể.'); },
+    });
+  }
+
+  // --- Lưu trữ ---
+  askArchive(product: ProductSummary): void { this.archiveTarget.set(product); }
+  confirmArchive(): void {
+    const target = this.archiveTarget();
+    if (!target) return;
+    this.archiving.set(true);
+    this.api.adminUpdateProduct(target.id, { status: 'ARCHIVED' }).subscribe({
+      next: () => {
+        this.archiving.set(false);
+        this.archiveTarget.set(null);
+        this.toast.success('Đã lưu trữ sản phẩm.');
+        this.loadProducts();
+      },
+      error: err => { this.archiving.set(false); this.toast.error(err.error?.message || 'Không thể lưu trữ sản phẩm.'); },
+    });
+  }
+
+  // --- Danh mục ---
+  openCreateCategory(): void {
+    this.editingCategoryId = ''; this.catName = ''; this.catSlug = ''; this.catStatus = 'ACTIVE'; this.catParentId = null;
+    this.categoryDrawerOpen.set(true);
+  }
+
+  openEditCategory(cat: Category): void {
+    this.editingCategoryId = cat.id; this.catName = cat.name; this.catSlug = cat.slug;
+    this.catStatus = cat.status || 'ACTIVE'; this.catParentId = cat.parentId || null;
+    this.categoryDrawerOpen.set(true);
   }
 
   saveCategory(): void {
@@ -854,142 +921,17 @@ export class AdminProductsPage implements OnInit {
       this.toast.warning('Vui lòng nhập tên và slug của danh mục.');
       return;
     }
-
     this.savingCat.set(true);
+    const done = (message: string) => { this.savingCat.set(false); this.categoryDrawerOpen.set(false); this.toast.success(message); this.loadCategories(); };
+    const fail = (fallback: string) => (err: { error?: { message?: string } }) => { this.savingCat.set(false); this.toast.error(err.error?.message || fallback); };
     if (this.editingCategoryId) {
-      // PATCH /categories/:categoryId
       this.api.updateCategory(this.editingCategoryId, {
-        name: this.catName.trim(),
-        slug: this.catSlug.trim(),
-        status: this.catStatus,
-        parentId: this.catParentId || null,
-      }).subscribe({
-        next: () => {
-          this.savingCat.set(false);
-          this.categoryModalOpen.set(false);
-          this.toast.success('Đã cập nhật danh mục thành công.');
-          this.loadCategories();
-        },
-        error: (err) => {
-          this.savingCat.set(false);
-          this.toast.error(err.error?.message || 'Không thể cập nhật danh mục.');
-        },
-      });
+        name: this.catName.trim(), slug: this.catSlug.trim(), status: this.catStatus, parentId: this.catParentId || null,
+      }).subscribe({ next: () => done('Đã cập nhật danh mục.'), error: fail('Không thể cập nhật danh mục.') });
     } else {
-      // POST /categories
       this.api.createCategory({
-        name: this.catName.trim(),
-        slug: this.catSlug.trim(),
-        status: this.catStatus,
-        parentId: this.catParentId || undefined,
-      }).subscribe({
-        next: () => {
-          this.savingCat.set(false);
-          this.categoryModalOpen.set(false);
-          this.toast.success('Đã tạo danh mục mới thành công.');
-          this.loadCategories();
-        },
-        error: (err) => {
-          this.savingCat.set(false);
-          this.toast.error(err.error?.message || 'Không thể tạo danh mục.');
-        },
-      });
+        name: this.catName.trim(), slug: this.catSlug.trim(), status: this.catStatus, parentId: this.catParentId || undefined,
+      }).subscribe({ next: () => done('Đã tạo danh mục mới.'), error: fail('Không thể tạo danh mục.') });
     }
-  }
-
-  // --- Variants Manager & Edit (PATCH /admin/products/:productId/variants/:variantId) ---
-
-  openManageVariantsModal(prod: ProductSummary): void {
-    this.selectedProduct.set(prod);
-    this.showAddVariantForm.set(false);
-    this.editingVariantId.set('');
-    this.variantsManagerOpen.set(true);
-    this.loadProductVariants(prod);
-  }
-
-  private loadProductVariants(prod: ProductSummary): void {
-    this.loadingVariants.set(true);
-    this.api.adminGetProduct(prod.id).subscribe({
-      next: (detail) => {
-        this.currentVariants.set(detail.variants || []);
-        this.loadingVariants.set(false);
-      },
-      error: () => {
-        this.currentVariants.set([]);
-        this.loadingVariants.set(false);
-        this.toast.error('Không thể tải dữ liệu biến thể. Vui lòng thử lại.');
-      },
-    });
-  }
-
-  saveNewVariant(): void {
-    const prod = this.selectedProduct();
-    if (!prod || !this.varSku || !this.varSize || !this.varColor) {
-      this.toast.warning('Vui lòng điền đủ SKU, size và màu sắc.');
-      return;
-    }
-
-    this.savingVariant.set(true);
-    this.api.adminCreateVariant(prod.id, {
-      sku: this.varSku,
-      size: this.varSize,
-      color: this.varColor,
-      price: this.varPrice,
-      stockOnHand: this.varStock,
-    }).subscribe({
-      next: () => {
-        this.savingVariant.set(false);
-        this.showAddVariantForm.set(false);
-        this.toast.success('Đã thêm biến thể mới.');
-        this.loadProductVariants(prod);
-      },
-      error: (err) => {
-        this.savingVariant.set(false);
-        this.toast.error(err.error?.message || 'Không thể tạo biến thể.');
-      },
-    });
-  }
-
-  startEditVariant(variant: ProductVariant): void {
-    this.editingVariantId.set(variant.id);
-    this.varEditSku = variant.sku;
-    this.varEditSize = variant.size;
-    this.varEditColor = variant.color;
-    this.varEditPrice = variant.price;
-    this.varEditStatus = variant.status || 'ACTIVE';
-  }
-
-  cancelEditVariant(): void {
-    this.editingVariantId.set('');
-  }
-
-  submitUpdateVariant(): void {
-    const prod = this.selectedProduct();
-    const vid = this.editingVariantId();
-    if (!prod || !vid) return;
-
-    this.savingVariant.set(true);
-    // PATCH /admin/products/:productId/variants/:variantId
-    this.api.adminUpdateVariant(prod.id, vid, {
-      sku: this.varEditSku.trim(),
-      size: this.varEditSize.trim(),
-      color: this.varEditColor.trim(),
-      price: this.varEditPrice,
-      status: this.varEditStatus,
-    }).subscribe({
-      next: (updated) => {
-        this.savingVariant.set(false);
-        this.editingVariantId.set('');
-        this.toast.success('Đã cập nhật thông tin biến thể.');
-        // Update local state
-        this.currentVariants.update((list) =>
-          list.map((v) => (v.id === vid ? { ...v, ...updated } : v))
-        );
-      },
-      error: (err) => {
-        this.savingVariant.set(false);
-        this.toast.error(err.error?.message || 'Không thể cập nhật biến thể.');
-      },
-    });
   }
 }

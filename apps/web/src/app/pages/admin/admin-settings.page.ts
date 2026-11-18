@@ -1,482 +1,208 @@
 import { PaginationComponent, PaginationState } from '../../components/pagination.component';
 import { Component, OnInit, inject, signal } from '@angular/core';
+import { ActivatedRoute, RouterLink } from '@angular/router';
 import { DatePipe, JsonPipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import type { SystemSettings, AuditLogEntry } from '@fashion/contracts';
 import { ApiService } from '../../services/api.service';
 import { ToastService } from '../../services/toast.service';
+import { AdminReportTabsComponent } from '../../components/admin-report-tabs.component';
+import { auditActionLabel, auditEntityLabel } from '../../shared/labels';
 
 @Component({
   standalone: true,
-  imports: [PaginationComponent, FormsModule, DatePipe, JsonPipe],
+  imports: [PaginationComponent, FormsModule, DatePipe, JsonPipe, RouterLink, AdminReportTabsComponent],
   template: `
     <div class="admin-settings-container">
-      <header class="page-header">
-        <div>
-          <h1 class="page-title">Hệ thống & Kiểm toán</h1>
-          <p class="page-desc">Quản lý biểu phí, hạn ngạch trải nghiệm AI và nhật ký kiểm toán hành vi hệ thống.</p>
-        </div>
-      </header>
+      @if (activeTab() === 'audit') {
+        <fc-admin-report-tabs active="audit" />
+        <header class="au-head">
+          <div>
+            <h1 class="au-title">Báo cáo và Phân quyền</h1>
+            <p class="au-sub">Nhật ký ghi lại các thao tác quan trọng của quản trị viên và nhân viên.</p>
+          </div>
+        </header>
+      } @else {
+        <header class="st-head">
+          <div>
+            <h1 class="st-title">Cấu hình hệ thống</h1>
+            <p class="st-sub">Biểu phí vận chuyển, ngưỡng cảnh báo tồn kho và hạn ngạch trải nghiệm AI.</p>
+          </div>
+          <a class="btn-outline" routerLink="/admin/audit">Xem nhật ký hoạt động</a>
+        </header>
+      }
 
-      <!-- Tab Navigation -->
-      <div class="tab-nav">
-        <button
-          type="button"
-          class="tab-btn"
-          [class.active]="activeTab() === 'settings'"
-          (click)="activeTab.set('settings')"
-        >
-          ⚙ Cấu hình & Hạn ngạch AI
-        </button>
-        <button
-          type="button"
-          class="tab-btn"
-          [class.active]="activeTab() === 'audit'"
-          (click)="switchToAuditTab()"
-        >
-          📜 Nhật ký kiểm toán (Audit Logs)
-        </button>
-      </div>
-
-      <!-- TAB 1: SYSTEM SETTINGS & AI QUOTAS -->
+      <!-- CẤU HÌNH HỆ THỐNG (GET/PATCH /admin/settings, GET/PATCH /admin/ai-quotas) -->
       @if (activeTab() === 'settings') {
         @if (loading()) {
-          <div class="loading-box">
-            <div class="spinner"></div>
-            <p>Đang tải cấu hình hệ thống...</p>
-          </div>
+          <div class="au-state" role="status"><span class="au-spinner"></span><p>Đang tải cấu hình hệ thống…</p></div>
         } @else {
-          <div class="settings-form-layout">
-            <!-- Shipping Settings -->
-            <section class="card">
-              <h3>Chính sách vận chuyển & Giao hàng</h3>
-              <div class="form-grid">
-                <label>
-                  <span>Phí vận chuyển tiêu chuẩn (VND) *</span>
-                  <input type="number" [(ngModel)]="standardShippingFee" min="0" step="1000" />
-                  <span class="hint">Áp dụng cho mọi đơn hàng giao trong nước chưa đạt ngưỡng miễn phí.</span>
+          <div class="st-layout">
+            <section class="st-card" aria-labelledby="st-ship">
+              <header class="st-card-head">
+                <h2 id="st-ship">Vận chuyển</h2>
+                <p>Phí giao hàng và điều kiện miễn phí vận chuyển cho đơn trong nước.</p>
+              </header>
+              <div class="st-grid">
+                <label class="st-field">
+                  <span class="st-label">Phí giao hàng chuẩn *</span>
+                  <span class="st-input"><input type="number" [(ngModel)]="standardShippingFee" min="0" step="1000" /><span class="st-unit">đ</span></span>
+                  @if (feeError()) { <span class="st-err" role="alert">{{ feeError() }}</span> }
+                  @else { <span class="st-hint">Áp dụng cho đơn chưa đạt ngưỡng miễn phí.</span> }
                 </label>
-
-                <label>
-                  <span>Ngưỡng miễn phí vận chuyển (Free shipping threshold) *</span>
-                  <input type="number" [(ngModel)]="freeShippingThreshold" min="0" step="50000" />
-                  <span class="hint">Đơn hàng có giá trị tiền hàng từ mức này trở lên sẽ được miễn 100% phí ship.</span>
-                </label>
-              </div>
-            </section>
-
-            <!-- Inventory & Warehouse Settings -->
-            <section class="card">
-              <h3>Cảnh báo Kho hàng & Tồn kho</h3>
-              <div class="form-grid">
-                <label>
-                  <span>Ngưỡng cảnh báo sắp hết hàng (Low Stock Threshold) *</span>
-                  <input type="number" [(ngModel)]="lowStockThreshold" min="1" max="100" />
-                  <span class="hint">Khi số lượng khả dụng của biến thể xuống dưới ngưỡng này, hệ thống sẽ gắn nhãn cảnh báo đỏ.</span>
+                <label class="st-field">
+                  <span class="st-label">Ngưỡng miễn phí vận chuyển *</span>
+                  <span class="st-input"><input type="number" [(ngModel)]="freeShippingThreshold" min="0" step="50000" /><span class="st-unit">đ</span></span>
+                  @if (thresholdError()) { <span class="st-err" role="alert">{{ thresholdError() }}</span> }
+                  @else { <span class="st-hint">Đơn có tiền hàng từ mức này trở lên được miễn phí giao hàng.</span> }
                 </label>
               </div>
             </section>
 
-            <!-- AI Quotas (GET /admin/ai-quotas, PATCH /admin/ai-quotas) -->
-            <section class="card">
-              <div class="card-header-flex">
-                <h3>Hạn ngạch AI Try-On & Mix-Match (AI Quota)</h3>
-                <span class="badge-accent">Quản lý GPU</span>
-              </div>
-              <div class="form-grid">
-                <label>
-                  <span>Số lượt chạy AI tối đa mỗi ngày / người dùng *</span>
-                  <div class="quota-input-group">
-                    <input type="number" [(ngModel)]="aiDailyJobs" min="1" max="500" />
-                    <button type="button" class="btn-sub-action" [disabled]="savingQuota()" (click)="saveAiQuotaOnly()">
-                      {{ savingQuota() ? 'Đang lưu...' : 'Lưu riêng hạn ngạch AI' }}
-                    </button>
-                  </div>
-                  <span class="hint">Giới hạn số job AI Try-On & Mix-Match mỗi ngày cho mỗi tài khoản để bảo toàn tài nguyên GPU.</span>
+            <section class="st-card" aria-labelledby="st-stock">
+              <header class="st-card-head">
+                <h2 id="st-stock">Tồn kho</h2>
+                <p>Mức tồn kho để hệ thống đánh dấu sản phẩm sắp hết hàng.</p>
+              </header>
+              <div class="st-grid">
+                <label class="st-field">
+                  <span class="st-label">Ngưỡng cảnh báo tồn thấp *</span>
+                  <span class="st-input"><input type="number" [(ngModel)]="lowStockThreshold" min="1" max="100" /><span class="st-unit">sản phẩm</span></span>
+                  @if (stockError()) { <span class="st-err" role="alert">{{ stockError() }}</span> }
+                  @else { <span class="st-hint">Biến thể có số lượng khả dụng từ mức này trở xuống sẽ được gắn cảnh báo.</span> }
                 </label>
               </div>
             </section>
 
-            <div class="actions-bar">
-              <button type="button" class="btn-primary" [disabled]="saving()" (click)="saveAllSettings()">
-                {{ saving() ? 'Đang lưu toàn bộ...' : 'Lưu toàn bộ thay đổi' }}
+            <section class="st-card" aria-labelledby="st-ai">
+              <header class="st-card-head">
+                <h2 id="st-ai">Hạn ngạch AI</h2>
+                <p>Giới hạn số lượt trải nghiệm AI của mỗi khách hàng trong một ngày.</p>
+              </header>
+              <div class="st-grid">
+                <div class="st-field">
+                  <span class="st-label">Số lượt tối đa mỗi khách mỗi ngày</span>
+                  <strong class="st-readonly">{{ aiQuotaLoaded() ? aiDailyJobs + ' lượt/ngày' : '—' }}</strong>
+                </div>
+              </div>
+              <p class="st-hint">Hạn ngạch này dùng chung cho Thử đồ và Mix &amp; Match: lượt chạy của hai tính năng cộng dồn vào cùng một giới hạn mỗi ngày.</p>
+              <div class="st-card-foot">
+                <a class="btn-outline" routerLink="/admin/ai">Cấu hình tại AI Workflow</a>
+              </div>
+            </section>
+
+            <div class="st-actions">
+              <span class="st-updated">Cập nhật lần cuối: {{ fmtUpdated() }}</span>
+              <button type="button" class="btn-primary" [disabled]="saving() || hasErrors()" (click)="saveAllSettings()">
+                {{ saving() ? 'Đang lưu…' : 'Lưu thay đổi' }}
               </button>
             </div>
           </div>
         }
       }
 
-      <!-- TAB 2: AUDIT LOGS (GET /admin/audit-logs) -->
+      <!-- NHẬT KÝ HOẠT ĐỘNG (GET /admin/audit-logs) -->
       @if (activeTab() === 'audit') {
-        <div class="audit-layout">
-          <!-- Filter Bar -->
-          <div class="audit-filter-card">
-            <div class="filter-inputs">
-              <label>
-                <span>Loại đối tượng (Entity Type)</span>
-                <select [(ngModel)]="auditEntityType" (change)="loadAuditLogs()">
-                  <option value="">-- Tất cả đối tượng --</option>
-                  <option value="order">Đơn hàng (order)</option>
-                  <option value="product">Sản phẩm (product)</option>
-                  <option value="variant">Biến thể (variant)</option>
-                  <option value="voucher">Mã giảm giá (voucher)</option>
-                  <option value="refund">Hoàn tiền (refund)</option>
-                  <option value="user">Người dùng / Nhân sự (user)</option>
-                </select>
-              </label>
-
-              <label>
-                <span>Mã đối tượng (Entity ID)</span>
-                <input
-                  type="text"
-                  [(ngModel)]="auditEntityId"
-                  placeholder="Nhập ID cần lọc..."
-                  (keyup.enter)="filterAuditLogs()"
-                />
-              </label>
-            </div>
-
-            <div class="filter-actions">
-              <button type="button" class="btn-primary-sm" (click)="filterAuditLogs()">🔍 Lọc nhật ký</button>
-              <button type="button" class="btn-outline-sm" (click)="resetAuditFilter()">Làm mới</button>
-            </div>
-          </div>
-
-          @if (loadingAudit()) {
-            <div class="loading-box">
-              <div class="spinner"></div>
-              <p>Đang tải nhật ký kiểm toán...</p>
-            </div>
-          } @else if (auditLogs().length === 0) {
-            <div class="empty-state">
-              <p>Không tìm thấy nhật ký kiểm toán nào phù hợp với bộ lọc.</p>
-            </div>
-          } @else {
-            <div class="audit-table-card">
-              <div class="audit-table-header">
-                <span>Thời gian</span>
-                <span>Hành động (Action)</span>
-                <span>Đối tượng</span>
-                <span>Tác nhân (Actor)</span>
-                <span>Chi tiết thay đổi</span>
-              </div>
-
-              @for (log of auditLogs(); track log.id) {
-                <div class="audit-table-row">
-                  <span class="time-col">{{ log.createdAt | date:'HH:mm:ss dd/MM/yyyy' }}</span>
-                  <div>
-                    <span class="action-tag">{{ log.action }}</span>
-                  </div>
-                  <div class="entity-col">
-                    <strong class="entity-type">{{ log.entityType }}</strong>
-                    <code class="entity-id">{{ log.entityId }}</code>
-                  </div>
-                  <span class="actor-col">{{ log.actorId || 'SYSTEM' }}</span>
-                  <div class="meta-col">
-                    <pre class="meta-json">{{ log.metadata | json }}</pre>
-                  </div>
-                </div>
-              }
-            </div>
-
-            <!-- Pagination info -->
-            <div class="pagination-info">
-              <span>Hiển thị {{ auditLogs().length }} / {{ auditTotal() }} bản ghi kiểm toán</span>
-            </div>
-          }
+        <div class="au-filters">
+          <label>Loại đối tượng
+            <select [(ngModel)]="auditEntityType" (change)="filterAuditLogs()" name="auditEntityType">
+              <option value="">Tất cả đối tượng</option>
+              <option value="order">Đơn hàng</option>
+              <option value="product">Sản phẩm</option>
+              <option value="variant">Biến thể</option>
+              <option value="voucher">Mã giảm giá</option>
+              <option value="refund">Hoàn tiền</option>
+              <option value="user">Người dùng / Nhân sự</option>
+            </select>
+          </label>
+          <label>Mã định danh đối tượng
+            <input type="text" [(ngModel)]="auditEntityId" name="auditEntityId" placeholder="Nhập mã cần lọc…" (keyup.enter)="filterAuditLogs()" />
+          </label>
+          <button type="button" class="btn-primary" (click)="filterAuditLogs()">Lọc nhật ký</button>
+          <button type="button" class="btn-outline" (click)="resetAuditFilter()">Làm mới</button>
         </div>
+
+        @if (loadingAudit()) {
+          <div class="au-state" role="status"><span class="au-spinner"></span><p>Đang tải nhật ký hoạt động…</p></div>
+        } @else if (auditLogs().length === 0) {
+          <div class="au-state"><p>Không có nhật ký nào phù hợp với bộ lọc.</p></div>
+        } @else {
+          <div class="au-wrap">
+            <table class="au-tbl">
+              <thead>
+                <tr><th>Thời gian</th><th>Người thực hiện</th><th>Hành động</th><th>Đối tượng</th><th>Mã định danh</th><th>Chi tiết</th></tr>
+              </thead>
+              <tbody>
+                @for (log of auditLogs(); track log.id) {
+                  <tr>
+                    <td class="nowrap">{{ log.createdAt | date:'dd/MM/yyyy HH:mm:ss' }}</td>
+                    <td>{{ actorName(log.actorId) }}</td>
+                    <td><span class="au-tag" [attr.title]="log.action">{{ actionText(log.action) }}</span></td>
+                    <td>{{ entityText(log.entityType) }}</td>
+                    <td><code class="au-id">{{ log.entityId }}</code></td>
+                    <td>
+                      @if (hasMeta(log)) {
+                        <details><summary>Xem</summary><pre class="au-json">{{ log.metadata | json }}</pre></details>
+                      } @else { — }
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+          <p class="au-note">Hiển thị {{ auditLogs().length }} / {{ auditTotal() }} bản ghi.</p>
+        }
       }
     </div>
 
     @if (activeTab() === 'audit') {<fc-pagination label="Nhật ký hệ thống" [page]="pagination.page()" [total]="pagination.total()" [limit]="pagination.limit" [loading]="loadingAudit()" (pageChange)="paginationChanged($event)" />}
 `,
   styles: [`
-    .admin-settings-container {
-      max-width: 1000px;
-      display: flex;
-      flex-direction: column;
-      gap: 20px;
-    }
-    .page-header {
-      margin-bottom: 4px;
-    }
-    .page-title {
-      font-family: Georgia, serif;
-      font-size: 1.8rem;
-      margin: 0 0 6px;
-      font-weight: 500;
-    }
-    .page-desc {
-      color: var(--color-muted);
-      font-size: 0.9rem;
-      margin: 0;
-    }
-    .tab-nav {
-      display: flex;
-      gap: 12px;
-      border-bottom: 1px solid var(--color-divider);
-      padding-bottom: 8px;
-    }
-    .tab-btn {
-      background: none;
-      border: 0;
-      padding: 8px 16px;
-      font-size: 0.92rem;
-      font-weight: 500;
-      color: var(--color-muted);
-      border-radius: var(--radius-control);
-      cursor: pointer;
-      transition: all 0.15s;
-    }
-    .tab-btn.active {
-      background: var(--color-text);
-      color: var(--color-surface);
-      font-weight: 600;
-    }
-    .settings-form-layout {
-      display: flex;
-      flex-direction: column;
-      gap: 24px;
-    }
-    .card {
-      background: var(--color-surface);
-      border: 1px solid var(--color-divider);
-      border-radius: var(--radius-card);
-      padding: 24px;
-      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.02);
-    }
-    .card-header-flex {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 18px;
-      padding-bottom: 12px;
-      border-bottom: 1px solid var(--color-divider);
-    }
-    .card h3 {
-      font-family: Georgia, serif;
-      font-size: 1.2rem;
-      margin: 0 0 18px;
-      padding-bottom: 12px;
-      border-bottom: 1px solid var(--color-divider);
-      font-weight: 500;
-      color: var(--color-text);
-    }
-    .card-header-flex h3 {
-      margin: 0 !important;
-      padding-bottom: 0 !important;
-      border-bottom: 0 !important;
-    }
-    .badge-accent {
-      background: #f4efe9;
-      color: #745136;
-      font-size: 0.75rem;
-      padding: 3px 8px;
-      border-radius: 10px;
-      font-weight: 600;
-    }
-    .form-grid {
-      display: flex;
-      flex-direction: column;
-      gap: 16px;
-    }
-    .form-grid label {
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-      font-size: 0.88rem;
-      color: #333;
-    }
-    .form-grid input, .form-grid select {
-      border: 1px solid var(--color-border);
-      border-radius: var(--radius-control);
-      padding: 10px 14px;
-      font-size: 0.95rem;
-      max-width: 400px;
-      outline: none;
-    }
-    .quota-input-group {
-      display: flex;
-      gap: 10px;
-      align-items: center;
-    }
-    .quota-input-group input {
-      width: 140px;
-    }
-    .btn-sub-action {
-      padding: 8px 14px;
-      background: var(--color-canvas);
-      border: 1px solid var(--color-border);
-      border-radius: var(--radius-control);
-      font-size: 0.82rem;
-      cursor: pointer;
-      color: #555;
-      transition: all 0.15s;
-    }
-    .btn-sub-action:hover {
-      background: var(--color-divider);
-      color: var(--color-text);
-    }
-    .hint {
-      font-size: 0.78rem;
-      color: var(--color-muted);
-      line-height: 1.4;
-    }
-    .actions-bar {
-      display: flex;
-      justify-content: flex-end;
-      padding-top: 10px;
-    }
-    .loading-box, .empty-state {
-      text-align: center;
-      padding: 60px 0;
-      color: var(--color-muted);
-    }
-    .spinner {
-      width: 32px;
-      height: 32px;
-      border: 3px solid var(--color-divider);
-      border-top-color: var(--color-text);
-      border-radius: 50%;
-      animation: spin 0.8s linear infinite;
-      margin: 0 auto 14px;
-    }
+    :host { display: block; }
+    .admin-settings-container { display: flex; flex-direction: column; gap: 16px; }
+    .st-head { display: flex; justify-content: space-between; align-items: flex-end; flex-wrap: wrap; gap: 16px; }
+    .st-title { margin: 0; font: 500 32px/40px var(--font-serif); }
+    .st-sub { margin: 4px 0 0; font-size: 13px; color: var(--ui-ink-soft); }
+    .st-head a { text-decoration: none; display: inline-flex; align-items: center; }
+    .st-layout { display: flex; flex-direction: column; gap: 16px; max-width: 880px; }
+    .st-card { background: var(--ui-bg); border: 1px solid var(--admin-line); padding: 24px; display: flex; flex-direction: column; gap: 16px; }
+    .st-card-head h2 { margin: 0; font: 500 22px/30px var(--font-serif); }
+    .st-card-head p { margin: 2px 0 0; font-size: 13px; color: var(--ui-ink-soft); }
+    .st-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 20px; }
+    .st-field { display: flex; flex-direction: column; gap: 6px; }
+    .st-label { font: 700 11px/16px var(--font-sans); letter-spacing: .4px; text-transform: uppercase; color: var(--ui-ink-soft); }
+    .st-input { display: flex; align-items: stretch; border: 1px solid var(--ui-line); border-radius: 2px; background: var(--ui-bg); }
+    .st-input:focus-within { border-color: var(--ui-ink); }
+    .st-input input { flex: 1; min-width: 0; border: 0; padding: 10px 12px; background: transparent; font: 400 14px/20px var(--font-sans); color: var(--ui-ink); outline: none; }
+    .st-unit { display: inline-flex; align-items: center; padding: 0 12px; background: var(--ui-bg-soft); border-left: 1px solid var(--ui-line); font: 600 12px/16px var(--font-sans); color: var(--ui-ink-soft); white-space: nowrap; }
+    .st-readonly { font: 600 15px/22px var(--font-sans); color: var(--ui-ink); }
+    .st-hint { margin: 0; font-size: 12px; line-height: 16px; color: var(--ui-subtle); }
+    .st-err { font-size: 12px; line-height: 16px; color: var(--ui-danger); }
+    .st-card-foot { display: flex; justify-content: flex-end; }
+    .st-actions { display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap; padding-top: 4px; }
+    .st-updated { font-size: 12px; color: var(--ui-subtle); }
     @keyframes spin { to { transform: rotate(360deg); } }
 
-    /* Audit Logs Styles */
-    .audit-layout {
-      display: flex;
-      flex-direction: column;
-      gap: 16px;
-    }
-    .audit-filter-card {
-      background: var(--color-surface);
-      border: 1px solid var(--color-divider);
-      border-radius: var(--radius-card);
-      padding: 16px 20px;
-      display: flex;
-      justify-content: space-between;
-      align-items: flex-end;
-      flex-wrap: wrap;
-      gap: 16px;
-    }
-    .filter-inputs {
-      display: flex;
-      gap: 16px;
-      flex-wrap: wrap;
-    }
-    .filter-inputs label {
-      display: flex;
-      flex-direction: column;
-      gap: 4px;
-      font-size: 0.82rem;
-      color: #555;
-    }
-    .filter-inputs select, .filter-inputs input {
-      padding: 8px 12px;
-      border: 1px solid var(--color-border);
-      border-radius: var(--radius-control);
-      font-size: 0.88rem;
-      outline: none;
-    }
-    .filter-actions {
-      display: flex;
-      gap: 8px;
-    }
-    .btn-primary-sm {
-      padding: 8px 16px;
-      background: var(--color-text);
-      color: var(--color-surface);
-      border: 0;
-      border-radius: var(--radius-control);
-      font-size: 0.85rem;
-      cursor: pointer;
-    }
-    .btn-outline-sm {
-      padding: 8px 14px;
-      background: var(--color-canvas);
-      border: 1px solid var(--color-border);
-      border-radius: var(--radius-control);
-      font-size: 0.85rem;
-      cursor: pointer;
-    }
-    .audit-table-card {
-      background: var(--color-surface);
-      border: 1px solid var(--color-divider);
-      border-radius: var(--radius-card);
-      overflow: hidden;
-    }
-    .audit-table-header {
-      display: grid;
-      grid-template-columns: 1.5fr 1.6fr 1.8fr 1.2fr 2fr;
-      padding: 10px 14px;
-      background: var(--color-canvas);
-      font-size: 0.78rem;
-      font-weight: 600;
-      color: var(--color-muted);
-      text-transform: uppercase;
-      letter-spacing: 0.04em;
-      border-bottom: 1px solid var(--color-divider);
-    }
-    .audit-table-row {
-      display: grid;
-      grid-template-columns: 1.5fr 1.6fr 1.8fr 1.2fr 2fr;
-      padding: 12px 14px;
-      border-bottom: 1px solid #f6f5f2;
-      align-items: center;
-      font-size: 0.84rem;
-    }
-    .time-col {
-      color: var(--color-muted);
-      font-size: 0.8rem;
-    }
-    .action-tag {
-      display: inline-block;
-      padding: 2px 8px;
-      background: #f2efe9;
-      border-radius: var(--radius-control);
-      font-size: 0.75rem;
-      font-family: monospace;
-      color: #5d4530;
-      font-weight: 600;
-    }
-    .entity-col {
-      display: flex;
-      flex-direction: column;
-      gap: 2px;
-    }
-    .entity-type {
-      color: var(--color-text);
-      font-size: 0.82rem;
-    }
-    .entity-id {
-      color: var(--color-muted);
-      font-size: 0.75rem;
-    }
-    .actor-col {
-      color: var(--color-muted);
-      font-size: 0.8rem;
-      font-family: monospace;
-    }
-    .meta-col {
-      max-height: 70px;
-      overflow-y: auto;
-    }
-    .meta-json {
-      margin: 0;
-      font-size: 0.72rem;
-      background: var(--color-canvas);
-      padding: 6px 8px;
-      border-radius: var(--radius-control);
-      color: #444;
-      white-space: pre-wrap;
-      word-break: break-all;
-    }
-    .pagination-info {
-      font-size: 0.82rem;
-      color: var(--color-muted);
-      text-align: right;
-    }
+    /* Nhật ký hoạt động */
+    .au-head { display: flex; justify-content: space-between; align-items: flex-end; flex-wrap: wrap; gap: 16px; }
+    .au-title { margin: 0; font: 500 32px/40px var(--font-serif); }
+    .au-sub { margin: 4px 0 0; font-size: 13px; color: var(--ui-ink-soft); }
+    .au-filters { display: flex; gap: 12px; flex-wrap: wrap; align-items: flex-end; }
+    .au-filters label { display: flex; flex-direction: column; gap: 4px; font: 600 11px/14px var(--font-sans); color: var(--ui-ink-soft); min-width: 200px; }
+    .au-filters select, .au-filters input { box-sizing: border-box; padding: 10px 12px; border: 1px solid var(--ui-line); border-radius: 2px; background: var(--ui-bg); font: 400 14px/20px var(--font-sans); color: var(--ui-ink); }
+    .au-wrap { overflow-x: auto; border: 1px solid var(--admin-line); background: var(--ui-bg); }
+    .au-tbl { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 900px; }
+    .au-tbl th { text-align: left; padding: 12px 14px; background: var(--ui-bg-soft); font: 700 11px/16px var(--font-sans); letter-spacing: .4px; text-transform: uppercase; color: var(--ui-ink-soft); border-bottom: 1px solid var(--admin-line); white-space: nowrap; }
+    .au-tbl td { padding: 12px 14px; border-bottom: 1px solid var(--admin-line-soft); vertical-align: top; }
+    .au-tbl tbody tr:last-child td { border-bottom: 0; }
+    .nowrap { white-space: nowrap; }
+    .au-tag { display: inline-block; padding: 3px 10px; border-radius: 999px; background: var(--ui-pink-soft); color: var(--ui-accent); font: 600 11px/16px var(--font-sans); }
+    .au-id { font: 400 12px/16px ui-monospace, monospace; overflow-wrap: anywhere; }
+    .au-tbl summary { cursor: pointer; color: var(--ui-accent); font-weight: 600; }
+    .au-json { margin: 6px 0 0; padding: 8px; background: var(--ui-bg-soft); font-size: 11px; white-space: pre-wrap; word-break: break-all; max-width: 320px; }
+    .au-note { margin: 0; font-size: 12px; color: var(--ui-subtle); text-align: right; }
+    .au-state { text-align: center; padding: 56px 16px; color: var(--ui-ink-soft); display: flex; flex-direction: column; align-items: center; gap: 12px; }
+    .au-spinner { width: 30px; height: 30px; border: 3px solid var(--ui-line-soft); border-top-color: var(--ui-ink); border-radius: 50%; animation: spin 0.8s linear infinite; }
   `],
 })
 export class AdminSettingsPage implements OnInit {
@@ -485,18 +211,21 @@ export class AdminSettingsPage implements OnInit {
 
   private readonly api = inject(ApiService);
   private readonly toast = inject(ToastService);
+  private readonly route = inject(ActivatedRoute);
 
   readonly activeTab = signal<'settings' | 'audit'>('settings');
 
   readonly loading = signal<boolean>(true);
   readonly saving = signal<boolean>(false);
   readonly savingQuota = signal<boolean>(false);
+  readonly aiQuotaLoaded = signal<boolean>(false);
 
   // Settings & Quotas (GET/PATCH /admin/settings & GET/PATCH /admin/ai-quotas)
   standardShippingFee = 30000;
   freeShippingThreshold = 1000000;
   lowStockThreshold = 5;
   aiDailyJobs = 10;
+  readonly updatedAt = signal<string | null>(null);
 
   // Audit logs (GET /admin/audit-logs)
   readonly auditLogs = signal<AuditLogEntry[]>([]);
@@ -504,9 +233,17 @@ export class AdminSettingsPage implements OnInit {
   readonly auditTotal = signal<number>(0);
   auditEntityType = '';
   auditEntityId = '';
+  readonly actorNames = signal<Record<string, string>>({});
 
   ngOnInit(): void {
-    this.loadSettings();
+    // Route /admin/audit dùng chung component này với data.view = 'audit'
+    if (this.route.snapshot?.data?.['view'] === 'audit') {
+      this.activeTab.set('audit');
+      this.loadActorNames();
+      this.loadAuditLogs();
+    } else {
+      this.loadSettings();
+    }
   }
 
   loadSettings(): void {
@@ -517,6 +254,7 @@ export class AdminSettingsPage implements OnInit {
         this.standardShippingFee = s.standardShippingFee ?? 30000;
         this.freeShippingThreshold = s.freeShippingThreshold ?? 1000000;
         this.lowStockThreshold = s.lowStockThreshold ?? 5;
+        this.updatedAt.set(s.updatedAt ?? null);
         this.loading.set(false);
       },
       error: () => this.loading.set(false),
@@ -527,12 +265,37 @@ export class AdminSettingsPage implements OnInit {
       next: (quota) => {
         if (quota && typeof quota.dailyJobs === 'number') {
           this.aiDailyJobs = quota.dailyJobs;
+          this.aiQuotaLoaded.set(true);
         }
       },
     });
   }
 
+  // --- Kiểm tra giá trị nhập (khớp ràng buộc của API: số nguyên, không âm) ---
+  private intError(value: unknown, min: number, max: number | null, label: string): string {
+    if (value === null || value === undefined || value === '' || typeof value !== 'number' || !Number.isInteger(value)) return `${label} phải là số nguyên.`;
+    if (value < min) return min === 0 ? `${label} không được âm.` : `${label} tối thiểu là ${min}.`;
+    if (max !== null && value > max) return `${label} tối đa là ${max}.`;
+    return '';
+  }
+  feeError(): string { return this.intError(this.standardShippingFee, 0, null, 'Phí giao hàng'); }
+  thresholdError(): string { return this.intError(this.freeShippingThreshold, 0, null, 'Ngưỡng miễn phí vận chuyển'); }
+  stockError(): string { return this.intError(this.lowStockThreshold, 1, 100, 'Ngưỡng tồn thấp'); }
+  quotaError(): string { return this.intError(this.aiDailyJobs, 1, 100, 'Hạn ngạch AI'); }
+  hasErrors(): boolean { return !!(this.feeError() || this.thresholdError() || this.stockError() || this.quotaError()); }
+
+  fmtUpdated(): string {
+    const value = this.updatedAt();
+    if (!value) return '—';
+    const d = new Date(value);
+    if (Number.isNaN(d.getTime())) return '—';
+    const p = (n: number) => String(n).padStart(2, '0');
+    return `${p(d.getDate())}/${p(d.getMonth() + 1)}/${d.getFullYear()} ${p(d.getHours())}:${p(d.getMinutes())}`;
+  }
+
   saveAiQuotaOnly(): void {
+    const invalid = this.quotaError();
+    if (invalid) { this.toast.error(invalid); return; }
     this.savingQuota.set(true);
     // PATCH /admin/ai-quotas
     this.api.adminUpdateAiQuota({ dailyJobs: this.aiDailyJobs }).subscribe({
@@ -549,6 +312,8 @@ export class AdminSettingsPage implements OnInit {
   }
 
   saveAllSettings(): void {
+    const invalid = this.feeError() || this.thresholdError() || this.stockError() || this.quotaError();
+    if (invalid) { this.toast.error(invalid); return; }
     this.saving.set(true);
     this.api.adminUpdateSettings({
       standardShippingFee: this.standardShippingFee,
@@ -556,9 +321,8 @@ export class AdminSettingsPage implements OnInit {
       lowStockThreshold: this.lowStockThreshold,
       aiDailyJobs: this.aiDailyJobs,
     }).subscribe({
-      next: () => {
-        // Also update AI quota
-        this.api.adminUpdateAiQuota({ dailyJobs: this.aiDailyJobs }).subscribe();
+      next: (res) => {
+        if (res?.updatedAt) this.updatedAt.set(res.updatedAt);
         this.saving.set(false);
         this.toast.success('Đã lưu toàn bộ cấu hình hệ thống.');
       },
@@ -570,13 +334,6 @@ export class AdminSettingsPage implements OnInit {
   }
 
   // --- Audit Logs (GET /admin/audit-logs) ---
-
-  switchToAuditTab(): void {
-    this.activeTab.set('audit');
-    if (this.auditLogs().length === 0) {
-      this.loadAuditLogs();
-    }
-  }
 
   loadAuditLogs(): void {
     this.loadingAudit.set(true);
@@ -602,4 +359,20 @@ export class AdminSettingsPage implements OnInit {
   }
 
   filterAuditLogs(): void { this.pagination.reset(); this.loadAuditLogs(); }
+
+  // --- Hiển thị nhật ký ---
+  private loadActorNames(): void {
+    const merge = (items: Array<{ id: string; fullName: string; email: string }>) =>
+      this.actorNames.update(m => ({ ...m, ...Object.fromEntries(items.map(u => [u.id, u.fullName || u.email])) }));
+    this.api.adminListUsers(1, 50, 'ADMIN').subscribe({ next: r => merge(r.items), error: () => undefined });
+    this.api.adminListUsers(1, 50, 'STAFF').subscribe({ next: r => merge(r.items), error: () => undefined });
+  }
+
+  actorName(id: string | null | undefined): string {
+    if (!id) return 'Hệ thống';
+    return this.actorNames()[id] ?? `Tài khoản …${id.slice(-6)}`;
+  }
+  actionText(action: string): string { return auditActionLabel(action); }
+  entityText(type: string): string { return auditEntityLabel(type); }
+  hasMeta(log: AuditLogEntry): boolean { return !!log.metadata && Object.keys(log.metadata).length > 0; }
 }
