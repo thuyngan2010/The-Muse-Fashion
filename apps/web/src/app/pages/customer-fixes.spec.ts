@@ -24,3 +24,11 @@ describe('Home new arrivals', () => {
     expect(home).toContain('<a class="btn-outline" routerLink="/lookbooks">{{ content.newArrivals.viewAll }}');
   });
 });
+
+describe('AI Mix & Match hero links', () => {
+  it('"Xem lịch sử" uses the same plain text-link style as "Về trang Thử đồ" (no outlined box)', () => {
+    const page = source('./ai-mix-match.page.ts');
+    expect(page).toContain('<a routerLink="/ai/history" class="text-link">{{ content.historyLink }}</a>');
+    expect(page).toContain('<a routerLink="/ai/try-on" class="text-link">{{ content.tryOnLink }}</a>');
+  });
+});

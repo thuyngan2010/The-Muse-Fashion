@@ -32,7 +32,7 @@ function generateUUID(): string {
         <h1>{{ content.title }}</h1>
         <p>{{ content.description }}</p>
         <div class="hero-links">
-          <a routerLink="/ai/history" class="outline-button">{{ content.historyLink }}</a>
+          <a routerLink="/ai/history" class="text-link">{{ content.historyLink }}</a>
           <a routerLink="/ai/try-on" class="text-link">{{ content.tryOnLink }}</a>
         </div>
       </header>
