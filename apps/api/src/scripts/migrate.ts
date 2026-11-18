@@ -1,3 +1,4 @@
+import '../common/mongo-dns.js';
 import mongoose from 'mongoose';
 import { createHash, randomUUID } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
@@ -37,9 +38,13 @@ async function main() {
     const plan = [];
     for (const migration of migrations) {
       const source = await readFile(new URL(`../../src/migrations/${migration.file}`, import.meta.url));
-      const checksum = createHash('sha256').update(source).digest('hex');
+      // Git trên Windows đổi xuống dòng thành CRLF; băm theo LF để cùng một file cho cùng checksum trên mọi máy.
+      const checksum = createHash('sha256').update(source.toString('utf8').replace(/\r\n/g, '\n')).digest('hex');
+      const rawChecksum = createHash('sha256').update(source).digest('hex');
       const previous = await history.findOne({ _id: migration.id });
-      if (previous?.checksum && previous.checksum !== checksum) throw new Error(`Migration ${migration.id} checksum changed`);
+      if (previous?.checksum && previous.checksum !== checksum && previous.checksum !== rawChecksum) {
+        throw new Error(`Migration ${migration.id} checksum changed`);
+      }
       plan.push({ migration, checksum, completed: previous?.status === 'COMPLETED' });
     }
 

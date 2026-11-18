@@ -1,3 +1,4 @@
+import '../common/mongo-dns.js';
 import mongoose from 'mongoose';
 import { hash } from 'bcryptjs';
 import { User, UserSchema } from '../modules/users/user.schema.js';
