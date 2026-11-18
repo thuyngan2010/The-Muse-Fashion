@@ -1,4 +1,4 @@
-import { Body, Controller, ForbiddenException, Get, HttpCode, Post, Req, Res, UnauthorizedException } from '@nestjs/common';
+import { Body, Controller, ForbiddenException, Get, HttpCode, Post, Query, Req, Res, UnauthorizedException } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import type { Request, Response } from 'express';
 import { Public } from '../../common/public.decorator.js';
@@ -6,8 +6,10 @@ import type { AuthenticatedRequest } from '../../common/auth.guard.js';
 import {
   ChangePasswordDto,
   ForgotPasswordDto,
+  GoogleLoginDto,
   LoginDto,
   RegisterDto,
+  RegistrationStatusQueryDto,
   ResendVerificationDto,
   ResetPasswordDto,
   VerifyEmailDto,
@@ -33,6 +35,9 @@ export class AuthController {
   constructor(private readonly auth: AuthService) {}
 
   @Public() @Post('register') register(@Body() dto: RegisterDto) { return this.auth.register(dto); }
+  @Public() @Get('registration-status') registrationStatus(@Query() query: RegistrationStatusQueryDto, @Req() req: Request) {
+    return this.auth.registrationStatus(query.token, req);
+  }
   @Public() @Post('verify-email') verifyEmail(@Body() dto: VerifyEmailDto) { return this.auth.verifyEmail(dto.token); }
   @Public() @Post('resend-verification') resendVerification(@Body() dto: ResendVerificationDto, @Req() req: Request) {
     return this.auth.resendVerification(dto.email, req);
@@ -41,6 +46,14 @@ export class AuthController {
   @Public() @Post('login') @HttpCode(201)
   async login(@Body() dto: LoginDto, @Req() req: Request, @Res({ passthrough: true }) res: Response) {
     const session = await this.auth.login(dto, req);
+    setRefreshCookie(res, session.refreshToken, session.persistent);
+    const { refreshToken: _ignored, persistent: _persistent, ...body } = session;
+    return body;
+  }
+
+  @Public() @Post('google') @HttpCode(201)
+  async google(@Body() dto: GoogleLoginDto, @Req() req: Request, @Res({ passthrough: true }) res: Response) {
+    const session = await this.auth.loginWithGoogle(dto, req);
     setRefreshCookie(res, session.refreshToken, session.persistent);
     const { refreshToken: _ignored, persistent: _persistent, ...body } = session;
     return body;

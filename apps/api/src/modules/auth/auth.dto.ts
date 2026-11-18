@@ -16,6 +16,15 @@ export class VerifyEmailDto {
   @IsString() @MinLength(32) token!: string;
 }
 
+export class RegistrationStatusQueryDto {
+  @IsString() @MaxLength(2048) token!: string;
+}
+
+export class GoogleLoginDto {
+  @IsString() @MinLength(20) @MaxLength(4096) credential!: string;
+  @IsOptional() @IsBoolean() remember?: boolean;
+}
+
 export class ResendVerificationDto {
   @IsEmail() email!: string;
 }

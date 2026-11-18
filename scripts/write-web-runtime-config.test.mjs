@@ -18,10 +18,12 @@ after(() => {
   rmSync(root, { recursive: true, force: true });
 });
 
-function run(value, args = []) {
+function run(value, args = [], extraEnv = undefined) {
   const env = { ...process.env };
   delete env.PUBLIC_API_BASE_URL;
+  delete env.PUBLIC_GOOGLE_CLIENT_ID;
   if (value !== undefined) env.PUBLIC_API_BASE_URL = value;
+  if (extraEnv) Object.assign(env, extraEnv);
   return spawnSync(process.execPath, [join(root, 'scripts/config.mjs'), ...args], { env, encoding: 'utf8' });
 }
 
@@ -51,5 +53,27 @@ test('rejects protocol-relative URLs, credentials and query/fragment values', ()
   for (const value of ['//evil.example/api', 'https://user:pass@api.example.com/api/v1',
     'https://api.example.com/api/v1?token=secret', 'https://api.example.com/api/v1#fragment']) {
     assert.notEqual(run(value).status, 0, value);
+  }
+});
+
+test('omits googleClientId when PUBLIC_GOOGLE_CLIENT_ID is empty or unset', () => {
+  assert.equal(run('/api/v1').status, 0);
+  assert.doesNotMatch(readFileSync(output, 'utf8'), /googleClientId/);
+  assert.equal(run('/api/v1', [], { PUBLIC_GOOGLE_CLIENT_ID: '   ' }).status, 0);
+  assert.doesNotMatch(readFileSync(output, 'utf8'), /googleClientId/);
+});
+
+test('writes a valid Google OAuth client id', () => {
+  const id = '1234567890-abc.apps.googleusercontent.com';
+  assert.equal(run('/api/v1', [], { PUBLIC_GOOGLE_CLIENT_ID: ` ${id} ` }).status, 0);
+  assert.match(readFileSync(output, 'utf8'), /"googleClientId":"1234567890-abc\.apps\.googleusercontent\.com"/);
+  assert.match(readFileSync(output, 'utf8'), /"apiBaseUrl":"\/api\/v1"/);
+});
+
+test('rejects a Google client id with the wrong format', () => {
+  for (const value of ['not-a-client-id', 'abc.apps.googleusercontent.com.evil.example', '"><script>.apps.googleusercontent.com']) {
+    const result = run('/api/v1', [], { PUBLIC_GOOGLE_CLIENT_ID: value });
+    assert.notEqual(result.status, 0, value);
+    assert.match(result.stderr, /PUBLIC_GOOGLE_CLIENT_ID/);
   }
 });

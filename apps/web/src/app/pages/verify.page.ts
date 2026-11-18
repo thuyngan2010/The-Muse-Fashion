@@ -2,6 +2,7 @@ import { Component, inject, OnInit, signal } from '@angular/core';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { ApiService } from '../services/api.service';
+import { STORE_EMAIL_VERIFICATION_CONTENT } from '../shared/store-content';
 
 @Component({
   standalone: true,
@@ -15,20 +16,21 @@ import { ApiService } from '../services/api.service';
       <div class="auth-card">
         <header class="auth-header">
           <img class="auth-logo" src="/assets/brand/muse-logo-black.png" alt="MUSE">
-          <span class="eyebrow">XÁC MINH TÀI KHOẢN</span>
-          <h1 class="auth-title">Xác thực địa chỉ email</h1>
+          <span class="eyebrow">{{ content.eyebrow }}</span>
+          <h1 class="auth-title">{{ success() ? content.successTitle : content.title }}</h1>
         </header>
 
         @if (busy()) {
           <div class="state-box" role="status" aria-live="polite">
             <div class="spinner" aria-hidden="true"></div>
-            <p class="message-text">Đang tiến hành xác minh liên kết của bạn...</p>
+            <p class="message-text">{{ content.busy }}</p>
           </div>
         } @else if (success()) {
           <div class="state-box" role="status">
             <div class="icon-circle" aria-hidden="true">✓</div>
             <p class="message-text">{{ message() }}</p>
-            <a routerLink="/auth" class="btn-primary">ĐĂNG NHẬP</a>
+            <a routerLink="/auth" class="btn-primary">{{ verified.cta }}</a>
+            <p class="close-hint">{{ content.closeTabHint }}</p>
           </div>
         } @else {
           <div class="state-box">
@@ -37,16 +39,16 @@ import { ApiService } from '../services/api.service';
 
             @if (resendFeedbackSuccess()) {
               <div class="resend-section sent" role="status">
-                <strong>Đã gửi lại thư</strong>
+                <strong>{{ content.resendDoneTitle }}</strong>
                 <p class="feedback-text success">{{ resendFeedback() }}</p>
               </div>
             } @else {
               <div class="resend-section">
-                <p class="resend-prompt">Chưa nhận được email hoặc liên kết đã hết hạn?</p>
+                <p class="resend-prompt">{{ content.resendPrompt }}</p>
                 <form (ngSubmit)="handleResend()" class="resend-form">
-                  <input type="email" [(ngModel)]="resendEmail" name="email" placeholder="Nhập email của bạn" aria-label="Email nhận liên kết xác thực" required />
+                  <input type="email" [(ngModel)]="resendEmail" name="email" [placeholder]="content.resendPlaceholder" aria-label="Email nhận liên kết xác thực" required />
                   <button type="submit" class="btn-resend" [disabled]="resending() || !resendEmail">
-                    {{ resending() ? 'ĐANG GỬI...' : 'GỬI LẠI EMAIL XÁC THỰC' }}
+                    {{ resending() ? content.resendBusy : content.resendButton }}
                   </button>
                 </form>
                 @if (resendFeedback()) {
@@ -57,7 +59,7 @@ import { ApiService } from '../services/api.service';
           </div>
         }
 
-        <a routerLink="/auth" class="back-link">Quay lại đăng nhập</a>
+        <a routerLink="/auth" class="back-link">{{ content.backToLogin }}</a>
       </div>
     </main>
   `,
@@ -92,6 +94,7 @@ import { ApiService } from '../services/api.service';
     .feedback-text.success { margin: 6px 0 0; color: var(--ui-success, #276749); }
     .btn-primary { display: inline-flex; min-height: 44px; align-items: center; justify-content: center; padding: 0 28px; border: 1px solid var(--ui-ink, #171717); border-radius: 0; background: var(--ui-ink, #171717); color: #fff; font-size: 12px; font-weight: 700; letter-spacing: .8px; text-decoration: none; }
     .btn-primary:hover { background: var(--ui-pink, #f4b8c1); color: var(--ui-ink, #171717); }
+    .close-hint { margin: 0; color: var(--ui-subtle, #747878); font-size: 12px; }
     .back-link { align-self: center; margin-top: 28px; color: var(--ui-ink, #171717); font-size: 12px; font-weight: 700; letter-spacing: .6px; text-decoration: underline; text-underline-offset: 5px; }
     :is(button, a, input):focus-visible { outline: 2px solid var(--ui-accent, #8f485d); outline-offset: 3px; }
     @media (max-width: 980px) {
@@ -110,9 +113,11 @@ export class VerifyPage implements OnInit {
   private readonly route = inject(ActivatedRoute);
   private readonly api = inject(ApiService);
 
+  readonly content = STORE_EMAIL_VERIFICATION_CONTENT.verifyPage;
+  readonly verified = STORE_EMAIL_VERIFICATION_CONTENT.verified;
   readonly busy = signal<boolean>(true);
   readonly success = signal<boolean>(false);
-  readonly message = signal<string>('Đang xác minh liên kết...');
+  readonly message = signal<string>(STORE_EMAIL_VERIFICATION_CONTENT.verifyPage.busy);
 
   resendEmail = '';
   readonly resending = signal<boolean>(false);
@@ -124,7 +129,7 @@ export class VerifyPage implements OnInit {
     if (!token) {
       this.busy.set(false);
       this.success.set(false);
-      this.message.set('Liên kết xác minh không hợp lệ hoặc thiếu mã token.');
+      this.message.set(this.content.missingToken);
       return;
     }
 
@@ -132,14 +137,25 @@ export class VerifyPage implements OnInit {
       next: () => {
         this.busy.set(false);
         this.success.set(true);
-        this.message.set('Địa chỉ email của bạn đã được xác minh thành công. Bạn đã có thể đăng nhập vào tài khoản.');
+        this.message.set(this.content.success);
+        this.notifyOtherTabs();
       },
       error: () => {
         this.busy.set(false);
         this.success.set(false);
-        this.message.set('Liên kết xác minh đã hết hạn hoặc không còn hiệu lực.');
+        this.message.set(this.content.failed);
       },
     });
+  }
+
+  /** Báo cho tab đăng ký (cùng trình duyệt) biết để cập nhật ngay. Trình duyệt không hỗ trợ thì bỏ qua. */
+  private notifyOtherTabs(): void {
+    if (typeof BroadcastChannel === 'undefined') return;
+    try {
+      const channel = new BroadcastChannel(STORE_EMAIL_VERIFICATION_CONTENT.broadcastChannel);
+      channel.postMessage({ type: 'email-verified' });
+      channel.close();
+    } catch { /* bỏ qua */ }
   }
 
   handleResend(): void {
@@ -147,15 +163,15 @@ export class VerifyPage implements OnInit {
     this.resending.set(true);
     this.resendFeedback.set('');
     this.api.resendVerification(this.resendEmail.trim()).subscribe({
-      next: (res) => {
+      next: () => {
         this.resending.set(false);
         this.resendFeedbackSuccess.set(true);
-        this.resendFeedback.set(res.message || 'Đã gửi lại email xác thực. Vui lòng kiểm tra hộp thư.');
+        this.resendFeedback.set(this.content.resendDone);
       },
       error: (err) => {
         this.resending.set(false);
         this.resendFeedbackSuccess.set(false);
-        this.resendFeedback.set(err.error?.message || 'Không thể gửi lại email xác minh.');
+        this.resendFeedback.set(this.content.resendFailed);
       },
     });
   }

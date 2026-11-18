@@ -1,11 +1,13 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, ElementRef, HostListener, OnDestroy, OnInit, ViewChild, inject, signal } from '@angular/core';
+import type { Subscription } from 'rxjs';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { AuthService } from '../services/auth.service';
 import { CartService } from '../services/cart.service';
 import { ToastService } from '../services/toast.service';
 import { ApiService } from '../services/api.service';
-import { STORE_AUTH_CONTENT } from '../shared/store-content';
+import { GoogleIdentityService } from '../services/google-identity.service';
+import { STORE_AUTH_CONTENT, STORE_EMAIL_VERIFICATION_CONTENT } from '../shared/store-content';
 
 @Component({
   standalone: true,
@@ -32,10 +34,12 @@ import { STORE_AUTH_CONTENT } from '../shared/store-content';
       <div class="auth-card">
         <header class="auth-header">
           <img class="auth-logo" src="/assets/brand/muse-logo-black.png" alt="MUSE">
-          <h1 class="auth-title">{{ mode() === 'forgot' ? 'Quên mật khẩu' : mode() === 'reset' ? 'Đặt lại mật khẩu' : mode() === 'resend' ? 'Kích hoạt tài khoản' : isRegisterMode() ? 'Tạo tài khoản thành viên' : 'Đăng nhập tài khoản' }}</h1>
+          <h1 class="auth-title">{{ mode() === 'pending' ? pendingTitle() : mode() === 'forgot' ? 'Quên mật khẩu' : mode() === 'reset' ? 'Đặt lại mật khẩu' : mode() === 'resend' ? 'Kích hoạt tài khoản' : isRegisterMode() ? 'Tạo tài khoản thành viên' : 'Đăng nhập tài khoản' }}</h1>
+          @if (mode() !== 'pending') {
           <p class="auth-desc">
             {{ mode() === 'forgot' ? 'Nhập email đã liên kết với MUSE. Chúng tôi sẽ gửi bạn liên kết để đặt lại mật khẩu.' : mode() === 'reset' ? 'Tạo mật khẩu mới cho tài khoản MUSE của bạn.' : mode() === 'resend' ? 'Nhập email để nhận lại thư xác thực tài khoản MUSE.' : isRegisterMode() ? 'Khởi tạo hồ sơ khách hàng để đồng bộ trải nghiệm mua sắm thời trang của MUSE.' : 'Chào mừng quý cô quay trở lại với không gian thời trang MUSE.' }}
           </p>
+          }
         </header>
 
         @if (mode() === 'auth') {
@@ -57,6 +61,7 @@ import { STORE_AUTH_CONTENT } from '../shared/store-content';
               <span class="pw-field"><input
                 [type]="isShown('login') ? 'text' : 'password'"
                 [(ngModel)]="loginPassword"
+                id="login-password"
                 name="password"
                 placeholder="••••••••"
                 required
@@ -70,6 +75,17 @@ import { STORE_AUTH_CONTENT } from '../shared/store-content';
               <span>{{ submitting() ? 'Đang xác thực...' : 'Đăng nhập' }}</span><span aria-hidden="true">→</span>
             </button>
           </form>
+          @if (googleAvailable()) {
+            <div class="or-divider" role="separator"><span>{{ content.google.divider }}</span></div>
+            <div #googleHost class="google-btn"></div>
+          }
+          @if (unverified()) {
+            <div class="notice-warn" role="alert">
+              <p>{{ unverifiedMessage() }}</p>
+              <p class="notice-hint">{{ unverifiedContent.hint }}</p>
+              <button type="button" class="btn-outline" [disabled]="resendBusy()" (click)="resendFromLogin()">{{ resendBusy() ? pendingContent.resending : unverifiedContent.resend }}</button>
+            </div>
+          }
           <div class="auth-aux-links">
             <a routerLink="/forgot-password">QUÊN MẬT KHẨU?</a>
             <button type="button" class="link-btn" (click)="mode.set('resend')">Gửi lại thư kích hoạt tài khoản</button>
@@ -145,11 +161,47 @@ import { STORE_AUTH_CONTENT } from '../shared/store-content';
               <span>{{ submitting() ? 'Đang tạo tài khoản...' : 'Tạo tài khoản' }}</span><span aria-hidden="true">→</span>
             </button>
           </form>
+          @if (googleAvailable()) {
+            <div class="or-divider" role="separator"><span>{{ content.google.divider }}</span></div>
+            <div #googleHost class="google-btn"></div>
+          }
           <div class="mode-switch">
             <span>Đã có tài khoản?</span>
             <button type="button" class="link-btn" [class.active]="!isRegisterMode()" (click)="isRegisterMode.set(false)">Đăng nhập ngay</button>
           </div>
         }
+        } @else if (mode() === 'pending') {
+          <section class="pending" aria-live="polite">
+            @if (pendingStatus() === 'VERIFIED') {
+              <div class="pending-icon ok" aria-hidden="true">✓</div>
+              <p class="pending-text">{{ verifiedContent.prefix }} <strong>{{ pendingEmail() }}</strong> {{ verifiedContent.suffix }}</p>
+              <button type="button" class="btn-submit" (click)="goToLogin()"><span>{{ verifiedContent.cta }}</span><span aria-hidden="true">→</span></button>
+            } @else if (pendingStatus() === 'EXPIRED') {
+              <div class="pending-icon fail" aria-hidden="true">!</div>
+              <p class="pending-text">{{ expiredContent.text }}</p>
+              <button type="button" class="btn-submit" [disabled]="resendCooldown() > 0 || resendBusy()" (click)="resendVerification()">
+                <span>{{ resendLabel() }}</span><span aria-hidden="true">→</span>
+              </button>
+              @if (resendNotice()) { <p class="pending-feedback" [class.error]="resendFailed()" role="status">{{ resendNotice() }}</p> }
+              <button type="button" class="btn-outline" (click)="goToLogin(false)">{{ expiredContent.backToLogin }}</button>
+            } @else {
+              <div class="pending-icon" aria-hidden="true">
+                <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="0"></rect><path d="M3 7l9 6 9-6"></path></svg>
+              </div>
+              <p class="pending-text">{{ pendingContent.sentPrefix }} <strong>{{ pendingEmail() }}</strong>. {{ pendingContent.sentSuffix }}</p>
+              @if (pendingToken()) {
+                <p class="pending-status" role="status"><span class="spinner-sm" aria-hidden="true"></span>{{ pendingContent.waiting }}</p>
+              } @else {
+                <p class="pending-hint">{{ pendingContent.noTokenHint }}</p>
+              }
+              <button type="button" class="btn-submit" [disabled]="resendCooldown() > 0 || resendBusy()" (click)="resendVerification()">
+                <span>{{ resendLabel() }}</span><span aria-hidden="true">→</span>
+              </button>
+              @if (resendNotice()) { <p class="pending-feedback" [class.error]="resendFailed()" role="status">{{ resendNotice() }}</p> }
+              <p class="pending-hint">{{ pendingContent.spamNote }}</p>
+              <p class="pending-wrong">{{ pendingContent.wrongEmail }} <button type="button" class="link-btn" (click)="registerAgain()">{{ pendingContent.registerAgain }}</button></p>
+            }
+          </section>
         } @else if (mode() === 'forgot') {
           <form (ngSubmit)="handleForgotPassword()" class="auth-form">
             <label class="form-group"><span>Địa chỉ email *</span><input type="email" name="forgotEmail" [(ngModel)]="forgotEmail" placeholder="nhap@email.com" required /></label>
@@ -428,17 +480,46 @@ import { STORE_AUTH_CONTENT } from '../shared/store-content';
     .terms-row { display: flex; align-items: flex-start; gap: 10px; color: #444; font-size: 12px; line-height: 1.5; cursor: pointer; }
     .terms-row input { width: 16px; height: 16px; margin: 2px 0 0; accent-color: #000; flex: none; }
     @media (max-width: 900px) { .visual-img, .privileges { display: none; } }
+    .or-divider { display: flex; align-items: center; gap: 14px; margin: 22px 0 18px; color: #5d5d5d; font-size: 12px; letter-spacing: .12em; text-transform: uppercase; }
+    .or-divider::before, .or-divider::after { content: ''; flex: 1; height: 1px; background: #dedede; }
+    .google-btn { display: flex; justify-content: center; width: 100%; min-height: 44px; }
+    .pending { display: flex; flex-direction: column; align-items: center; gap: 18px; text-align: center; }
+    .pending-icon { display: inline-flex; width: 64px; height: 64px; align-items: center; justify-content: center; border: 1px solid #171717; background: #f9eef0; color: #171717; font-size: 26px; }
+    .pending-icon.ok { border-color: #276749; background: #edf8f1; color: #276749; }
+    .pending-icon.fail { border-color: #9b2c2c; background: #fff1f1; color: #9b2c2c; font-weight: 700; }
+    .pending-text { margin: 0; color: #444748; font-size: 14px; line-height: 1.65; overflow-wrap: anywhere; }
+    .pending-text strong { color: #171717; }
+    .pending-status { display: inline-flex; align-items: center; gap: 10px; margin: 0; color: #5d5d5d; font-size: 13px; }
+    .spinner-sm { width: 16px; height: 16px; border: 2px solid #e3e2e2; border-top-color: #171717; border-radius: 50%; animation: pending-spin .8s linear infinite; }
+    @keyframes pending-spin { to { transform: rotate(360deg); } }
+    @media (prefers-reduced-motion: reduce) { .spinner-sm { animation: none; } }
+    .pending-hint { margin: 0; color: #5d5d5d; font-size: 12px; line-height: 1.55; }
+    .pending-feedback { margin: 0; color: #276749; font-size: 12px; }
+    .pending-feedback.error { color: #9b2c2c; }
+    .pending-wrong { margin: 0; color: #444748; font-size: 13px; }
+    .pending .btn-submit { margin-top: 4px; }
+    .btn-outline { min-height: 44px; padding: 0 22px; border: 1px solid #171717; border-radius: 0; background: #fff; color: #171717; font: inherit; font-size: 12px; font-weight: 800; letter-spacing: .8px; cursor: pointer; }
+    .btn-outline:hover:not(:disabled) { background: #171717; color: #fff; }
+    .btn-outline:disabled { border-color: #c4c7c7; color: #747878; cursor: not-allowed; }
+    .notice-warn { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; margin-top: 18px; padding: 16px; border: 1px solid #b7791f; border-left-width: 3px; background: #fffaf0; color: #5f370e; font-size: 13px; line-height: 1.55; }
+    .notice-warn p { margin: 0; }
+    .notice-hint { color: #744210; font-size: 12px; }
   `],
 })
-export class AuthPage implements OnInit {
+export class AuthPage implements OnInit, OnDestroy {
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly auth = inject(AuthService);
   private readonly cart = inject(CartService);
   private readonly toast = inject(ToastService);
   private readonly api = inject(ApiService);
+  private readonly google = inject(GoogleIdentityService);
 
   readonly content = STORE_AUTH_CONTENT;
+  readonly pendingContent = STORE_EMAIL_VERIFICATION_CONTENT.pending;
+  readonly verifiedContent = STORE_EMAIL_VERIFICATION_CONTENT.verified;
+  readonly expiredContent = STORE_EMAIL_VERIFICATION_CONTENT.expired;
+  readonly unverifiedContent = STORE_EMAIL_VERIFICATION_CONTENT.unverified;
   private readonly shown = signal<Record<string, boolean>>({});
   isShown(key: string): boolean { return !!this.shown()[key]; }
   toggleShow(key: string): void { this.shown.update(v => ({ ...v, [key]: !v[key] })); }
@@ -453,7 +534,34 @@ export class AuthPage implements OnInit {
   readonly isRegisterMode = signal<boolean>(false);
   readonly registered = signal(false);
   readonly submitting = signal<boolean>(false);
-  readonly mode = signal<'auth' | 'forgot' | 'reset' | 'resend'>('auth');
+  readonly mode = signal<'auth' | 'forgot' | 'reset' | 'resend' | 'pending'>('auth');
+
+  // --- Màn hình chờ xác thực email ---
+  private static readonly PENDING_KEY = 'muse-auth-pending';
+  private static readonly RESEND_COOLDOWN_SECONDS = 60;
+  private static readonly POLL_INTERVAL_MS = 5000;
+  readonly pendingEmail = signal('');
+  readonly pendingToken = signal('');
+  readonly pendingStatus = signal<'PENDING' | 'VERIFIED' | 'EXPIRED'>('PENDING');
+  readonly resendCooldown = signal(0);
+  readonly resendBusy = signal(false);
+  readonly resendNotice = signal('');
+  readonly resendFailed = signal(false);
+  readonly unverified = signal(false);
+  readonly unverifiedMessage = signal('');
+  private pollTimer: ReturnType<typeof setInterval> | null = null;
+  private cooldownTimer: ReturnType<typeof setInterval> | null = null;
+  private channel: BroadcastChannel | null = null;
+  private checking = false;
+
+  pendingTitle(): string {
+    return this.pendingStatus() === 'VERIFIED' ? this.verifiedContent.title
+      : this.pendingStatus() === 'EXPIRED' ? this.expiredContent.title : this.pendingContent.title;
+  }
+  resendLabel(): string {
+    if (this.resendBusy()) return this.pendingContent.resending;
+    return this.resendCooldown() > 0 ? `${this.pendingContent.resendIn} ${this.resendCooldown()}s` : this.pendingContent.resend;
+  }
   forgotEmail = '';
   resendEmail = '';
   resetPassword = '';
@@ -479,7 +587,195 @@ export class AuthPage implements OnInit {
     this.returnUrl = typeof requested === 'string' && requested.startsWith('/') && !requested.startsWith('//') ? requested : '/';
     if (this.mode() === 'auth' && this.auth.isAuthenticated()) {
       this.router.navigateByUrl(this.returnUrl);
+      return;
     }
+    if (this.mode() === 'auth') this.restorePending();
+    this.openChannel();
+    if (this.mode() === 'forgot') {
+      const state = history.state as { email?: unknown } | null;
+      if (typeof state?.email === 'string') this.forgotEmail = state.email;
+    }
+    if (this.mode() === 'auth' && this.google.configured) {
+      this.googleSub = this.google.credential$.subscribe((credential) => this.handleGoogleCredential(credential));
+      void this.google.load().then((ok) => this.googleAvailable.set(ok));
+    }
+  }
+
+  // --- Đăng nhập bằng Google ---
+  readonly googleAvailable = signal(false);
+  private googleSub: Subscription | null = null;
+
+  /** Nút Google nằm trong form đăng nhập hoặc đăng ký; mỗi lần phần tử xuất hiện thì vẽ lại nút. */
+  @ViewChild('googleHost') set googleHost(ref: ElementRef<HTMLElement> | undefined) {
+    if (!ref) return;
+    const text = this.isRegisterMode() ? 'signup_with' : 'signin_with';
+    void this.google.renderButton(ref.nativeElement, text).then((ok) => { if (!ok) this.googleAvailable.set(false); });
+  }
+
+  private handleGoogleCredential(credential: string): void {
+    if (this.submitting() || this.mode() !== 'auth') return;
+    this.submitting.set(true);
+    this.auth.loginWithGoogle(credential).subscribe({
+      next: () => {
+        this.submitting.set(false);
+        this.router.navigateByUrl(this.returnUrl === '/' && this.auth.isStaff() ? '/admin' : this.returnUrl);
+      },
+      error: (err) => {
+        this.submitting.set(false);
+        this.toast.error(typeof err.error?.message === 'string' && err.error.message ? err.error.message : this.content.google.error);
+      },
+    });
+  }
+
+  ngOnDestroy(): void {
+    this.stopPolling();
+    this.googleSub?.unsubscribe();
+    if (this.cooldownTimer) clearInterval(this.cooldownTimer);
+    this.channel?.close();
+    this.channel = null;
+  }
+
+  @HostListener('document:visibilitychange')
+  onVisibilityChange(): void {
+    if (document.visibilityState === 'visible') this.checkStatus();
+  }
+
+  private restorePending(): void {
+    try {
+      const raw = sessionStorage.getItem(AuthPage.PENDING_KEY);
+      if (!raw) return;
+      const data = JSON.parse(raw) as { email?: unknown; token?: unknown };
+      if (typeof data.email !== 'string' || !data.email) return;
+      this.enterPending(data.email, typeof data.token === 'string' ? data.token : '', false);
+    } catch { /* trình duyệt chặn sessionStorage hoặc dữ liệu hỏng: bỏ qua */ }
+  }
+
+  private persistPending(email: string, token: string): void {
+    try { sessionStorage.setItem(AuthPage.PENDING_KEY, JSON.stringify({ email, token })); } catch { /* bỏ qua */ }
+  }
+
+  private clearPending(): void {
+    try { sessionStorage.removeItem(AuthPage.PENDING_KEY); } catch { /* bỏ qua */ }
+  }
+
+  private enterPending(email: string, token: string, persist: boolean): void {
+    this.pendingEmail.set(email);
+    this.pendingToken.set(token);
+    this.pendingStatus.set('PENDING');
+    this.resendNotice.set('');
+    this.resendFailed.set(false);
+    this.unverified.set(false);
+    this.mode.set('pending');
+    if (persist) this.persistPending(email, token);
+    this.startPolling();
+    this.checkStatus();
+  }
+
+  private startPolling(): void {
+    this.stopPolling();
+    if (!this.pendingToken()) return;
+    this.pollTimer = setInterval(() => { if (document.visibilityState === 'visible') this.checkStatus(); }, AuthPage.POLL_INTERVAL_MS);
+  }
+
+  private stopPolling(): void {
+    if (this.pollTimer) { clearInterval(this.pollTimer); this.pollTimer = null; }
+  }
+
+  private openChannel(): void {
+    if (typeof BroadcastChannel === 'undefined') return;
+    try {
+      this.channel = new BroadcastChannel(STORE_EMAIL_VERIFICATION_CONTENT.broadcastChannel);
+      this.channel.onmessage = (event: MessageEvent) => {
+        // Chỉ xác nhận qua API, tránh nhầm khi người dùng xác thực một tài khoản khác trên cùng trình duyệt.
+        if (event.data?.type === 'email-verified') this.checkStatus();
+      };
+    } catch { this.channel = null; }
+  }
+
+  private checkStatus(): void {
+    const token = this.pendingToken();
+    if (this.mode() !== 'pending' || !token || this.pendingStatus() !== 'PENDING' || this.checking) return;
+    this.checking = true;
+    this.api.registrationStatus(token).subscribe({
+      next: ({ status }) => {
+        this.checking = false;
+        if (status === 'VERIFIED') { this.pendingStatus.set('VERIFIED'); this.stopPolling(); this.clearPending(); }
+        else if (status === 'EXPIRED') { this.pendingStatus.set('EXPIRED'); this.stopPolling(); }
+      },
+      error: () => { this.checking = false; },
+    });
+  }
+
+  private startCooldown(): void {
+    if (this.cooldownTimer) clearInterval(this.cooldownTimer);
+    this.resendCooldown.set(AuthPage.RESEND_COOLDOWN_SECONDS);
+    this.cooldownTimer = setInterval(() => {
+      const next = this.resendCooldown() - 1;
+      this.resendCooldown.set(Math.max(0, next));
+      if (next <= 0 && this.cooldownTimer) { clearInterval(this.cooldownTimer); this.cooldownTimer = null; }
+    }, 1000);
+  }
+
+  resendVerification(): void {
+    if (this.resendCooldown() > 0 || this.resendBusy() || !this.pendingEmail()) return;
+    this.sendVerification(this.pendingEmail(), () => { /* ở lại màn hình chờ */ });
+  }
+
+  resendFromLogin(): void {
+    const email = this.loginEmail.trim();
+    if (!email || this.resendBusy()) return;
+    this.sendVerification(email, () => {
+      this.enterPending(email, '', true);
+      this.resendNotice.set(this.pendingContent.resendSent);
+      this.resendFailed.set(false);
+      this.startCooldown();
+    });
+  }
+
+  private sendVerification(email: string, onSent: () => void): void {
+    this.resendBusy.set(true);
+    this.resendNotice.set('');
+    this.api.resendVerification(email).subscribe({
+      next: () => {
+        this.resendBusy.set(false);
+        this.resendNotice.set(this.pendingContent.resendSent);
+        this.resendFailed.set(false);
+        this.startCooldown();
+        onSent();
+      },
+      error: (err) => {
+        this.resendBusy.set(false);
+        this.resendFailed.set(true);
+        this.resendNotice.set(err?.status === 429 ? 'Bạn đã yêu cầu quá nhiều lần. Vui lòng thử lại sau.' : this.pendingContent.resendFailed);
+        if (err?.status === 429) this.startCooldown();
+        if (this.mode() !== 'pending') this.toast.error(this.resendNotice());
+      },
+    });
+  }
+
+  registerAgain(): void {
+    this.stopPolling();
+    this.clearPending();
+    this.pendingToken.set('');
+    this.pendingStatus.set('PENDING');
+    this.regPassword = '';
+    this.regConfirm = '';
+    this.regTerms = false;
+    this.isRegisterMode.set(true);
+    this.mode.set('auth');
+  }
+
+  goToLogin(fillEmail = true): void {
+    this.stopPolling();
+    this.clearPending();
+    if (fillEmail || this.pendingEmail()) this.loginEmail = this.pendingEmail();
+    this.loginPassword = '';
+    this.pendingToken.set('');
+    this.pendingStatus.set('PENDING');
+    this.unverified.set(false);
+    this.isRegisterMode.set(false);
+    this.mode.set('auth');
+    setTimeout(() => document.getElementById('login-password')?.focus());
   }
 
   handleForgotPassword(): void {
@@ -526,6 +822,7 @@ export class AuthPage implements OnInit {
       return;
     }
 
+    this.unverified.set(false);
     this.submitting.set(true);
     this.auth.login(this.loginEmail, this.loginPassword).subscribe({
       next: () => {
@@ -534,7 +831,14 @@ export class AuthPage implements OnInit {
       },
       error: (err) => {
         this.submitting.set(false);
-        this.toast.error(err.error?.message || 'Email hoặc mật khẩu không chính xác.');
+        const message = typeof err.error?.message === 'string' ? err.error.message : '';
+        if (err.error?.code === 'EMAIL_NOT_VERIFIED' || /must be active and verified/i.test(message)) {
+          this.unverifiedMessage.set(err.error?.code === 'EMAIL_NOT_VERIFIED' && message ? message
+            : 'Tài khoản chưa xác thực email. Vui lòng kiểm tra hộp thư hoặc gửi lại email xác thực.');
+          this.unverified.set(true);
+          return;
+        }
+        this.toast.error(message || 'Email hoặc mật khẩu không chính xác.');
       },
     });
   }
@@ -557,15 +861,14 @@ export class AuthPage implements OnInit {
       email: this.regEmail,
       password: this.regPassword,
     }).subscribe({
-      next: () => {
+      next: (res) => {
         this.submitting.set(false);
         this.registered.set(true);
-        this.isRegisterMode.set(false);
-        this.loginEmail = this.regEmail;
         this.regPassword = '';
         this.regConfirm = '';
         this.regTerms = false;
-        this.toast.success('Kiểm tra email để xác minh tài khoản trước khi đăng nhập.');
+        this.enterPending(this.regEmail.trim(), res.registrationToken ?? '', true);
+        this.startCooldown();
       },
       error: (err) => {
         this.submitting.set(false);
