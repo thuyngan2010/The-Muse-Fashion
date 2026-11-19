@@ -264,7 +264,7 @@ export const STORE_ABOUT = {
     title: 'MUSE',
     quote: ['"Thời trang không chỉ để mặc.', 'Đó là cách bạn kể câu chuyện', 'của chính mình."'],
     cta: 'KHÁM PHÁ CÂU CHUYỆN',
-    image: '/assets/about/about-hero.png',
+    image: '/assets/about/about-hero.jpg',
     imageAlt: 'Người mẫu MUSE trong áo trench coat',
     badge: 'EDITION 2026 • MUSE SILHOUETTES',
   },
@@ -279,7 +279,7 @@ export const STORE_ABOUT = {
       { title: 'HAUTE', text: 'TINH TUYỂN TRONG TỪNG ĐƯỜNG KIM MŨI CHỈ' },
       { title: 'INTUITIVE', text: 'TRẢI NGHIỆM TƯƠNG TÁC SỐ HIỆN ĐẠI' },
     ],
-    image: '/assets/about/about-story.png',
+    image: '/assets/about/about-story.jpg',
     imageAlt: 'Hình ảnh câu chuyện thương hiệu MUSE',
   },
   core: {
@@ -301,7 +301,7 @@ export const STORE_ABOUT = {
       { title: 'Size Guide', text: 'Gợi ý size có sẵn ngay tại trang chi tiết của từng sản phẩm, dựa trên số đo ngực, eo và hông.' },
     ],
     cta: 'KHÁM PHÁ AI STUDIO →',
-    image: '/assets/about/about-tech.png',
+    image: '/assets/about/about-tech.jpg',
     imageAlt: 'Không gian thử đồ MUSE',
   },
   lookbook: {
@@ -309,10 +309,10 @@ export const STORE_ABOUT = {
     title: 'Cảm hứng từ Bộ sưu tập',
     text: 'Mỗi Bộ sưu tập là một cách kể câu chuyện thời trang thông qua hình ảnh, sản phẩm và những chủ đề khác nhau.',
     cta: 'KHÁM PHÁ BỘ SƯU TẬP →',
-    main: { image: '/assets/about/about-lookbook-1.png', title: 'Volume 04: Tĩnh tại & Cấu trúc', sub: 'Mùa Thu - Đông 2026' },
+    main: { image: '/assets/about/about-lookbook-1.jpg', title: 'Volume 04: Tĩnh tại & Cấu trúc', sub: 'Mùa Thu - Đông 2026' },
     cards: [
-      { image: '/assets/about/about-lookbook-2.png', tag: 'TAILORED COAT EDITION', title: 'Chất liệu tự nhiên & Dáng vẻ vĩnh cửu', text: 'Lựa chọn len dệt thủ công và lụa tơ tằm nguyên bản.' },
-      { image: '/assets/about/about-lookbook-3.png', tag: 'PHỤ KIỆN & ĐIỂM NHẤN', title: 'Sự cân bằng giữa hình khối và cảm xúc', text: 'Hoàn thiện vẻ ngoài với các chi tiết tối giản có chủ đích.' },
+      { image: '/assets/about/about-lookbook-2.jpg', tag: 'TAILORED COAT EDITION', title: 'Chất liệu tự nhiên & Dáng vẻ vĩnh cửu', text: 'Lựa chọn len dệt thủ công và lụa tơ tằm nguyên bản.' },
+      { image: '/assets/about/about-lookbook-3.jpg', tag: 'PHỤ KIỆN & ĐIỂM NHẤN', title: 'Sự cân bằng giữa hình khối và cảm xúc', text: 'Hoàn thiện vẻ ngoài với các chi tiết tối giản có chủ đích.' },
     ],
   },
   community: {
