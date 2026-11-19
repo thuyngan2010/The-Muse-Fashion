@@ -3,7 +3,9 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model, type ClientSession } from 'mongoose';
 import { SystemSetting } from '../admin/admin.schemas.js';
 import { AiQuota } from './ai.schemas.js';
-import { AI_QUOTA_TYPE, nextUtcDayStart, utcDayStart } from './ai-quota.util.js';
+import { AppConfig } from '../../common/app-config.js';
+import { AI_QUOTA_EXCEEDED_MESSAGE, AI_QUOTA_TYPE, AI_TOTAL_QUOTA_OWNER, AI_TOTAL_QUOTA_TYPE, nextUtcDayStart, totalDailyLimit,
+  utcDayStart } from './ai-quota.util.js';
 
 const DEFAULT_DAILY_JOBS = 5;
 
@@ -30,10 +32,10 @@ export class AiQuotaService {
    */
   async reserve(ownerId: string, session: ClientSession, at = new Date()): Promise<{ windowStart: Date; limit: number }> {
     const limit = await this.getDailyLimit(session);
-    if (limit < 1) this.exceeded(at, 'AI jobs are disabled');
+    if (limit < 1) this.exceeded(at, 'Tính năng thử đồ AI đang tạm dừng. Vui lòng quay lại sau.');
     const windowStart = utcDayStart(at);
     const existing = await this.quotas.findOne({ ownerId, type: AI_QUOTA_TYPE, windowStart }).session(session).lean().exec();
-    if (existing && existing.used >= limit) this.exceeded(at, 'Daily AI quota exceeded');
+    if (existing && existing.used >= limit) this.exceeded(at, AI_QUOTA_EXCEEDED_MESSAGE);
     try {
       await this.quotas.updateOne(
         { ownerId, type: AI_QUOTA_TYPE, windowStart, used: { $lt: limit } },
@@ -41,9 +43,10 @@ export class AiQuotaService {
         { upsert: true, setDefaultsOnInsert: false, session },
       ).exec();
     } catch (error) {
-      if (typeof error === 'object' && error && 'code' in error && error.code === 11000) this.exceeded(at, 'Daily AI quota exceeded');
+      if (typeof error === 'object' && error && 'code' in error && error.code === 11000) this.exceeded(at, AI_QUOTA_EXCEEDED_MESSAGE);
       throw error;
     }
+    await this.reserveTotal(windowStart, session, at);
     return { windowStart, limit };
   }
 
@@ -53,6 +56,30 @@ export class AiQuotaService {
       { $inc: { used: -1 } },
       { session },
     ).exec();
+    await this.quotas.updateOne(
+      { ownerId: AI_TOTAL_QUOTA_OWNER, type: AI_TOTAL_QUOTA_TYPE, windowStart, used: { $gt: 0 } },
+      { $inc: { used: -1 } },
+      { session },
+    ).exec();
+  }
+
+  /**
+   * Giới hạn tổng lượt tạo ảnh của cả hệ thống mỗi ngày (AI_DAILY_LIMIT_TOTAL, mặc định 40) để bảo vệ ngân sách API.
+   * Chạy trong cùng transaction với lượt của khách: vượt giới hạn thì không tạo job, không gọi API trả phí.
+   */
+  private async reserveTotal(windowStart: Date, session: ClientSession, at: Date): Promise<void> {
+    const totalLimit = totalDailyLimit(AppConfig.optional('AI_DAILY_LIMIT_TOTAL'));
+    if (totalLimit < 1) this.exceeded(at, AI_QUOTA_EXCEEDED_MESSAGE);
+    try {
+      await this.quotas.updateOne(
+        { ownerId: AI_TOTAL_QUOTA_OWNER, type: AI_TOTAL_QUOTA_TYPE, windowStart, used: { $lt: totalLimit } },
+        { $inc: { used: 1 } },
+        { upsert: true, setDefaultsOnInsert: false, session },
+      ).exec();
+    } catch (error) {
+      if (typeof error === 'object' && error && 'code' in error && error.code === 11000) this.exceeded(at, AI_QUOTA_EXCEEDED_MESSAGE);
+      throw error;
+    }
   }
 
   private exceeded(at: Date, message: string): never {

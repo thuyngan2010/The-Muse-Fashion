@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { SystemSetting, SystemSettingSchema } from '../admin/admin.schemas.js';
 import { Product, ProductSchema } from '../catalog/product.schema.js';
+import { Category, CategorySchema } from '../catalog/catalog.schemas.js';
 import { MediaObject, MediaObjectSchema } from '../storage/media-object.schema.js';
 import { StorageModule } from '../storage/storage.module.js';
 import { AiCleanupWorker } from './ai-cleanup.worker.js';
@@ -25,6 +26,7 @@ import { OutboxEvent, OutboxEventSchema } from '../operations/outbox-event.schem
       { name: AiQuota.name, schema: AiQuotaSchema },
       { name: AiConsent.name, schema: AiConsentSchema },
       { name: Product.name, schema: ProductSchema },
+      { name: Category.name, schema: CategorySchema },
       { name: User.name, schema: UserSchema },
       { name: MediaObject.name, schema: MediaObjectSchema },
       { name: SystemSetting.name, schema: SystemSettingSchema },

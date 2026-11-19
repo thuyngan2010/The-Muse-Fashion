@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import OpenAI from 'openai';
 import { AppConfig } from '../../common/app-config.js';
-import { describeBody, type BodyMeasurements } from './fashion-plan.js';
+import { buildTryOnPrompt, type BodyMeasurements, type FashionPipelineInput, type TryOnPromptProduct } from './fashion-plan.js';
 import { sanitizeImage } from '../storage/image-sanitize.util.js';
 
 const JSON_RESPONSE_MAX_BYTES = 64 * 1024;
@@ -9,10 +9,19 @@ const HARD_IMAGE_MAX_BYTES = 10 * 1024 * 1024;
 const IMAGE_JSON_OVERHEAD_BYTES = 128 * 1024;
 type ProviderProtocol = 'openai' | 'custom';
 
-const OPENAI_PROMPTS: Record<AiProviderSubmitInput['type'], string> = {
-  TRY_ON: 'Use the first image as the person and the remaining images as clothing references. Edit the person to wear the referenced clothing. Preserve their face, body proportions, pose, background, garment colors, patterns, and details. Produce one realistic fashion image.',
-  MIX_MATCH: 'Use the first image as the person and the remaining images as clothing references. Create one coordinated outfit using the referenced garments. Preserve the person’s identity, body proportions, and the garments’ distinctive colors and details. Produce one realistic fashion image.',
-};
+/**
+ * Tham số ảnh đầu ra cho /images/edits (gpt-image-2), chọn để giảm chi phí mỗi lần tạo ảnh:
+ * ảnh dọc cố định 1024x1536, chất lượng theo AI_IMAGE_QUALITY (mặc định medium), JPEG nén 85 (nhẹ hơn PNG).
+ * Không gửi input_fidelity vì gpt-image-2 yêu cầu bỏ tham số này.
+ */
+export const OPENAI_IMAGE_SIZE = '1024x1536';
+export const OPENAI_OUTPUT_COMPRESSION = 85;
+const IMAGE_QUALITIES = ['low', 'medium', 'high'] as const;
+export type ImageQuality = typeof IMAGE_QUALITIES[number];
+export function imageQuality(): ImageQuality {
+  const value = (AppConfig.optional('AI_IMAGE_QUALITY') ?? '').trim().toLowerCase();
+  return (IMAGE_QUALITIES as readonly string[]).includes(value) ? value as ImageQuality : 'medium';
+}
 
 export type AiProviderSubmitInput = {
   jobId: string;
@@ -22,6 +31,9 @@ export type AiProviderSubmitInput = {
   providerJobId?: string;
   prompt?: string;
   body?: BodyMeasurements;
+  /** Tên, loại, chất liệu sản phẩm theo đúng thứ tự productImageUrls (dùng cho prompt khi tắt planner). */
+  products?: TryOnPromptProduct[];
+  style?: FashionPipelineInput['style'];
 };
 
 export type AiProviderResult =
@@ -196,9 +208,11 @@ export class AiProviderService {
     try {
       return await client.post('/images/edits', {
         body: {
-          ...(model ? { model } : {}), prompt: input.prompt ?? [OPENAI_PROMPTS[input.type], describeBody(input.body)].filter(Boolean).join(' '),
+          ...(model ? { model } : {}),
+          prompt: input.prompt ?? buildTryOnPrompt({ type: input.type, products: input.products ?? [], body: input.body, style: input.style }),
           images: [input.inputUrl, ...input.productImageUrls].map((image_url) => ({ image_url })),
-          n: 1, output_format: 'png',
+          n: 1, size: OPENAI_IMAGE_SIZE, quality: imageQuality(),
+          output_format: 'jpeg', output_compression: OPENAI_OUTPUT_COMPRESSION,
         },
         headers: { 'Idempotency-Key': input.jobId }, signal, maxRetries: 0,
         fetchOptions: { redirect: 'error' },

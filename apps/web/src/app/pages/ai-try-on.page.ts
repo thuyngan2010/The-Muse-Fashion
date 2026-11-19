@@ -7,10 +7,12 @@ import { FormsModule } from '@angular/forms';
 import type { AiJob, ProductSummary } from '@fashion/contracts';
 import { ApiService, bodyPayload, heightError, weightError } from '../services/api.service';
 import { ToastService } from '../services/toast.service';
-import { Subscription } from 'rxjs';
+import { Observable, Subscription, from, map, switchMap, tap } from 'rxjs';
 import { AiJobDetailsComponent } from '../components/ai-job-details.component';
 import { STORE_AI_TRY_ON_CONTENT } from '../shared/store-content';
 import { PageStateComponent } from '../components/page-state.component';
+import { PHOTO_ACCEPT, PHOTO_LIMITS_TEXT, compressPhoto, isLandscape, isLowResolution, photoUploadErrorMessage, uploadTryOnPhoto, validatePhotoFile, type PreparedPhoto } from '../shared/ai-photo';
+import { UPLOAD_MAX_BYTES } from '../shared/upload-limits';
 
 function generateUUID(): string {
   if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();
@@ -46,17 +48,21 @@ function generateUUID(): string {
               </div>
             }
           </div>
-          <input #fileInput type="file" accept="image/jpeg,image/png,image/webp" [disabled]="generating() || uploading()" hidden (change)="onFileSelected($event)" />
+          <input #fileInput type="file" [accept]="photoAccept" [disabled]="generating() || uploading()" hidden (change)="onFileSelected($event)" />
           <button type="button" class="upload-canvas" (click)="fileInput.click()" [disabled]="generating() || uploading()">
             @if (previewUrl()) { <img [src]="previewUrl()" alt="Ảnh toàn thân bạn đã tải lên" /> }
             @else {
-              <span class="upload-mark" aria-hidden="true">＋</span><strong>TẢI ẢNH TOÀN THÂN</strong><small>PNG, JPG hoặc WEBP · tối đa 10MB</small>
+              <span class="upload-mark" aria-hidden="true">＋</span><strong>TẢI ẢNH CỦA BẠN</strong>
             }
-            @if (uploading()) { <span class="upload-overlay" role="status"><span class="spinner"></span>Đang tải và kiểm tra ảnh...</span> }
+            @if (uploading()) { <span class="upload-overlay" role="status"><span class="spinner"></span>{{ uploadStage() === 'compressing' ? 'Đang nén ảnh...' : 'Đang tải ảnh...' }}</span> }
           </button>
+          <p class="photo-limits">{{ photoLimits }}</p>
+          <p class="photo-guide">Chỉ cần ảnh thấy rõ khuôn mặt. Nên dùng ảnh <strong>toàn thân, đứng thẳng, đủ sáng, một mình</strong> để kết quả giống bạn nhất. Ảnh chỉ có mặt hoặc nửa người thì AI sẽ tự dựng phần còn lại, nên kém chân thực hơn.</p>
+          @if (landscapeHint()) { <p class="photo-hint" role="status">Ảnh nằm ngang thường không thấy toàn thân. Bạn có thể đổi sang ảnh dọc để kết quả đẹp hơn.</p> }
+          @if (lowResHint()) { <p class="photo-hint" role="status">Ảnh có độ phân giải thấp, kết quả có thể bị mờ.</p> }
           <button type="button" class="outline-button upload-other" (click)="fileInput.click()" [disabled]="generating() || uploading()">TẢI ẢNH KHÁC TỪ MÁY <span aria-hidden="true">↗</span></button>
           @if (uploadError()) {
-            <div class="inline-message error" role="alert"><span>{{ uploadError() }}</span><button type="button" (click)="retryUpload()">THỬ TẢI LẠI</button></div>
+            <div class="inline-message error" role="alert"><span>{{ uploadError() }}</span>@if (canRetryUpload()) { <button type="button" (click)="retryUpload()">THỬ TẢI LẠI</button> }</div>
           } @else if (uploadedMediaId()) { <p class="inline-message success" role="status">Ảnh đã sẵn sàng để thử đồ.</p> }
           <aside class="tip-box"><strong>Mẹo nhỏ</strong><p>{{ content.tips }}</p></aside>
           <p class="privacy-note"><span aria-hidden="true">◇</span> {{ content.privacy }}</p>
@@ -91,6 +97,7 @@ function generateUUID(): string {
             <p class="measure-error" role="alert">{{ heightError() || weightError() }}</p>
           }
           <p class="measure-note">Không bắt buộc. Giúp AI thể hiện độ dài và độ vừa của trang phục sát hơn.</p>
+          @if (!height || !weight) { <p class="measure-hint">Nhập chiều cao và cân nặng giúp AI dựng dáng chính xác hơn, nhất là khi ảnh không toàn thân.</p> }
           <label class="consent-row"><input type="checkbox" [(ngModel)]="consentAccepted" name="consent" /><span>Tôi đồng ý xử lý ảnh để tạo bản thử đồ. {{ content.privacy }}</span></label>
           <div class="ready-panel">
             <div><span>SẴN SÀNG TẠO DIỆN MẠO</span><p>{{ content.processingTime }}</p></div>
@@ -181,6 +188,7 @@ function generateUUID(): string {
     .picker-grid .product-option span{padding:8px;font-size:12px}
     .measure-error{margin:8px 0 0;color:#7f2424;font-size:12px}
     .measure-note{margin:8px 0 0;color:#6b625d;font-size:11px;line-height:1.5}
+    .photo-limits{margin:10px 0 0;color:#77706a;font-size:11px;line-height:1.5;text-align:center}.photo-guide{margin:12px 0 0;color:#4f4842;font-size:12px;line-height:1.6}.photo-guide strong{color:#171513}.photo-hint{margin:8px 0 0;padding:8px 12px;background:#fff7e6;color:#7a5200;font-size:12px;line-height:1.5}.measure-hint{margin:6px 0 0;color:#9b5663;font-size:11px;line-height:1.5}
     .compare-figure{margin:0}
     .compare-figure figcaption{min-height:18px;margin-bottom:6px;font-size:10px;font-weight:700;letter-spacing:.12em;color:#5f5953}
   `],
@@ -195,6 +203,17 @@ export class AiTryOnPage implements OnInit, OnDestroy {
   readonly uploadedMediaId = signal('');
   readonly uploading = signal(false);
   readonly uploadError = signal('');
+  /** Ảnh nằm ngang (rộng hơn cao): chỉ gợi ý đổi sang ảnh dọc, không chặn. */
+  readonly landscapeHint = signal(false);
+  readonly lowResHint = signal(false);
+  /** Bước đang chạy khi tải ảnh: nén trên trình duyệt rồi mới tải lên. */
+  readonly uploadStage = signal<'' | 'compressing' | 'uploading'>('');
+  readonly photoAccept = PHOTO_ACCEPT;
+  readonly photoLimits = PHOTO_LIMITS_TEXT;
+  /** Nén ảnh trước khi tải (tách riêng để test có thể thay thế). */
+  preparePhoto: (file: File) => Observable<PreparedPhoto> = (file) => from(compressPhoto(file, UPLOAD_MAX_BYTES));
+  /** Ảnh đã nén, dùng lại khi bấm THỬ TẢI LẠI. */
+  private preparedFile?: File;
   readonly generating = signal(false);
   readonly generationError = signal('');
   readonly job = signal<AiJob | null>(null);
@@ -233,16 +252,29 @@ export class AiTryOnPage implements OnInit, OnDestroy {
   selectTrendingProduct(productId: string): void { this.selectedProductId.set(productId); document.getElementById('outfit-selection')?.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
   onFileSelected(event: Event): void {
     const input = event.target as HTMLInputElement; if (!input.files?.length) return;
-    const file = input.files[0]; input.value = ''; this.selectedFile = file;
-    const reader = new FileReader(); reader.onload = (loadEvent) => { if (this.selectedFile === file) this.previewUrl.set(loadEvent.target?.result as string); }; reader.readAsDataURL(file); this.uploadFile(file);
+    const file = input.files[0]; input.value = '';
+    const invalid = validatePhotoFile(file);
+    if (invalid) { this.clearUpload(); this.uploadError.set(invalid); this.toast.error(invalid); return; }
+    this.selectedFile = file; this.preparedFile = undefined; this.uploadFile(file);
   }
-  clearUpload(): void { this.uploadSubscription?.unsubscribe(); this.selectedFile = undefined; this.previewUrl.set(''); this.uploadedMediaId.set(''); this.uploadError.set(''); this.uploading.set(false); }
-  retryUpload(): void { if (this.selectedFile && !this.uploading()) this.uploadFile(this.selectedFile); }
-  private uploadFile(file: File): void {
+  clearUpload(): void { this.uploadSubscription?.unsubscribe(); this.selectedFile = undefined; this.preparedFile = undefined; this.previewUrl.set(''); this.landscapeHint.set(false); this.lowResHint.set(false); this.uploadStage.set(''); this.uploadedMediaId.set(''); this.uploadError.set(''); this.uploading.set(false); }
+  canRetryUpload(): boolean { return !!(this.preparedFile || this.selectedFile); }
+  /** Thử lại dùng ảnh đã nén (không bắt chọn lại); nếu chưa nén xong thì nén lại từ ảnh gốc. */
+  retryUpload(): void { if (this.uploading()) return; if (this.preparedFile) this.uploadFile(this.preparedFile, true); else if (this.selectedFile) this.uploadFile(this.selectedFile); }
+  private uploadFile(file: File, alreadyPrepared = false): void {
     this.uploadSubscription?.unsubscribe(); this.uploadError.set(''); this.uploadedMediaId.set(''); this.uploading.set(true);
-    this.uploadSubscription = this.api.uploadImage(file, 'tryon').subscribe({
-      next: (res) => { this.uploadedMediaId.set(res.id); this.uploading.set(false); this.toast.success('Đã tải ảnh, sẵn sàng thử đồ.'); },
-      error: (err) => { this.uploading.set(false); this.uploadError.set(err.error?.message || err.message || 'Không thể tải ảnh lên.'); this.toast.error(this.uploadError()); },
+    if (!alreadyPrepared) { this.previewUrl.set(''); this.landscapeHint.set(false); this.lowResHint.set(false); }
+    this.uploadStage.set(alreadyPrepared ? 'uploading' : 'compressing');
+    const prepared$: Observable<File> = alreadyPrepared ? from([file]) : this.preparePhoto(file).pipe(tap((photo) => {
+      this.preparedFile = photo.file;
+      this.landscapeHint.set(isLandscape(photo.width, photo.height));
+      this.lowResHint.set(isLowResolution(photo.width, photo.height));
+      this.uploadStage.set('uploading');
+      const reader = new FileReader(); reader.onload = (loadEvent) => { if (this.preparedFile === photo.file) this.previewUrl.set(loadEvent.target?.result as string); }; reader.readAsDataURL(photo.file);
+    }), map((photo) => photo.file));
+    this.uploadSubscription = prepared$.pipe(switchMap((ready) => uploadTryOnPhoto((f) => this.api.uploadImage(f, 'tryon'), ready))).subscribe({
+      next: (res) => { this.uploadedMediaId.set(res.id); this.uploading.set(false); this.uploadStage.set(''); this.toast.success('Đã tải ảnh, sẵn sàng thử đồ.'); },
+      error: (err) => { this.uploading.set(false); this.uploadStage.set(''); this.uploadError.set(photoUploadErrorMessage(err)); this.toast.error(this.uploadError()); },
     });
   }
   startTryOn(): void {

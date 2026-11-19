@@ -25,6 +25,8 @@ describe.each([AiTryOnPage, AiMixMatchPage])('AI image upload recovery: %s', (Pa
       { provide: ActivatedRoute, useValue: {} },
     ] });
     const page = runInInjectionContext(injector, () => new Page());
+    // Bước nén ảnh chạy bằng canvas trên trình duyệt; ở đây thay bằng bản giả trả lại đúng file (đã "nén").
+    page.preparePhoto = (file: File) => of({ file, width: 1080, height: 1920 });
     const select = (file: File) => {
       const input = { files: [file], value: file.name };
       page.onFileSelected({ target: input } as unknown as Event);
@@ -39,7 +41,7 @@ describe.each([AiTryOnPage, AiMixMatchPage])('AI image upload recovery: %s', (Pa
     uploadImage.mockReturnValueOnce(throwError(() => new Error('Upload failed')))
       .mockReturnValueOnce(of({ id: 'ready' }));
     expect(select(file).value).toBe('');
-    expect(page.uploadError()).toBe('Upload failed');
+    expect(page.uploadError()).toBe('Tải ảnh không thành công. Vui lòng thử lại sau ít phút.');
     expect(page.uploadedMediaId()).toBe('');
     page.retryUpload();
     expect(uploadImage).toHaveBeenNthCalledWith(2, file, 'tryon');
@@ -60,6 +62,29 @@ describe.each([AiTryOnPage, AiMixMatchPage])('AI image upload recovery: %s', (Pa
     second.next({ id: 'second' });
     first.next({ id: 'first' });
     expect(page.uploadedMediaId()).toBe('second');
+    page.ngOnDestroy();
+  });
+
+  it('rejects a file over 15MB or of another format right away, without uploading', () => {
+    const { page, uploadImage, select } = fixture();
+    const big = new File(['x'], 'big.jpg', { type: 'image/jpeg' });
+    Object.defineProperty(big, 'size', { value: 15 * 1024 * 1024 + 1 });
+    select(big);
+    expect(page.uploadError()).toBe('Ảnh lớn hơn 15MB. Vui lòng chọn ảnh khác hoặc chụp màn hình ảnh rồi tải lên.');
+    select(new File(['gif'], 'anim.gif', { type: 'image/gif' }));
+    expect(page.uploadError()).toBe('Chỉ hỗ trợ ảnh JPG, PNG, WEBP hoặc HEIC.');
+    expect(uploadImage).not.toHaveBeenCalled();
+    expect(page.uploading()).toBe(false);
+    page.ngOnDestroy();
+  });
+
+  it('retries once with a new upload session when the previous one expired', () => {
+    const { page, uploadImage, select } = fixture();
+    uploadImage.mockReturnValueOnce(throwError(() => ({ status: 422, error: { message: 'Upload has expired' } })))
+      .mockReturnValueOnce(of({ id: 'fresh' }));
+    select(new File(['test'], 'photo.png', { type: 'image/png' }));
+    expect(uploadImage).toHaveBeenCalledTimes(2);
+    expect(page.uploadedMediaId()).toBe('fresh');
     page.ngOnDestroy();
   });
 

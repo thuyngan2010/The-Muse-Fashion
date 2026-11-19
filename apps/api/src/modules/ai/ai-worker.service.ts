@@ -5,6 +5,7 @@ import { randomUUID } from 'node:crypto';
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
 import { AppConfig } from '../../common/app-config.js';
 import { Product } from '../catalog/product.schema.js';
+import { Category } from '../catalog/catalog.schemas.js';
 import { MediaObject } from '../storage/media-object.schema.js';
 import { StorageService } from '../storage/storage.service.js';
 import { AiJob } from './ai.schemas.js';
@@ -27,6 +28,8 @@ export class AiWorkerService implements OnModuleInit, OnModuleDestroy {
     private readonly ai: AiService,
     private readonly storage: StorageService,
     private readonly planner: AiFashionPlannerService,
+    // Để cuối và không bắt buộc: chỗ nào tạo worker theo thứ tự tham số cũ vẫn chạy, chỉ thiếu tên danh mục trong prompt.
+    @InjectModel(Category.name) private readonly categories?: Model<Category>,
   ) {}
 
   onModuleInit(): void {
@@ -99,6 +102,10 @@ export class AiWorkerService implements OnModuleInit, OnModuleDestroy {
           ? await this.media.find({ _id: { $in: mediaIds }, purpose: 'product', status: 'READY' }).lean().exec()
           : [];
         const mediaById = new Map(productMedia.map((item) => [String(item._id), item]));
+        // Tên danh mục của cửa hàng (ví dụ "Áo", "Đầm") để mô tả sản phẩm trong prompt; chỉ đọc database.
+        const categoryIds = [...new Set(products.map((product) => product.categoryId).filter(Boolean).map(String))];
+        const categoryRows = categoryIds.length && this.categories ? await this.categories.find({ _id: { $in: categoryIds } }).select('name').lean().exec() : [];
+        const categoryById = new Map(categoryRows.map((row) => [String(row._id), row.name]));
         // Keep one reference per selected product in request order, rather than letting
         // multiple images of the first product consume all reference slots.
         const references = await Promise.all(claimed.productIds.map(async (id) => {
@@ -111,7 +118,8 @@ export class AiWorkerService implements OnModuleInit, OnModuleDestroy {
               ?? await this.storage.signedReadUrl(item.key, 600) ?? undefined;
           }
           if (!imageUrl) throw new FashionInputError('Mỗi sản phẩm cần có ảnh tham chiếu để thử đồ.');
-          return { id: String(id), name: product.name, description: product.description ?? '', material: product.material ?? '', imageUrl };
+          return { id: String(id), name: product.name, description: product.description ?? '', material: product.material ?? '', imageUrl,
+            category: product.categoryId ? categoryById.get(String(product.categoryId)) : undefined };
         }));
         const productImageUrls = references.map(p => p.imageUrl);
         const setPhase = async (phase: 'ANALYZING' | 'PLANNING' | 'GENERATING') => {
@@ -139,6 +147,8 @@ export class AiWorkerService implements OnModuleInit, OnModuleDestroy {
           providerJobId: claimed.providerJobId,
           prompt: renderPlan?.prompt,
           body: { heightCm: claimed.heightCm, weightKg: claimed.weightKg },
+          products: references.map(({ name, category, material }) => ({ name, category, material })),
+          style: claimed.style,
         });
 
         if (result.status === 'PROCESSING') {
