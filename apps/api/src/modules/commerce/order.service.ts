@@ -40,6 +40,7 @@ import {
 import {
   cartFingerprint,
   generateOrderCode,
+  selectCartLines,
   serializeOrder,
   type OrderLineSnapshot,
   type OrderMoney,
@@ -89,7 +90,11 @@ export class OrderService {
 
       const cart = await this.carts.getCart(customerId, session);
       if (!cart.items.length) throw new BadRequestException('Cart is empty');
-      const fingerprint = cartFingerprint(cart.items.map((item) => ({ variantId: item.variantId, quantity: item.quantity })));
+      // Chỉ đặt các sản phẩm đã báo giá (sản phẩm khách chọn trong giỏ); sản phẩm khác vẫn ở lại giỏ.
+      const quotedVariantIds = quote.cartItems.map((item) => String(item.variantId));
+      const selected = selectCartLines(cart.items, quotedVariantIds);
+      if (!selected) throw new ConflictException('Cart changed since quote; request a new quote');
+      const fingerprint = cartFingerprint(selected.items.map((item) => ({ variantId: item.variantId, quantity: item.quantity })));
       if (fingerprint !== quote.cartFingerprint) {
         throw new ConflictException('Cart changed since quote; request a new quote');
       }
@@ -104,10 +109,10 @@ export class OrderService {
       const settings = await this.pricing.getSettings(session);
       const { discount: voucherDiscount, code: voucherCode } = await this.pricing.resolveVoucher(
         quote.voucherCode,
-        cart.subtotal,
+        selected.subtotal,
         session,
       );
-      const totals = this.pricing.totals(cart.subtotal, voucherDiscount, settings);
+      const totals = this.pricing.totals(selected.subtotal, voucherDiscount, settings);
       if (
         totals.subtotal !== quote.subtotal
         || totals.shippingFee !== quote.shippingFee
@@ -117,7 +122,7 @@ export class OrderService {
         throw new ConflictException('Pricing changed since quote; request a new quote');
       }
 
-      const lines = await this.buildLineSnapshots(cart.items, session);
+      const lines = await this.buildLineSnapshots(selected.items, session);
       const paymentDueAt = new Date(Date.now() + PAYMENT_HOLD_MS);
       const money: OrderMoney = { ...totals, voucherCode };
 
@@ -153,14 +158,14 @@ export class OrderService {
 
       const orderId = String(order._id);
       await this.reservations.reserveLines(lines, orderId, customerId, session);
-      if (voucherCode) await this.reservations.consumeVoucherUsage(voucherCode, cart.subtotal, session);
+      if (voucherCode) await this.reservations.consumeVoucherUsage(voucherCode, selected.subtotal, session);
 
       const consumed = await this.quotes.updateOne(
         { quoteId: dto.quoteId, customerId, consumedAt: null, expiresAt: { $gt: new Date() } },
         { $set: { consumedAt: new Date() } }, { session },
       ).exec();
       if (consumed.modifiedCount !== 1) throw new ConflictException('Checkout quote was already used or expired');
-      await this.carts.clearCart(customerId, session);
+      await this.carts.removeItems(customerId, quotedVariantIds, session);
 
       await this.orderEvents.create(
         [{ orderId, to: 'PENDING_PAYMENT', actorId: customerId, reason: 'Order created' }],

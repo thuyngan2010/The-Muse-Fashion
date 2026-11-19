@@ -34,6 +34,12 @@ export class CartService {
     await this.carts.updateOne({ customerId }, { $set: { items: [] } }, { session }).exec();
   }
 
+  /** Bỏ khỏi giỏ các sản phẩm vừa đặt hàng; sản phẩm chưa chọn vẫn ở lại giỏ. */
+  async removeItems(customerId: string, variantIds: string[], session?: ClientSession) {
+    const ids = variantIds.map((id) => new Types.ObjectId(String(id)));
+    await this.carts.updateOne({ customerId }, { $pull: { items: { variantId: { $in: ids } } } }, { session }).exec();
+  }
+
   private async ensureCart(customerId: string, session?: ClientSession) {
     return this.carts.findOneAndUpdate(
       { customerId },

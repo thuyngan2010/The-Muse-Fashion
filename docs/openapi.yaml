@@ -396,6 +396,13 @@ paths:
                 addressId: {$ref: '#/components/schemas/ObjectId'}
                 voucherCode: {type: string, minLength: 1, maxLength: 50}
                 shippingMethod: {type: string, const: STANDARD}
+                variantIds:
+                  type: array
+                  description: Only check out these cart lines; omitted means the whole cart. The order keeps the other lines in the cart.
+                  minItems: 1
+                  maxItems: 100
+                  uniqueItems: true
+                  items: {$ref: '#/components/schemas/ObjectId'}
       responses:
         '200':
           description: Server-calculated quote valid for ten minutes

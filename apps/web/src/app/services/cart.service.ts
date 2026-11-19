@@ -195,7 +195,13 @@ export class CartService {
     }
   }
 
-  resetAfterCheckout(): void { this.cart.set({ items: [], subtotal: 0 }); }
+  resetAfterCheckout(): void {
+    this.cart.set({ items: [], subtotal: 0 });
+    // Đặt hàng chỉ với sản phẩm được tick thì các sản phẩm còn lại vẫn ở giỏ trên máy chủ: tải lại để hiển thị đúng.
+    if (this.auth.isAuthenticated() && this.auth.isCustomer()) {
+      this.api.getCart().subscribe({ next: (cart) => this.cart.set(cart), error: () => undefined });
+    }
+  }
 
   private saveItems(items: CartItem[], toastMsg?: string): void {
     const subtotal = items.reduce((sum, item) => sum + item.unitPrice * item.quantity, 0);
