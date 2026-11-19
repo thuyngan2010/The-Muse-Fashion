@@ -9,6 +9,20 @@ const HARD_IMAGE_MAX_BYTES = 10 * 1024 * 1024;
 const IMAGE_JSON_OVERHEAD_BYTES = 128 * 1024;
 type ProviderProtocol = 'openai' | 'custom';
 
+/**
+ * Tham số ảnh đầu ra cho /images/edits (gpt-image-2), chọn để giảm chi phí mỗi lần tạo ảnh:
+ * ảnh dọc cố định 1024x1536, chất lượng theo AI_IMAGE_QUALITY (mặc định medium), JPEG nén 85 (nhẹ hơn PNG).
+ * Không gửi input_fidelity vì gpt-image-2 yêu cầu bỏ tham số này.
+ */
+export const OPENAI_IMAGE_SIZE = '1024x1536';
+export const OPENAI_OUTPUT_COMPRESSION = 85;
+const IMAGE_QUALITIES = ['low', 'medium', 'high'] as const;
+export type ImageQuality = typeof IMAGE_QUALITIES[number];
+export function imageQuality(): ImageQuality {
+  const value = (AppConfig.optional('AI_IMAGE_QUALITY') ?? '').trim().toLowerCase();
+  return (IMAGE_QUALITIES as readonly string[]).includes(value) ? value as ImageQuality : 'medium';
+}
+
 export type AiProviderSubmitInput = {
   jobId: string;
   type: 'TRY_ON' | 'MIX_MATCH';
@@ -197,7 +211,8 @@ export class AiProviderService {
           ...(model ? { model } : {}),
           prompt: input.prompt ?? buildTryOnPrompt({ type: input.type, products: input.products ?? [], body: input.body, style: input.style }),
           images: [input.inputUrl, ...input.productImageUrls].map((image_url) => ({ image_url })),
-          n: 1, output_format: 'png',
+          n: 1, size: OPENAI_IMAGE_SIZE, quality: imageQuality(),
+          output_format: 'jpeg', output_compression: OPENAI_OUTPUT_COMPRESSION,
         },
         headers: { 'Idempotency-Key': input.jobId }, signal, maxRetries: 0,
         fetchOptions: { redirect: 'error' },

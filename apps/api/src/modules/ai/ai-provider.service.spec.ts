@@ -107,9 +107,22 @@ describe('OpenAI-compatible image edits', () => {
     expect(new Headers(options.headers).get('authorization')).toBe('Bearer test-key');
     expect(new Headers(options.headers).get('idempotency-key')).toBe(input.jobId);
     expect(JSON.parse(String(options.body))).toMatchObject({
-      model: 'gpt-image-2', n: 1, output_format: 'png',
+      model: 'gpt-image-2', n: 1, size: '1024x1536', quality: 'medium', output_format: 'jpeg', output_compression: 85,
       images: [{ image_url: input.inputUrl }, { image_url: input.productImageUrls[0] }],
     });
+  });
+
+  it.each([['low', 'low'], ['HIGH', 'high'], ['ultra', 'medium'], ['', 'medium']])('sends quality from AI_IMAGE_QUALITY=%s as %s and never input_fidelity', async (env, expected) => {
+    vi.stubEnv('AI_IMAGE_QUALITY', env);
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ data: [{ b64_json: png.toString('base64') }] }), {
+      headers: { 'content-type': 'application/json' },
+    }));
+    vi.stubGlobal('fetch', fetchMock);
+    await new AiProviderService().runJob(input);
+    const body = JSON.parse(String(fetchMock.mock.calls[0][1].body));
+    expect(body.quality).toBe(expected);
+    expect(body.size).toBe('1024x1536');
+    expect(body).not.toHaveProperty('input_fidelity');
   });
 
   it.each(['openai', 'custom'])('passes the validated fashion prompt to the %s image contract', async protocol => {
