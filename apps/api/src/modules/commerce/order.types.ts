@@ -45,6 +45,21 @@ export function serializeOrder(order: OrderDocLike) {
   };
 }
 
+/**
+ * Các dòng giỏ hàng được chọn để thanh toán. Không truyền variantIds thì lấy cả giỏ (hành vi cũ).
+ * Trả null khi có mã biến thể không còn trong giỏ.
+ */
+export function selectCartLines<T extends { variantId: string; quantity: number; unitPrice: number }>(
+  items: T[], variantIds?: string[] | null,
+): { items: T[]; subtotal: number } | null {
+  const sum = (lines: T[]) => lines.reduce((total, line) => total + line.unitPrice * line.quantity, 0);
+  if (!variantIds) return { items, subtotal: sum(items) };
+  const wanted = new Set(variantIds.map(String));
+  const picked = items.filter((item) => wanted.has(String(item.variantId)));
+  if (!picked.length || picked.length !== wanted.size) return null;
+  return { items: picked, subtotal: sum(picked) };
+}
+
 export function cartFingerprint(items: Array<{ variantId: string; quantity: number }>): string {
   return [...items]
     .map((item) => `${item.variantId}:${item.quantity}`)

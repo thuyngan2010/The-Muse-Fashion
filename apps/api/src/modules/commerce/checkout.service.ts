@@ -6,7 +6,7 @@ import { Address } from '../users/identity.schemas.js';
 import { CheckoutQuote } from './commerce.schemas.js';
 import { CartService } from './cart.service.js';
 import { PricingService } from './pricing.service.js';
-import { cartFingerprint } from './order.types.js';
+import { cartFingerprint, selectCartLines } from './order.types.js';
 import type { CheckoutQuoteDto } from './commerce.dto.js';
 
 @Injectable()
@@ -25,13 +25,15 @@ export class CheckoutService {
 
     const cart = await this.carts.getCart(customerId);
     if (!cart.items.length) throw new BadRequestException('Cart is empty');
+    const selected = selectCartLines(cart.items, dto.variantIds);
+    if (!selected) throw new BadRequestException('Selected items are not in the cart');
 
     const settings = await this.pricing.getSettings();
-    const { discount: voucherDiscount } = await this.pricing.resolveVoucher(dto.voucherCode, cart.subtotal);
-    const totals = this.pricing.totals(cart.subtotal, voucherDiscount, settings);
+    const { discount: voucherDiscount } = await this.pricing.resolveVoucher(dto.voucherCode, selected.subtotal);
+    const totals = this.pricing.totals(selected.subtotal, voucherDiscount, settings);
     const quoteId = randomUUID();
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
-    const cartItems = cart.items.map((item) => ({ variantId: item.variantId, quantity: item.quantity }));
+    const cartItems = selected.items.map((item) => ({ variantId: item.variantId, quantity: item.quantity }));
 
     await this.quotes.create({
       quoteId,

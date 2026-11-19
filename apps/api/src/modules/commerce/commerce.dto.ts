@@ -1,5 +1,5 @@
 import {
-  IsArray, IsDateString, IsEnum, IsInt, IsMongoId, IsOptional, IsString, IsUUID, Max, MaxLength, Min, MinLength, Matches, ValidateNested, NotEquals,
+  ArrayMaxSize, ArrayMinSize, ArrayUnique, IsArray, IsDateString, IsEnum, IsInt, IsMongoId, IsOptional, IsString, IsUUID, Max, MaxLength, Min, MinLength, Matches, ValidateNested, NotEquals,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { PaginationQueryDto } from '../../common/pagination-query.dto.js';
@@ -27,6 +27,8 @@ export class CheckoutQuoteDto {
   @IsMongoId() addressId!: string;
   @IsOptional() @IsString() @MinLength(1) @MaxLength(50) voucherCode?: string;
   @IsOptional() @IsEnum(['STANDARD']) shippingMethod?: 'STANDARD';
+  /** Chỉ thanh toán các sản phẩm được chọn trong giỏ; bỏ trống thì thanh toán cả giỏ. */
+  @IsOptional() @IsArray() @ArrayMinSize(1) @ArrayMaxSize(100) @ArrayUnique() @IsMongoId({ each: true }) variantIds?: string[];
 }
 
 export class InventoryAdjustDto {

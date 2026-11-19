@@ -299,7 +299,8 @@ paths:
         schema: {type: string, maxLength: 100}
       - name: sort
         in: query
-        schema: {type: string, enum: [newest, price_asc, price_desc, name_asc]}
+        description: rating returns only products with at least one public review, highest average stars first.
+        schema: {type: string, enum: [newest, price_asc, price_desc, name_asc, rating]}
       responses:
         '200':
           description: Published products
@@ -395,6 +396,13 @@ paths:
                 addressId: {$ref: '#/components/schemas/ObjectId'}
                 voucherCode: {type: string, minLength: 1, maxLength: 50}
                 shippingMethod: {type: string, const: STANDARD}
+                variantIds:
+                  type: array
+                  description: Only check out these cart lines; omitted means the whole cart. The order keeps the other lines in the cart.
+                  minItems: 1
+                  maxItems: 100
+                  uniqueItems: true
+                  items: {$ref: '#/components/schemas/ObjectId'}
       responses:
         '200':
           description: Server-calculated quote valid for ten minutes

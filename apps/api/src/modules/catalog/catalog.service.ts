@@ -69,10 +69,12 @@ export class CatalogService {
     if (Object.keys(price).length) variantFilter.price = price;
     const variantCriteria = Object.keys(variantFilter).length > 1;
     const priceSort = query.sort === 'price_asc' || query.sort === 'price_desc';
+    // sort=rating: chỉ sản phẩm đã có đánh giá công khai, điểm trung bình cao trước (dùng cho "Sản phẩm nổi bật").
+    const ratingSort = query.sort === 'rating';
     const skip = (query.page - 1) * query.limit;
     let rows: Array<Record<string, any>>;
     let total: number;
-    if (variantCriteria || priceSort) {
+    if (variantCriteria || priceSort || ratingSort) {
       const match = { ...filter, ...(filter.categoryId ? { categoryId: new Types.ObjectId(String(filter.categoryId)) } : {}) };
       const [result] = await this.products.aggregate<{ items: typeof rows; count: Array<{ total: number }> }>([
         { $match: match },
@@ -82,8 +84,19 @@ export class CatalogService {
         ], as: 'variantMatch' } },
         ...(variantCriteria ? [{ $match: { 'variantMatch.0': { $exists: true } } }] : []),
         { $addFields: { displayPrice: { $ifNull: [{ $arrayElemAt: ['$variantMatch.minPrice', 0] }, '$price'] } } },
-        { $facet: { items: [{ $sort: priceSort ? { displayPrice: query.sort === 'price_desc' ? -1 : 1, _id: 1 } : this.sortOption(query.sort) },
-          { $skip: skip }, { $limit: query.limit }, { $project: { variantMatch: 0, displayPrice: 0 } }], count: [{ $count: 'total' }] } },
+        ...(ratingSort ? [
+          { $lookup: { from: 'reviews', let: { productId: '$_id' }, pipeline: [
+            { $match: { $expr: { $eq: ['$productId', '$$productId'] }, status: 'PUBLIC', deletedAt: null } },
+            { $group: { _id: null, avgStars: { $avg: '$stars' }, reviewCount: { $sum: 1 } } },
+          ], as: 'ratingMatch' } },
+          { $match: { 'ratingMatch.0': { $exists: true } } },
+          { $addFields: { avgStars: { $arrayElemAt: ['$ratingMatch.avgStars', 0] }, reviewCount: { $arrayElemAt: ['$ratingMatch.reviewCount', 0] } } },
+        ] : []),
+        { $facet: { items: [{ $sort: priceSort ? { displayPrice: query.sort === 'price_desc' ? -1 : 1, _id: 1 }
+          : ratingSort ? { avgStars: -1, reviewCount: -1, createdAt: -1, _id: 1 } : this.sortOption(query.sort) },
+          { $skip: skip }, { $limit: query.limit },
+          { $project: { variantMatch: 0, displayPrice: 0, ...(ratingSort ? { ratingMatch: 0, avgStars: 0, reviewCount: 0 } : {}) } }],
+          count: [{ $count: 'total' }] } },
       ]).exec();
       rows = result?.items ?? []; total = result?.count[0]?.total ?? 0;
     } else {

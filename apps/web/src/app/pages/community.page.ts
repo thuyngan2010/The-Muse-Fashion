@@ -1,6 +1,7 @@
 import { PaginationComponent, PaginationState } from '../components/pagination.component';
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { DatePipe } from '@angular/common';
+import { Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import type { CommunityPost, CommunityComment } from '@fashion/contracts';
 import { ApiService } from '../services/api.service';
@@ -45,7 +46,7 @@ import { PageStateComponent } from '../components/page-state.component';
           <article class="cover">
             <div class="cover-img" (click)="viewPostDetail(fp.id)">
               @if (fp.mediaUrls && fp.mediaUrls.length > 0) { <img [src]="fp.mediaUrls[0]" [alt]="titleOf(fp)" /> }
-              <span class="cover-badge">COVER STORY</span>
+              <span class="cover-badge">BÀI MỚI NHẤT</span>
             </div>
             <div class="cover-text">
               <div class="meta">
@@ -173,42 +174,6 @@ import { PageStateComponent } from '../components/page-state.component';
             </button>
           </div>
         </form>
-      }
-    </fc-modal>
-
-    <!-- Post Detail Modal (GET /community/posts/:postId) -->
-    <fc-modal
-      [isOpen]="detailModalOpen()"
-      title="Chi tiết bài viết"
-      maxWidth="680px"
-      (close)="detailModalOpen.set(false)"
-    >
-      @if (loadingDetail()) {
-        <p class="notice">Đang tải chi tiết bài viết...</p>
-      } @else if (detailedPost(); as dp) {
-        <div class="detail-container">
-          <div class="post-header">
-            <div class="author-circle">{{ dp.authorName?.[0] || 'U' }}</div>
-            <div class="header-meta">
-              <strong class="author-name">{{ dp.authorName || 'Thành viên' }}</strong>
-              <span class="post-time">{{ dp.createdAt | date:'dd/MM/yyyy HH:mm' }}</span>
-            </div>
-          </div>
-
-          @if (dp.mediaUrls && dp.mediaUrls.length > 0) {
-            <div class="detail-image-wrap">
-              <img [src]="dp.mediaUrls[0]" alt="Ảnh bài viết" />
-            </div>
-          }
-
-          <p class="detail-caption">{{ dp.caption }}</p>
-
-          <div class="modal-footer-btn">
-            <button type="button" class="btn-primary" (click)="openCommentsFromDetail(dp)">
-              💬 Mở khung bình luận
-            </button>
-          </div>
-        </div>
       }
     </fc-modal>
 
@@ -542,6 +507,7 @@ export class CommunityPage implements OnInit {
   private readonly api = inject(ApiService);
   readonly auth = inject(AuthService);
   private readonly toast = inject(ToastService);
+  private readonly router = inject(Router);
 
   readonly posts = signal<CommunityPost[]>([]);
   searchTerm = '';
@@ -566,11 +532,6 @@ export class CommunityPage implements OnInit {
   editPostCaption = '';
   editPostImageUrl = '';
   readonly editPostMediaId = signal('');
-
-  // Detail Post (GET /community/posts/:postId)
-  readonly detailModalOpen = signal<boolean>(false);
-  readonly detailedPost = signal<CommunityPost | null>(null);
-  readonly loadingDetail = signal<boolean>(false);
 
   // Comments (with PATCH/DELETE comments)
   readonly commentsModalOpen = signal<boolean>(false);
@@ -630,27 +591,9 @@ export class CommunityPage implements OnInit {
     return cur.id === comment.authorId || (cur as any).sub === comment.authorId || this.auth.isAdmin();
   }
 
-  // --- GET /community/posts/:postId ---
+  // Chi tiết bài viết mở trang riêng /community/:postId (bố cục theo Figma "Chi tiết Blog").
   viewPostDetail(postId: string): void {
-    this.loadingDetail.set(true);
-    this.detailedPost.set(null);
-    this.detailModalOpen.set(true);
-    this.api.getPost(postId).subscribe({
-      next: (post) => {
-        this.detailedPost.set(post);
-        this.loadingDetail.set(false);
-      },
-      error: (err) => {
-        this.loadingDetail.set(false);
-        this.detailModalOpen.set(false);
-        this.toast.error(err.error?.message || 'Không thể tải chi tiết bài viết.');
-      },
-    });
-  }
-
-  openCommentsFromDetail(post: CommunityPost): void {
-    this.detailModalOpen.set(false);
-    this.openComments(post);
+    void this.router.navigate(['/community', postId]);
   }
 
   // --- Create Post ---

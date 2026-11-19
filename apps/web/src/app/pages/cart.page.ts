@@ -33,7 +33,7 @@ type CartRecommendation = ProductSummary & {
           <section class="cart-items-col" aria-label="Sản phẩm trong giỏ hàng">
             <div class="batch-controls">
               <label class="select-all-control">
-                <input type="checkbox" [checked]="allSelected()" [disabled]="cart.cart()!.items.length === 0 || removing()" (change)="toggleAll($any($event.target).checked)" aria-label="Chọn tất cả sản phẩm để xóa" />
+                <input type="checkbox" [checked]="allSelected()" [disabled]="cart.cart()!.items.length === 0 || removing()" (change)="toggleAll($any($event.target).checked)" aria-label="Chọn tất cả sản phẩm" />
                 <span>CHỌN TẤT CẢ</span>
               </label>
               <div class="batch-actions">
@@ -49,7 +49,7 @@ type CartRecommendation = ProductSummary & {
                 @for (item of cart.cart()!.items; track item.variantId) {
                   <article class="cart-item">
                   <label class="item-select">
-                    <input type="checkbox" [checked]="selectedVariantIds().has(item.variantId)" [disabled]="removing()" (change)="toggleItem(item.variantId, $any($event.target).checked)" [attr.aria-label]="'Chọn ' + item.productName + ' để xóa'" />
+                    <input type="checkbox" [checked]="selectedVariantIds().has(item.variantId)" [disabled]="removing()" (change)="toggleItem(item.variantId, $any($event.target).checked)" [attr.aria-label]="'Chọn ' + item.productName" />
                   </label>
 
                   <div class="item-image">
@@ -107,8 +107,8 @@ type CartRecommendation = ProductSummary & {
               <label for="cart-voucher">MÃ ƯU ĐÃI / VOUCHER</label>
               <div class="voucher-control">
                 <input id="cart-voucher" type="text" placeholder="Nhập tại bước thanh toán" readonly data-ui-only />
-                @if (cart.cart()!.items.length > 0) {
-                  <a routerLink="/checkout">ÁP DỤNG</a>
+                @if (selectedItems().length > 0) {
+                  <a routerLink="/checkout" [queryParams]="checkoutQueryParams()">ÁP DỤNG</a>
                 } @else {
                   <button type="button" disabled>ÁP DỤNG</button>
                 }
@@ -116,18 +116,21 @@ type CartRecommendation = ProductSummary & {
             </div>
 
             <div class="summary-lines">
-              <div class="summary-line"><span>Tạm tính:</span><strong>{{ cart.subtotal() | currency:'VND':'symbol':'1.0-0' }}</strong></div>
+              <div class="summary-line"><span>Tạm tính ({{ selectedItems().length }} sản phẩm):</span><strong>{{ selectedSubtotal() | currency:'VND':'symbol':'1.0-0' }}</strong></div>
               @if (cart.cart()!.items.length > 0) {
                 <div class="summary-line"><span>Phí vận chuyển:</span><span>Tính tại thanh toán</span></div>
                 <div class="summary-line"><span>Giảm giá voucher:</span><span>Nhập tại thanh toán</span></div>
               }
               <div class="summary-total">
                 <span>TỔNG THANH TOÁN:</span>
-                <strong>{{ cart.subtotal() | currency:'VND':'symbol':'1.0-0' }}</strong>
+                <strong>{{ selectedSubtotal() | currency:'VND':'symbol':'1.0-0' }}</strong>
               </div>
             </div>
+            @if (cart.cart()!.items.length > 0 && selectedItems().length === 0) {
+              <p class="select-hint" role="status">Tick chọn sản phẩm muốn thanh toán.</p>
+            }
 
-            <button type="button" class="checkout-button" [disabled]="cart.cart()!.items.length === 0" (click)="goToCheckout()">TIẾN HÀNH THANH TOÁN</button>
+            <button type="button" class="checkout-button" [disabled]="selectedItems().length === 0" (click)="goToCheckout()">TIẾN HÀNH THANH TOÁN</button>
             <ul class="assurance-list">
               @for (assurance of storeContent.assurances; track assurance) {
                 <li><span aria-hidden="true">✓</span>{{ assurance }}</li>
@@ -237,6 +240,7 @@ type CartRecommendation = ProductSummary & {
     .summary-total { display: grid; gap: 10px; margin-top: 20px; padding-top: 18px; border-top: 1px solid rgba(0,0,0,.2); }
     .summary-total span { font-size: 14px; font-weight: 700; letter-spacing: .7px; }
     .summary-total strong { color: #c52929; font-family: "Playfair Display", Georgia, serif; font-size: 30px; font-weight: 600; line-height: 1.15; text-align: right; }
+    .select-hint { margin: 16px 0 0; color: #8f485d; font-size: 12px; font-weight: 600; }
     .checkout-button { width: 100%; min-height: 50px; margin-top: 24px; border: 1px solid #171717; background: #f4b8c1; color: #171717; font-size: 12px; font-weight: 800; letter-spacing: 1.2px; cursor: pointer; }
     .checkout-button:hover { background: #171717; color: #fff; }
     .checkout-button:disabled { border-color: #c4c7c7; background: #efeded; color: #747878; cursor: not-allowed; }
@@ -310,6 +314,13 @@ export class CartPage implements OnInit {
       this.cart.removeItem(next);
     });
   });
+  /** Sản phẩm được tick: tổng tiền và thanh toán chỉ tính các sản phẩm này (chưa tick thì 0đ). */
+  readonly selectedItems = computed(() => {
+    const selected = this.selectedVariantIds();
+    return (this.cart.cart()?.items ?? []).filter((item) => selected.has(item.variantId));
+  });
+  readonly selectedSubtotal = computed(() => this.selectedItems().reduce((sum, item) => sum + item.unitPrice * item.quantity, 0));
+  readonly checkoutQueryParams = computed(() => ({ items: this.selectedItems().map((item) => item.variantId).join(',') }));
   readonly allSelected = computed(() => {
     const items = this.cart.cart()?.items ?? [];
     const selected = this.selectedVariantIds();
@@ -359,10 +370,12 @@ export class CartPage implements OnInit {
   }
 
   goToCheckout(): void {
+    if (this.selectedItems().length === 0) return;
+    const queryParams = this.checkoutQueryParams();
     if (!this.auth.isAuthenticated()) {
-      this.router.navigate(['/auth'], { queryParams: { returnUrl: '/checkout' } });
+      this.router.navigate(['/auth'], { queryParams: { returnUrl: '/checkout?items=' + queryParams.items } });
       return;
     }
-    this.router.navigate(['/checkout']);
+    this.router.navigate(['/checkout'], { queryParams });
   }
 }

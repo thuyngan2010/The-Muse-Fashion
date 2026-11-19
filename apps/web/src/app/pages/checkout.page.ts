@@ -1,5 +1,5 @@
-import { Component, OnInit, OnDestroy, inject, signal } from '@angular/core';
-import { Router, RouterLink } from '@angular/router';
+import { Component, OnInit, OnDestroy, computed, inject, signal } from '@angular/core';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { CurrencyPipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import type { UserAddress, CheckoutQuote } from '@fashion/contracts';
@@ -9,6 +9,12 @@ import { CartService } from '../services/cart.service';
 import { ToastService } from '../services/toast.service';
 import { STORE_CART_CONTENT, STORE_CHECKOUT_CONTENT } from '../shared/store-content';
 import { catchError, map, Subscription, throwError } from 'rxjs';
+
+/** Đọc danh sách sản phẩm được tick ở giỏ hàng (?items=id1,id2). Không có thì thanh toán cả giỏ. */
+export function parseSelectedItems(raw: string | null | undefined): string[] | null {
+  const ids = [...new Set((raw ?? '').split(',').map((id) => id.trim()).filter((id) => /^[a-f0-9]{24}$/i.test(id)))];
+  return ids.length ? ids : null;
+}
 
 const VOUCHER_ERRORS: Record<string, string> = {
   VOUCHER_INVALID: 'Mã ưu đãi không hợp lệ.',
@@ -50,7 +56,7 @@ function generateUUID(): string {
           <button type="button" class="btn-primary" [disabled]="placingOrder()" (click)="recoverPendingOrder()">{{ placingOrder() ? 'Đang kiểm tra…' : 'Kiểm tra đơn hàng' }}</button>
           <a routerLink="/orders" class="link-text">Xem lịch sử đơn hàng</a>
         </section>
-      } @else if (cart.itemCount() === 0) {
+      } @else if (orderItems().length === 0) {
         <section class="state-card">
           <p>{{ content.emptyTitle }}</p>
           <a routerLink="/products" class="btn-primary">{{ content.emptyAction }}</a>
@@ -122,7 +128,7 @@ function generateUUID(): string {
                 <a routerLink="/cart" class="btn-text">{{ content.editCart }}</a>
               </div>
               <ul class="order-items">
-                @for (item of cart.cart()?.items ?? []; track item.variantId) {
+                @for (item of orderItems(); track item.variantId) {
                   <li>
                     <div class="oi-main">
                       <strong>{{ item.productName }}</strong>
@@ -281,8 +287,18 @@ export class CheckoutPage implements OnInit, OnDestroy {
   readonly cart = inject(CartService);
   private readonly toast = inject(ToastService);
   private readonly router = inject(Router);
+  private readonly route = inject(ActivatedRoute, { optional: true });
 
   readonly content = STORE_CHECKOUT_CONTENT;
+  /** Sản phẩm được tick ở giỏ hàng; null = thanh toán cả giỏ. */
+  readonly selectedVariantIds = signal<string[] | null>(parseSelectedItems(this.route?.snapshot?.queryParamMap?.get('items')));
+  readonly orderItems = computed(() => {
+    const items = this.cart.cart()?.items ?? [];
+    const selected = this.selectedVariantIds();
+    if (!selected) return items;
+    const wanted = new Set(selected);
+    return items.filter((item) => wanted.has(item.variantId));
+  });
   readonly assurances = STORE_CART_CONTENT.assurances;
 
   readonly addresses = signal<UserAddress[]>([]);
@@ -414,16 +430,18 @@ export class CheckoutPage implements OnInit, OnDestroy {
       this.quote.set(null);
       this.appliedVoucherCode.set('');
     }
+    const variantIds = this.selectedVariantIds() ?? undefined;
     this.quoteSubscription = this.api.createQuote({
       addressId: addrId,
       voucherCode: requestedVoucher || undefined,
+      variantIds,
     }).pipe(
       map((q) => ({ q, code: requestedVoucher && q.voucherDiscount > 0 ? requestedVoucher : '' })),
       catchError((err) => {
         const message = VOUCHER_ERRORS[err.error?.code];
         if (!requestedVoucher || err.status !== 400 || !message) return throwError(() => err);
         this.voucherError.set(`${message} Bạn có thể đặt hàng không dùng mã này.`);
-        return this.api.createQuote({ addressId: addrId }).pipe(map((q) => ({ q, code: '' })));
+        return this.api.createQuote({ addressId: addrId, variantIds }).pipe(map((q) => ({ q, code: '' })));
       }),
     ).subscribe({
       next: ({ q, code }) => {

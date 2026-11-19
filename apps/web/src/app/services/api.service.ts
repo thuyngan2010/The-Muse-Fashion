@@ -231,7 +231,7 @@ export class ApiService {
     return this.http.delete<void>(`${this.api}/cart`);
   }
 
-  createQuote(dto: { addressId: string; voucherCode?: string; shippingMethod?: 'STANDARD' }): Observable<CheckoutQuote> {
+  createQuote(dto: { addressId: string; voucherCode?: string; shippingMethod?: 'STANDARD'; variantIds?: string[] }): Observable<CheckoutQuote> {
     return this.http.post<CheckoutQuote>(`${this.api}/checkout/quote`, dto);
   }
 

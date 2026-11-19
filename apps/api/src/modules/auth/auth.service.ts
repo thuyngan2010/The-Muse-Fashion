@@ -359,6 +359,10 @@ export class AuthService {
       role: user.role,
       status: user.status,
       hasPassword: (user as { hasPassword?: boolean }).hasPassword !== false,
+      // Trả kèm hồ sơ hiển thị để sau đăng nhập / làm mới phiên giao diện không mất ảnh đại diện đã lưu.
+      phone: (user as { phone?: string | null }).phone ?? null,
+      avatarMediaId: (user as { avatarMediaId?: string | null }).avatarMediaId ?? null,
+      avatarUrl: await this.users.avatarUrl(user as UserDocument),
     };
   }
 }

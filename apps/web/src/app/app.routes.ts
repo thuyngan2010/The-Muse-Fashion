@@ -7,6 +7,7 @@ import { CatalogPage } from './pages/catalog.page';
 import { ProductPage } from './pages/product.page';
 import { LookbooksPage } from './pages/lookbooks.page';
 import { CommunityPage } from './pages/community.page';
+import { CommunityPostPage } from './pages/community-post.page';
 import { AboutPage } from './pages/about.page';
 import { CartPage } from './pages/cart.page';
 import { CheckoutPage } from './pages/checkout.page';
@@ -51,6 +52,7 @@ export const routes: Routes = [
   { path: 'lookbooks', component: LookbooksPage, title: 'Bộ sưu tập Lookbook | Fashion Commerce' },
   { path: 'about', component: AboutPage, title: 'Về chúng tôi | Fashion Commerce' },
   { path: 'community', component: CommunityPage, title: 'Cộng đồng phong cách | Fashion Commerce' },
+  { path: 'community/:postId', component: CommunityPostPage, title: 'Chi tiết bài viết | Fashion Commerce' },
 
   // Shopping & Checkout
   { path: 'cart', component: CartPage, title: 'Giỏ hàng | Fashion Commerce' },

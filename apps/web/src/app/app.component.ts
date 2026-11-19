@@ -1,13 +1,15 @@
 import { Component, computed, inject } from '@angular/core';
+import { ViewportScroller } from '@angular/common';
 import { Router, RouterOutlet } from '@angular/router';
-import { toSignal } from '@angular/core/rxjs-interop';
-import { NavigationEnd } from '@angular/router';
+import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
+import { NavigationEnd, NavigationStart } from '@angular/router';
 import { filter, map } from 'rxjs';
 import { HeaderComponent } from './components/header.component';
 import { FooterComponent } from './components/footer.component';
 import { ToastComponent } from './components/toast.component';
 import { MaintenanceOverlayComponent } from './components/maintenance-overlay.component';
 import { ServerStatusService } from './services/server-status.service';
+import { shouldScrollToTop } from './services/scroll-to-top';
 
 @Component({
   selector: 'fc-root',
@@ -65,4 +67,18 @@ export class AppComponent {
     const url = this.currentUrl();
     return url ? url.startsWith('/admin') : false;
   });
+
+  constructor() {
+    // Sang trang mới thì hiển thị từ đầu trang thay vì giữ vị trí cuộn của trang trước.
+    const viewport = inject(ViewportScroller);
+    let previousUrl: string | null = null;
+    let trigger: 'imperative' | 'popstate' | 'hashchange' = 'imperative';
+    this.router.events.pipe(takeUntilDestroyed()).subscribe((event) => {
+      if (event instanceof NavigationStart) trigger = event.navigationTrigger ?? 'imperative';
+      if (!(event instanceof NavigationEnd)) return;
+      const nextUrl = event.urlAfterRedirects || event.url;
+      if (shouldScrollToTop(previousUrl, nextUrl, trigger)) viewport.scrollToPosition([0, 0]);
+      previousUrl = nextUrl;
+    });
+  }
 }

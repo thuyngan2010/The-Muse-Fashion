@@ -42,6 +42,9 @@ const KIND_LABEL: Record<NotificationKind, string> = {
             <button type="button" role="tab" class="tab" [class.active]="tab() === 'unread'" [attr.aria-selected]="tab() === 'unread'" (click)="tab.set('unread')">
               CHƯA ĐỌC @if (unreadCount() > 0) { <span class="tab-badge">{{ unreadCount() }}</span> }
             </button>
+            <button type="button" role="tab" class="tab" [class.active]="tab() === 'read'" [attr.aria-selected]="tab() === 'read'" (click)="tab.set('read')">
+              ĐÃ ĐỌC <span class="tab-count">({{ readCount() }})</span>
+            </button>
           </div>
           @if (notifications().length > 0 && unreadCount() > 0) {
             <button type="button" class="mark-all" (click)="markAllRead()">
@@ -57,6 +60,8 @@ const KIND_LABEL: Record<NotificationKind, string> = {
           <fc-page-state kind="error" title="Không thể tải thông báo" [message]="error()" actionLabel="THỬ LẠI" (action)="loadNotifications()" />
         } @else if (visibleNotifications().length === 0 && tab() === 'unread' && notifications().length > 0) {
           <fc-page-state kind="empty" title="Bạn đã đọc hết thông báo" message="Không còn thông báo chưa đọc trong trang đang xem." actionLabel="XEM TẤT CẢ THÔNG BÁO" (action)="tab.set('all')" />
+        } @else if (visibleNotifications().length === 0 && tab() === 'read' && notifications().length > 0) {
+          <fc-page-state kind="empty" title="Chưa có thông báo đã đọc" message="Không có thông báo đã đọc trong trang đang xem." actionLabel="XEM TẤT CẢ THÔNG BÁO" (action)="tab.set('all')" />
         } @else if (notifications().length === 0) {
           <fc-page-state kind="empty" title="Không có thông báo mới" [message]="content.emptyDescription" actionLabel="TIẾP TỤC MUA SẮM" actionLink="/products" />
         } @else {
@@ -165,11 +170,16 @@ export class NotificationsPage implements OnInit {
   readonly unreadCount = signal<number>(0);
   readonly loading = signal<boolean>(true);
   readonly error = signal<string>('');
-  readonly tab = signal<'all' | 'unread'>('all');
-  /** Tab "Chưa đọc" lọc trong trang đang xem: chỉ giữ thông báo chưa có readAt. */
-  readonly visibleNotifications = computed(() =>
-    this.tab() === 'unread' ? this.notifications().filter((n) => !n.readAt) : this.notifications(),
-  );
+  readonly tab = signal<'all' | 'unread' | 'read'>('all');
+  /** Tab "Chưa đọc" / "Đã đọc" lọc trong trang đang xem theo readAt. */
+  readonly visibleNotifications = computed(() => {
+    const tab = this.tab();
+    if (tab === 'unread') return this.notifications().filter((n) => !n.readAt);
+    if (tab === 'read') return this.notifications().filter((n) => !!n.readAt);
+    return this.notifications();
+  });
+  /** Số thông báo đã đọc = tổng số thông báo - số chưa đọc (cả hai do API trả về). */
+  readonly readCount = computed(() => Math.max(0, this.pagination.total() - this.unreadCount()));
 
   readonly pageCount = computed(() => Math.max(1, Math.ceil(this.pagination.total() / this.pagination.limit)));
   /** Danh sách số trang; 0 là dấu "…". */

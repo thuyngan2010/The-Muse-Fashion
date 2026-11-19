@@ -66,7 +66,7 @@ export class UsersService {
   }
 
   /** Liên kết ảnh đại diện: công khai nếu có, nếu không thì liên kết ký có thời hạn. Lỗi thì trả null. */
-  private async avatarUrl(user: UserDocument): Promise<string | null> {
+  async avatarUrl(user: UserDocument): Promise<string | null> {
     if (!user.avatarMediaId || !this.moduleRef) return null;
     try {
       const media = await this.media.findOne({ _id: user.avatarMediaId, ownerId: String(user._id),

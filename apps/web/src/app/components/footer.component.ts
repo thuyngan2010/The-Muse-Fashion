@@ -31,7 +31,7 @@ import { STORE_CONTACT } from '../shared/store-content';
         <div class="footer-col">
           <h4>CỬA HÀNG &amp; THÔNG TIN</h4>
           <ul>
-            <li><a routerLink="/">Sản phẩm</a></li>
+            <li><a routerLink="/products">Sản phẩm</a></li>
             <li><a routerLink="/lookbooks">Bộ sưu tập</a></li>
             <li><a routerLink="/community">Cộng đồng</a></li>
             <li><a routerLink="/ai/try-on">Thử đồ AI</a></li>
