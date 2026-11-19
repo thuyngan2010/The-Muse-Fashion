@@ -6,6 +6,7 @@ import { ApiService } from '../../services/api.service';
 import { AuthService } from '../../services/auth.service';
 import { ToastService } from '../../services/toast.service';
 import { AdminOrdersPage } from './admin-orders.page';
+import { AdminCustomersPage } from './admin-customers.page';
 
 const auth = { isAdmin: () => false, isStaff: () => true, currentUser: () => ({ id: 'staff' }), can: () => true, canGlobal: () => true };
 
@@ -33,6 +34,22 @@ describe('Admin orders search', () => {
     params.next(convertToParamMap({ q: 'FCMWMCIJRIB3C82D2CD5C0' }));
     expect(listCalls()).toHaveLength(2);
     expect(listCalls()[1]).toEqual([undefined, 1, 20, { q: 'FCMWMCIJRIB3C82D2CD5C0', customerId: undefined }]);
+    page.ngOnDestroy();
+  });
+});
+
+describe('Admin customers filters', () => {
+  it('reloads with the selected status and the typed name/email', () => {
+    const adminListUsers = vi.fn(() => of({ items: [], total: 0, page: 1, limit: 20, statusCounts: {} }));
+    const { page, params } = setup(AdminCustomersPage, { adminListUsers });
+    expect(adminListUsers).toHaveBeenCalledTimes(1);
+    page.setStatus('SUSPENDED');
+    params.next(convertToParamMap({ status: 'SUSPENDED' }));
+    expect(adminListUsers).toHaveBeenLastCalledWith(1, 20, 'CUSTOMER', { q: undefined, status: 'SUSPENDED' });
+    page.onSearch('khach@example.com');
+    params.next(convertToParamMap({ status: 'SUSPENDED', q: 'khach@example.com' }));
+    expect(adminListUsers).toHaveBeenLastCalledWith(1, 20, 'CUSTOMER', { q: 'khach@example.com', status: 'SUSPENDED' });
+    expect(adminListUsers).toHaveBeenCalledTimes(3);
     page.ngOnDestroy();
   });
 });
