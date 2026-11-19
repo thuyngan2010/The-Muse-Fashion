@@ -45,7 +45,7 @@ import { PageStateComponent } from '../components/page-state.component';
           <article class="cover">
             <div class="cover-img" (click)="viewPostDetail(fp.id)">
               @if (fp.mediaUrls && fp.mediaUrls.length > 0) { <img [src]="fp.mediaUrls[0]" [alt]="titleOf(fp)" /> }
-              <span class="cover-badge">COVER STORY</span>
+              <span class="cover-badge">BÀI MỚI NHẤT</span>
             </div>
             <div class="cover-text">
               <div class="meta">

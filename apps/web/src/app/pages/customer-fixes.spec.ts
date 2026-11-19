@@ -45,3 +45,11 @@ describe('AI Try-on hero links', () => {
     expect(page).toMatch(/\.text-link\{[^}]*font-size:12px/);
   });
 });
+
+describe('Community cover post badge', () => {
+  it('labels the auto-picked cover post as the newest post', () => {
+    const page = source('./community.page.ts');
+    expect(page).toContain('<span class="cover-badge">BÀI MỚI NHẤT</span>');
+    expect(page).not.toContain('COVER STORY');
+  });
+});
