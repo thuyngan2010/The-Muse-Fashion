@@ -31,7 +31,7 @@ export class AiFashionPlannerService {
             items: [{ productId: 'exact product id', action: 'exact required action', notes: 'short placement/layering notes' }] } }) },
       ], value => validateStyling(value, analysis), controller.signal);
       return buildFashionPrompt(input.type, analysis, styling, input.body,
-        input.products.map(({ name, category, material }) => ({ name, category, material })), input.style);
+        input.products.map(({ name, category, material, referenceIsolated }) => ({ name, category, material, referenceIsolated })), input.style);
     } finally { clearTimeout(timer); }
   }
 

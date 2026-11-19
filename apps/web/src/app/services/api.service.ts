@@ -537,6 +537,7 @@ export class ApiService {
     images?: string[];
     imageMediaIds?: string[];
     sizeGuide?: Array<{ size: string; measurements: Record<string, number> }>;
+    aiReferenceImage?: string | null;
   }): Observable<{ id: string; slug: string }> {
     return this.http.post<{ id: string; slug: string }>(`${this.api}/products`, dto);
   }

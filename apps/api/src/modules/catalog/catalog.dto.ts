@@ -49,6 +49,8 @@ export class CreateProductDto {
   @IsOptional() @IsArray() @ArrayMaxSize(MAX_PRODUCT_IMAGES) @ArrayUnique() @IsMongoId({ each: true }) imageMediaIds?: string[];
   @IsOptional() @IsArray() @ValidateNested({ each: true }) @Type(() => SizeGuideRowDto) sizeGuide?: SizeGuideRowDto[];
   @IsEnum(['DRAFT', 'PUBLISHED', 'ARCHIVED']) status!: 'DRAFT' | 'PUBLISHED' | 'ARCHIVED';
+  /** Ảnh dùng cho AI: một URL trong images hoặc một id trong imageMediaIds của chính sản phẩm; null để bỏ chọn. */
+  @IsOptional() @IsString() @MinLength(1) @MaxLength(2048) aiReferenceImage?: string | null;
 }
 
 export class UpdateProductDto {
@@ -63,6 +65,8 @@ export class UpdateProductDto {
   @IsOptional() @IsArray() @ArrayMaxSize(MAX_PRODUCT_IMAGES) @ArrayUnique() @IsMongoId({ each: true }) imageMediaIds?: string[];
   @IsOptional() @IsArray() @ValidateNested({ each: true }) @Type(() => SizeGuideRowDto) sizeGuide?: SizeGuideRowDto[];
   @IsOptional() @IsEnum(['DRAFT', 'PUBLISHED', 'ARCHIVED']) status?: 'DRAFT' | 'PUBLISHED' | 'ARCHIVED';
+  /** Ảnh dùng cho AI: một URL trong images hoặc một id trong imageMediaIds của chính sản phẩm; null để bỏ chọn. */
+  @IsOptional() @IsString() @MinLength(1) @MaxLength(2048) aiReferenceImage?: string | null;
 }
 
 export class CategoryDto {

@@ -22,6 +22,8 @@ export class Product {
   @Prop({ type: String, default: 'VND', enum: ['VND'] }) currency!: string;
   @Prop({ type: [String], default: [] }) images!: string[];
   @Prop({ type: [SchemaTypes.ObjectId], default: [] }) imageMediaIds!: string[];
+  /** Ảnh dùng cho AI thử đồ/phối đồ: một URL trong images hoặc một id trong imageMediaIds. Không bắt buộc. */
+  @Prop({ type: String, default: undefined }) aiReferenceImage?: string | null;
   @Prop({ type: [SizeGuideRowSchema], default: [] }) sizeGuide!: SizeGuideRow[];
   @Prop({ type: String, enum: ['DRAFT', 'PUBLISHED', 'ARCHIVED'], default: 'DRAFT' }) status!: string;
 }
