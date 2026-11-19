@@ -381,7 +381,7 @@ export const STORE_AI_MIX_MATCH_CONTENT = {
   title: 'Phối đồ theo phong cách của bạn',
   description: 'Chọn từ 2 đến 5 thiết kế MUSE, hệ thống sẽ gợi ý một bản phối hoàn chỉnh từ ảnh của bạn.',
   historyLink: 'XEM LỊCH SỬ',
-  tryOnLink: 'Về trang Thử đồ',
+  tryOnLink: 'VỀ TRANG THỬ ĐỒ',
   step1: { label: 'BƯỚC 01', title: 'Bắt đầu bằng ảnh của bạn' },
   step2: { label: 'BƯỚC 02', title: 'Chọn sản phẩm để phối' },
   uploadHint: 'PNG, JPG hoặc WEBP',
