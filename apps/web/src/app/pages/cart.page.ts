@@ -8,6 +8,7 @@ import { AuthService } from '../services/auth.service';
 import { ApiService } from '../services/api.service';
 import { STORE_CART_CONTENT } from '../shared/store-content';
 import { PageStateComponent } from '../components/page-state.component';
+import { VOUCHER_ERRORS } from './checkout.page';
 
 type CartRecommendation = ProductSummary & {
   createdAt?: string;
@@ -106,24 +107,28 @@ type CartRecommendation = ProductSummary & {
             <div class="voucher-block">
               <label for="cart-voucher">MÃ ƯU ĐÃI / VOUCHER</label>
               <div class="voucher-control">
-                <input id="cart-voucher" type="text" placeholder="Nhập tại bước thanh toán" readonly data-ui-only />
-                @if (selectedItems().length > 0) {
-                  <a routerLink="/checkout" [queryParams]="checkoutQueryParams()">ÁP DỤNG</a>
-                } @else {
-                  <button type="button" disabled>ÁP DỤNG</button>
-                }
+                <input id="cart-voucher" type="text" name="cartVoucher" placeholder="Nhập mã ưu đãi" maxlength="50" autocomplete="off"
+                  [(ngModel)]="voucherCode" (ngModelChange)="voucherError.set('')" (keydown.enter)="applyVoucher()"
+                  [attr.aria-invalid]="voucherError() ? 'true' : null" [attr.aria-describedby]="voucherError() ? 'cart-voucher-feedback' : null" />
+                <button type="button" [disabled]="checkingVoucher() || cart.loading()" (click)="applyVoucher()">{{ checkingVoucher() ? 'ĐANG KIỂM TRA...' : 'ÁP DỤNG' }}</button>
               </div>
+              @if (voucherError()) {
+                <p id="cart-voucher-feedback" class="voucher-error" role="status">{{ voucherError() }}</p>
+              }
+              @if (appliedVoucher(); as applied) {
+                <p class="voucher-success">✓ Đã áp dụng mã: {{ applied.code }} <button type="button" class="voucher-remove" (click)="removeVoucher()">Bỏ mã</button></p>
+              }
             </div>
 
             <div class="summary-lines">
               <div class="summary-line"><span>Tạm tính ({{ selectedItems().length }} sản phẩm):</span><strong>{{ selectedSubtotal() | currency:'VND':'symbol':'1.0-0' }}</strong></div>
               @if (cart.cart()!.items.length > 0) {
                 <div class="summary-line"><span>Phí vận chuyển:</span><span>Tính tại thanh toán</span></div>
-                <div class="summary-line"><span>Giảm giá voucher:</span><span>Nhập tại thanh toán</span></div>
+                <div class="summary-line"><span>Giảm giá voucher:</span>@if (voucherDiscount() > 0) {<span class="discount-value">-{{ voucherDiscount() | currency:'VND':'symbol':'1.0-0' }}</span>} @else {<span>Chưa áp dụng</span>}</div>
               }
               <div class="summary-total">
                 <span>TỔNG THANH TOÁN:</span>
-                <strong>{{ selectedSubtotal() | currency:'VND':'symbol':'1.0-0' }}</strong>
+                <strong>{{ cartTotal() | currency:'VND':'symbol':'1.0-0' }}</strong>
               </div>
             </div>
             @if (cart.cart()!.items.length > 0 && selectedItems().length === 0) {
@@ -234,6 +239,10 @@ type CartRecommendation = ProductSummary & {
     .voucher-control input { min-width: 0; padding: 0 12px; border: 0; background: #fff; color: #444748; font: inherit; font-size: 12px; }
     .voucher-control a, .voucher-control button { display: flex; align-items: center; padding: 0 16px; border: 0; background: #171717; color: #fff; font: inherit; font-size: 11px; font-weight: 700; letter-spacing: .55px; }
     .voucher-control button:disabled { background: #747878; cursor: not-allowed; }
+    .voucher-error { margin: 10px 0 0; color: #9b2c2c; font-size: 12px; }
+    .voucher-success { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 10px 0 0; color: #276749; font-size: 12px; font-weight: 600; }
+    .voucher-remove { padding: 0; border: 0; background: none; color: #444748; font: inherit; font-size: 11px; text-decoration: underline; cursor: pointer; }
+    .summary-line > .discount-value { color: #276749; }
     .summary-lines { margin-top: 24px; padding-top: 8px; border-top: 1px solid rgba(196,199,199,.6); }
     .summary-line { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; margin: 14px 0; color: #444748; font-size: 13px; line-height: 1.45; }
     .summary-line > :last-child { color: #171717; text-align: right; }
@@ -321,6 +330,24 @@ export class CartPage implements OnInit {
   });
   readonly selectedSubtotal = computed(() => this.selectedItems().reduce((sum, item) => sum + item.unitPrice * item.quantity, 0));
   readonly checkoutQueryParams = computed(() => ({ items: this.selectedItems().map((item) => item.variantId).join(',') }));
+  /** Mã ưu đãi nhập ở giỏ: kiểm tra qua API theo đúng các sản phẩm đang tick (và số lượng). */
+  voucherCode = '';
+  readonly voucherError = signal('');
+  readonly checkingVoucher = signal(false);
+  readonly appliedVoucher = signal<{ code: string; discount: number; selection: string } | null>(null);
+  private readonly selectionKey = computed(() => this.selectedItems().map((item) => `${item.variantId}:${item.quantity}`).join(','));
+  readonly voucherDiscount = computed(() => {
+    const applied = this.appliedVoucher();
+    return applied && applied.selection === this.selectionKey() ? applied.discount : 0;
+  });
+  readonly cartTotal = computed(() => Math.max(0, this.selectedSubtotal() - this.voucherDiscount()));
+  /** Đổi tick hoặc số lượng thì kiểm tra lại mã đã áp dụng (đợi giỏ hàng lưu xong). */
+  private readonly voucherRecheck = effect(() => {
+    const selection = this.selectionKey();
+    const applied = this.appliedVoucher();
+    if (!applied || applied.selection === selection || this.checkingVoucher() || this.cart.loading()) return;
+    untracked(() => this.checkVoucher(applied.code));
+  });
   readonly allSelected = computed(() => {
     const items = this.cart.cart()?.items ?? [];
     const selected = this.selectedVariantIds();
@@ -369,9 +396,45 @@ export class CartPage implements OnInit {
     window.location.reload();
   }
 
+  applyVoucher(): void {
+    if (this.checkingVoucher()) return;
+    this.checkVoucher(this.voucherCode);
+  }
+
+  removeVoucher(): void {
+    this.voucherCode = '';
+    this.voucherError.set('');
+    this.appliedVoucher.set(null);
+  }
+
+  private checkVoucher(raw: string): void {
+    const code = raw.trim().toUpperCase();
+    const items = this.selectedItems();
+    this.voucherError.set('');
+    if (!code) { this.appliedVoucher.set(null); this.voucherError.set('Vui lòng nhập mã ưu đãi.'); return; }
+    if (items.length === 0) { this.appliedVoucher.set(null); this.voucherError.set('Tick chọn sản phẩm trước khi áp dụng mã ưu đãi.'); return; }
+    if (!this.auth.isAuthenticated()) { this.appliedVoucher.set(null); this.voucherError.set('Vui lòng đăng nhập để áp dụng mã ưu đãi.'); return; }
+    const selection = this.selectionKey();
+    this.checkingVoucher.set(true);
+    this.api.checkVoucher({ voucherCode: code, variantIds: items.map((item) => item.variantId) }).subscribe({
+      next: (result) => {
+        this.voucherCode = result.code;
+        this.appliedVoucher.set({ code: result.code, discount: result.voucherDiscount, selection });
+        this.checkingVoucher.set(false);
+      },
+      error: (err) => {
+        this.appliedVoucher.set(null);
+        this.voucherError.set(VOUCHER_ERRORS[err?.error?.code] ?? 'Không thể áp dụng mã ưu đãi. Vui lòng thử lại.');
+        this.checkingVoucher.set(false);
+      },
+    });
+  }
+
   goToCheckout(): void {
     if (this.selectedItems().length === 0) return;
-    const queryParams = this.checkoutQueryParams();
+    const applied = this.appliedVoucher();
+    const voucher = applied && applied.selection === this.selectionKey() ? applied.code : '';
+    const queryParams = voucher ? { ...this.checkoutQueryParams(), voucher } : this.checkoutQueryParams();
     if (!this.auth.isAuthenticated()) {
       this.router.navigate(['/auth'], { queryParams: { returnUrl: '/checkout?items=' + queryParams.items } });
       return;

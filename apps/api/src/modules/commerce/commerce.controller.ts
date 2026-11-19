@@ -17,6 +17,7 @@ import {
   AdminOrdersQueryDto,
   AssignStaffDto,
   CheckoutQuoteDto,
+  CheckVoucherDto,
   CreateOrderDto,
   InventoryAdjustDto,
   InventoryLedgerQueryDto,
@@ -48,6 +49,10 @@ export class CheckoutController {
 
   @Post('quote') quote(@Req() req: AuthenticatedRequest, @Body() dto: CheckoutQuoteDto) {
     return this.checkout.createQuote(req.user.sub, dto);
+  }
+
+  @Post('voucher') @HttpCode(200) checkVoucher(@Req() req: AuthenticatedRequest, @Body() dto: CheckVoucherDto) {
+    return this.checkout.checkVoucher(req.user.sub, dto);
   }
 }
 

@@ -103,8 +103,8 @@ import { STORE_PROFILE_CONTENT } from '../shared/store-content';
             <header><span>BẢO MẬT</span><h2>Cập nhật mật khẩu</h2></header>
             @if (passwordError()) { <p class="form-error" role="alert">{{ passwordError() }}</p> }
 
-            <label class="form-field"><span>MẬT KHẨU HIỆN TẠI <b aria-hidden="true">*</b></span><input type="password" [(ngModel)]="oldPassword" name="oldPassword" required autocomplete="current-password" /></label>
-            <label class="form-field"><span>MẬT KHẨU MỚI <b aria-hidden="true">*</b></span><input type="password" [(ngModel)]="newPassword" name="newPassword" minlength="12" maxlength="128" required autocomplete="new-password" /></label>
+            <label class="form-field"><span>MẬT KHẨU HIỆN TẠI <b aria-hidden="true">*</b></span><span class="pw-field"><input [type]="isShown('old') ? 'text' : 'password'" [(ngModel)]="oldPassword" name="oldPassword" required autocomplete="current-password" /><button type="button" class="pw-eye" (click)="toggleShow('old')" [attr.aria-label]="isShown('old') ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'" [attr.aria-pressed]="isShown('old')"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z"></path><circle cx="12" cy="12" r="3"></circle>@if (isShown('old')) {<line x1="3" y1="3" x2="21" y2="21"></line>}</svg></button></span></label>
+            <label class="form-field"><span>MẬT KHẨU MỚI <b aria-hidden="true">*</b></span><span class="pw-field"><input [type]="isShown('new') ? 'text' : 'password'" [(ngModel)]="newPassword" name="newPassword" minlength="12" maxlength="128" required autocomplete="new-password" /><button type="button" class="pw-eye" (click)="toggleShow('new')" [attr.aria-label]="isShown('new') ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'" [attr.aria-pressed]="isShown('new')"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z"></path><circle cx="12" cy="12" r="3"></circle>@if (isShown('new')) {<line x1="3" y1="3" x2="21" y2="21"></line>}</svg></button></span></label>
 
             <div class="password-strength" aria-live="polite">
               <div class="strength-label"><span>ĐỘ MẠNH MẬT KHẨU</span><strong>{{ passwordStrengthLabel }}</strong></div>
@@ -115,7 +115,7 @@ import { STORE_PROFILE_CONTENT } from '../shared/store-content';
               </ul>
             </div>
 
-            <label class="form-field"><span>XÁC NHẬN MẬT KHẨU MỚI <b aria-hidden="true">*</b></span><input type="password" [(ngModel)]="confirmPassword" name="confirmPassword" required autocomplete="new-password" /></label>
+            <label class="form-field"><span>XÁC NHẬN MẬT KHẨU MỚI <b aria-hidden="true">*</b></span><span class="pw-field"><input [type]="isShown('confirm') ? 'text' : 'password'" [(ngModel)]="confirmPassword" name="confirmPassword" required autocomplete="new-password" /><button type="button" class="pw-eye" (click)="toggleShow('confirm')" [attr.aria-label]="isShown('confirm') ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'" [attr.aria-pressed]="isShown('confirm')"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z"></path><circle cx="12" cy="12" r="3"></circle>@if (isShown('confirm')) {<line x1="3" y1="3" x2="21" y2="21"></line>}</svg></button></span></label>
             <div class="password-actions"><button type="submit" class="button button-black" [disabled]="savingPassword()">{{ savingPassword() ? 'ĐANG CẬP NHẬT...' : 'CẬP NHẬT MẬT KHẨU' }}</button></div>
           </form>
           }
@@ -148,6 +148,8 @@ import { STORE_PROFILE_CONTENT } from '../shared/store-content';
     .profile-form { padding:32px 40px 40px; } .profile-form h2 { margin-bottom:26px; }
     .form-field { display:grid; gap:8px; margin-bottom:22px; } .form-field > span:first-child,.modal-label { font-size:10px; font-weight:600; letter-spacing:1px; } .form-field b { color:#de233f; }
     .form-field input { width:100%; height:50px; border:1px solid #5f5353; border-radius:0; background:#fff; padding:0 16px; color:#171414; outline:none; font:400 14px 'Montserrat',sans-serif; }
+    .pw-field { position:relative; display:block; } .pw-field input { padding-right:50px; } .pw-field input::-ms-reveal,.pw-field input::-ms-clear { display:none; }
+    .pw-eye { position:absolute; top:0; right:0; width:50px; height:50px; display:inline-flex; align-items:center; justify-content:center; border:0; background:none; color:#444; cursor:pointer; } .pw-eye:hover { color:#000; } .pw-eye:focus-visible { outline:2px solid #000; outline-offset:-2px; }
     .form-field input:focus { box-shadow:inset 0 0 0 1px #000; } .form-field small { color:#555; font:300 11px/1.5 'Outfit',sans-serif; }
     .locked-input { position:relative; } .locked-input input { background:#f5f3f3; border-color:#d2cece; color:#555; padding-right:48px; } .locked-input svg { position:absolute; right:16px; top:14px; width:20px; stroke:#aaa; stroke-width:1.5; }
     .form-actions,.password-actions { display:flex; justify-content:flex-end; gap:14px; margin-top:30px; }
@@ -189,6 +191,9 @@ export class ProfilePage implements OnInit {
   confirmPassword = '';
   readonly savingPassword = signal(false);
   readonly passwordError = signal('');
+  private readonly shownPasswords = signal<Record<string, boolean>>({});
+  isShown(key: string): boolean { return !!this.shownPasswords()[key]; }
+  toggleShow(key: string): void { this.shownPasswords.update(v => ({ ...v, [key]: !v[key] })); }
   readonly policy = STORE_PROFILE_CONTENT;
 
   get userInitial(): string { return this.auth.currentUser()?.fullName?.trim()?.[0] || 'M'; }

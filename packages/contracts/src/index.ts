@@ -150,6 +150,13 @@ export type CheckoutQuote = {
   expiresAt: string;
 };
 
+/** Kết quả kiểm tra mã ưu đãi ở giỏ hàng (POST /checkout/voucher). */
+export type VoucherCheck = {
+  code: string;
+  subtotal: number;
+  voucherDiscount: number;
+};
+
 export type OrderLine = {
   lineId: string;
   productId: string;

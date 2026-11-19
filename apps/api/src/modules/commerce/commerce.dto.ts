@@ -31,6 +31,12 @@ export class CheckoutQuoteDto {
   @IsOptional() @IsArray() @ArrayMinSize(1) @ArrayMaxSize(100) @ArrayUnique() @IsMongoId({ each: true }) variantIds?: string[];
 }
 
+/** Kiểm tra mã ưu đãi ngay ở giỏ hàng (chưa cần địa chỉ), tính theo các sản phẩm được tick. */
+export class CheckVoucherDto {
+  @IsString() @MinLength(1) @MaxLength(50) voucherCode!: string;
+  @IsOptional() @IsArray() @ArrayMinSize(1) @ArrayMaxSize(100) @ArrayUnique() @IsMongoId({ each: true }) variantIds?: string[];
+}
+
 export class InventoryAdjustDto {
   @IsMongoId() variantId!: string;
   @IsInt() @NotEquals(0) @Min(-100000) @Max(100000) delta!: number;
