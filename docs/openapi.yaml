@@ -411,6 +411,36 @@ paths:
               schema: {$ref: '#/components/schemas/CheckoutQuote'}
         '400': {$ref: '#/components/responses/ValidationError'}
         '409': {$ref: '#/components/responses/Conflict'}
+  /checkout/voucher:
+    post:
+      tags: [Commerce]
+      operationId: checkCheckoutVoucher
+      x-implementation-status: partial
+      description: Check a voucher against the current cart (or the ticked lines) before an address is chosen. Stores no quote and reserves no voucher usage. Rejections use the same VOUCHER_* codes as /checkout/quote.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [voucherCode]
+              properties:
+                voucherCode: {type: string, minLength: 1, maxLength: 50}
+                variantIds:
+                  type: array
+                  description: Only price these cart lines; omitted means the whole cart.
+                  minItems: 1
+                  maxItems: 100
+                  uniqueItems: true
+                  items: {$ref: '#/components/schemas/ObjectId'}
+      responses:
+        '200':
+          description: Voucher is usable for this cart; discount computed server-side
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/VoucherCheck'}
+        '400': {$ref: '#/components/responses/ValidationError'}
   /orders:
     get:
       tags: [Commerce]
@@ -3231,6 +3261,14 @@ components:
         voucherDiscount: {$ref: '#/components/schemas/Money'}
         payableTotal: {$ref: '#/components/schemas/Money'}
         expiresAt: {type: string, format: date-time}
+    VoucherCheck:
+      type: object
+      additionalProperties: false
+      required: [code, subtotal, voucherDiscount]
+      properties:
+        code: {type: string}
+        subtotal: {$ref: '#/components/schemas/Money'}
+        voucherDiscount: {$ref: '#/components/schemas/Money'}
     Order:
       type: object
       required: [id, code, state, money, paymentDueAt, createdAt]

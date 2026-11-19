@@ -7,7 +7,7 @@ import { CheckoutQuote } from './commerce.schemas.js';
 import { CartService } from './cart.service.js';
 import { PricingService } from './pricing.service.js';
 import { cartFingerprint, selectCartLines } from './order.types.js';
-import type { CheckoutQuoteDto } from './commerce.dto.js';
+import type { CheckVoucherDto, CheckoutQuoteDto } from './commerce.dto.js';
 
 @Injectable()
 export class CheckoutService {
@@ -54,5 +54,15 @@ export class CheckoutService {
       ...totals,
       expiresAt: expiresAt.toISOString(),
     };
+  }
+
+  /** Chỉ kiểm tra mã và tính số tiền giảm trên giỏ hàng hiện tại; không lưu báo giá, không giữ lượt dùng mã. */
+  async checkVoucher(customerId: string, dto: CheckVoucherDto) {
+    const cart = await this.carts.getCart(customerId);
+    if (!cart.items.length) throw new BadRequestException('Cart is empty');
+    const selected = selectCartLines(cart.items, dto.variantIds);
+    if (!selected) throw new BadRequestException('Selected items are not in the cart');
+    const { discount, code } = await this.pricing.resolveVoucher(dto.voucherCode, selected.subtotal);
+    return { code: code ?? dto.voucherCode.trim().toUpperCase(), subtotal: selected.subtotal, voucherDiscount: discount };
   }
 }
