@@ -1,9 +1,9 @@
 import { watchAiJob } from '../services/ai-polling';
-import { Component, OnInit, OnDestroy, inject, signal } from '@angular/core';
+import { Component, OnInit, OnDestroy, computed, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { CurrencyPipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import type { AiJob, ProductSummary } from '@fashion/contracts';
+import { detectGarmentSlot, findOutfitConflict, type AiJob, type GarmentSlotMatch, type ProductSummary } from '@fashion/contracts';
 import { ApiService, bodyPayload, heightError, weightError } from '../services/api.service';
 import { CartService } from '../services/cart.service';
 import { ToastService } from '../services/toast.service';
@@ -101,6 +101,7 @@ function generateUUID(): string {
                   @for (prod of getSelectedProducts(); track prod.id) {
                     <li>
                       <span class="p-thumb">@if (prod.images && prod.images.length > 0) { <img [src]="prod.images[0]" [alt]="prod.name" /> }</span>
+                      @if (slotOf(prod); as garment) { @if (garment.slot !== 'UNKNOWN') { <span class="slot-tag">{{ garment.label }}</span> } }
                       <span class="sel-name">{{ prod.name }}</span>
                       <button type="button" class="remove" [attr.aria-label]="'Bỏ ' + prod.name" (click)="toggleProduct(prod.id)">×</button>
                     </li>
@@ -108,6 +109,9 @@ function generateUUID(): string {
                 </ul>
               }
             </div>
+
+            @if (outfitWarning(); as warning) { <p class="outfit-warning" role="alert">{{ warning }}</p> }
+            <p class="outfit-tip">Mẹo: chọn mỗi vị trí 1 món (ví dụ 1 áo + 1 quần/chân váy + 1 đôi giày) để AI phối chính xác nhất.</p>
 
             <div class="measure-grid">
               <label>CHIỀU CAO <span><input type="number" inputmode="numeric" min="120" max="220" step="1" [(ngModel)]="height" name="height" placeholder="—" [attr.aria-invalid]="heightError() ? 'true' : null" /> cm</span></label>
@@ -127,7 +131,7 @@ function generateUUID(): string {
             <button
               type="button"
               class="btn-submit"
-              [disabled]="generating() || uploading() || !uploadedMediaId() || selectedProductIds().length < 2 || !consentAccepted || job()?.state === 'PENDING' || job()?.state === 'PROCESSING'"
+              [disabled]="generating() || uploading() || !uploadedMediaId() || selectedProductIds().length < 2 || !!outfitWarning() || !consentAccepted || job()?.state === 'PENDING' || job()?.state === 'PROCESSING'"
               (click)="generateMixMatch()"
             >
               {{ generating() ? 'ĐANG TẠO BẢN PHỐI...' : content.generate }}
@@ -228,6 +232,9 @@ function generateUUID(): string {
     .selected-strip li { display: flex; align-items: center; gap: 8px; max-width: 100%; padding: 6px 6px 6px 6px; border: 1px solid var(--ui-line, #c4c7c7); background: #fff; }
     .p-thumb { display: block; width: 40px; height: 48px; flex: none; background: var(--ui-bg-image, #efeded); overflow: hidden; }
     .p-thumb img { width: 100%; height: 100%; object-fit: cover; }
+    .slot-tag { padding: 1px 6px; background: var(--ui-pink-soft, #ffd9e1); color: var(--ui-accent, #8f485d); font-size: 10px; font-weight: 700; letter-spacing: .4px; white-space: nowrap; }
+    .outfit-warning { margin: 12px 0 0; padding: 10px 12px; border: 1px solid var(--ui-danger, #9b2c2c); background: var(--ui-danger-bg, #fff1f1); color: var(--ui-danger, #9b2c2c); font-size: 13px; }
+    .outfit-tip { margin: 10px 0 0; color: var(--ui-subtle, #747878); font-size: 12px; }
     .sel-name { max-width: 140px; overflow: hidden; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
     .remove { width: 28px; height: 28px; border: 0; background: none; color: var(--ui-ink, #171717); font-size: 18px; line-height: 1; cursor: pointer; }
     .remove:hover { color: var(--ui-danger, #9b2c2c); }
@@ -325,7 +332,23 @@ export class AiMixMatchPage implements OnInit, OnDestroy {
   private pollSubscription?: Subscription;
   readonly pollingError = signal('');
 
+  /** Tên danh mục theo id, để đoán vị trí mặc (áo, quần, đầm...) giống hệt server. */
+  readonly categoryNames = signal<ReadonlyMap<string, string>>(new Map());
+  slotOf(product: ProductSummary): GarmentSlotMatch {
+    return detectGarmentSlot(product.categoryId ? this.categoryNames().get(product.categoryId) : null, product.name);
+  }
+  /** Cảnh báo bộ phối sai (cùng quy tắc với server), khóa nút phối cho tới khi hợp lệ. */
+  readonly outfitWarning = computed(() => {
+    const ids = this.selectedProductIds();
+    const selected = this.products().filter((p) => ids.includes(p.id));
+    return findOutfitConflict(selected.map((p) => this.slotOf(p).slot));
+  });
+
   ngOnInit(): void {
+    this.api.categories().subscribe({
+      next: (list) => this.categoryNames.set(new Map(list.map((category) => [category.id, category.name]))),
+      error: () => undefined, // Không có danh mục thì đoán theo tên sản phẩm; server vẫn kiểm tra lại.
+    });
     this.api.products({ limit: 12 }).subscribe({
       next: (res) => {
         const items = res.items;
@@ -366,6 +389,8 @@ export class AiMixMatchPage implements OnInit, OnDestroy {
   generateMixMatch(): void {
     const ids = this.selectedProductIds();
     if (ids.length < 2 || !this.uploadedMediaId() || !this.consentAccepted || this.generating()) return;
+    const warning = this.outfitWarning();
+    if (warning) { this.toast.warning(warning); return; }
     const bodyMsg = this.heightError() || this.weightError();
     if (bodyMsg) { this.toast.error(bodyMsg); return; }
 
