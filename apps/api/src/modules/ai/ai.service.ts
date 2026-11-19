@@ -10,6 +10,7 @@ import { InjectConnection, InjectModel } from '@nestjs/mongoose';
 import { Model, Types, type Connection } from 'mongoose';
 import { randomUUID } from 'node:crypto';
 import { Product } from '../catalog/product.schema.js';
+import { Category } from '../catalog/catalog.schemas.js';
 import { MediaObject } from '../storage/media-object.schema.js';
 import { StorageService } from '../storage/storage.service.js';
 import type { AiJobWriteDto } from './ai.dto.js';
@@ -18,6 +19,7 @@ import { AiQuotaService } from './ai-quota.service.js';
 import { AiProviderService } from './ai-provider.service.js';
 import { OutboxEvent } from '../operations/outbox-event.schema.js';
 import { withCommerceTransaction } from '../../common/mongo-transaction.util.js';
+import { detectGarmentSlot, findOutfitConflict } from './garment-slot.js';
 
 const INPUT_RETENTION_MS = 24 * 60 * 60 * 1000;
 const OUTPUT_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
@@ -34,6 +36,8 @@ export class AiService {
     private readonly storage: StorageService,
     @InjectConnection() private readonly connection: Connection,
     @InjectModel(OutboxEvent.name) private readonly outbox: Model<OutboxEvent>,
+    // Để cuối và không bắt buộc: chỗ nào tạo service theo thứ tự tham số cũ vẫn chạy (khi đó chỉ xét tên sản phẩm).
+    @InjectModel(Category.name) private readonly categories?: Model<Category>,
   ) {}
 
   async createTryOn(ownerId: string, idempotencyKey: string | undefined, dto: AiJobWriteDto) {
@@ -86,6 +90,8 @@ export class AiService {
     }
 
     await this.validateInput(ownerId, dto);
+    // Chặn bộ phối sai (2 quần, đầm + áo...) trước khi lưu job: không trừ lượt, không gọi AI.
+    if (type === 'MIX_MATCH') await this.assertOutfitRules(dto.productIds);
 
     const quotaEventKey = `ai:${ownerId}:${idempotencyKey.trim()}`;
 
@@ -152,6 +158,20 @@ export class AiService {
     if (published !== dto.productIds.length) {
       throw new BadRequestException('One or more products are unavailable');
     }
+  }
+
+  private async assertOutfitRules(productIds: string[]) {
+    const rows = await this.products.find({ _id: { $in: productIds } }).select('name categoryId').lean().exec();
+    const categoryIds = [...new Set(rows.map((row) => row.categoryId).filter(Boolean).map(String))];
+    const categoryRows = categoryIds.length && this.categories
+      ? await this.categories.find({ _id: { $in: categoryIds } }).select('name').lean().exec() : [];
+    const categoryById = new Map(categoryRows.map((row) => [String(row._id), row.name]));
+    const slots = productIds.map((id) => {
+      const product = rows.find((row) => String(row._id) === String(id));
+      return detectGarmentSlot(product?.categoryId ? categoryById.get(String(product.categoryId)) : null, product?.name).slot;
+    });
+    const conflict = findOutfitConflict(slots);
+    if (conflict) throw new BadRequestException(conflict);
   }
 
   async failJob(jobId: string, message: string, refund = true, leaseId?: string): Promise<void> {

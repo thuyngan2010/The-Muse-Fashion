@@ -543,3 +543,5 @@ export type SupportStats = {
   avgFirstResponseMinutes: number | null;
   windowDays: number;
 };
+
+export * from './garment-slot.js';
