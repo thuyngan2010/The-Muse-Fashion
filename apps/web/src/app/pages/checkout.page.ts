@@ -16,7 +16,13 @@ export function parseSelectedItems(raw: string | null | undefined): string[] | n
   return ids.length ? ids : null;
 }
 
-const VOUCHER_ERRORS: Record<string, string> = {
+/** Mã ưu đãi đã áp dụng ở giỏ hàng (?voucher=CODE) được điền sẵn để tự áp dụng ở bước thanh toán. */
+export function parseVoucherCode(raw: string | null | undefined): string {
+  const code = (raw ?? '').trim().toUpperCase();
+  return code.length > 0 && code.length <= 50 ? code : '';
+}
+
+export const VOUCHER_ERRORS: Record<string, string> = {
   VOUCHER_INVALID: 'Mã ưu đãi không hợp lệ.',
   VOUCHER_DISABLED: 'Mã ưu đãi hiện không khả dụng.',
   VOUCHER_EXPIRED: 'Mã ưu đãi đã hết hạn.',
@@ -314,7 +320,7 @@ export class CheckoutPage implements OnInit, OnDestroy {
   newProvince = '';
   readonly savingAddress = signal<boolean>(false);
 
-  voucherCode = '';
+  voucherCode = parseVoucherCode(this.route?.snapshot?.queryParamMap?.get('voucher'));
   readonly appliedVoucherCode = signal('');
   readonly voucherError = signal('');
   readonly quoteError = signal('');

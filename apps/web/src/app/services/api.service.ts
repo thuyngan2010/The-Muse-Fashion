@@ -18,6 +18,7 @@ import type {
   ProductVariant,
   Cart,
   CheckoutQuote,
+  VoucherCheck,
   Order,
   AdminOrderSummary,
   PaymentAttempt,
@@ -234,6 +235,11 @@ export class ApiService {
 
   createQuote(dto: { addressId: string; voucherCode?: string; shippingMethod?: 'STANDARD'; variantIds?: string[] }): Observable<CheckoutQuote> {
     return this.http.post<CheckoutQuote>(`${this.api}/checkout/quote`, dto);
+  }
+
+  /** Kiểm tra mã ưu đãi ở giỏ hàng (chưa cần địa chỉ); lỗi trả về mã VOUCHER_* như bước báo giá. */
+  checkVoucher(dto: { voucherCode: string; variantIds?: string[] }): Observable<VoucherCheck> {
+    return this.http.post<VoucherCheck>(`${this.api}/checkout/voucher`, dto);
   }
 
   createOrder(dto: { quoteId: string }, idempotencyKey?: string): Observable<Order> {

@@ -39,6 +39,7 @@
 | GET | `/ai/jobs/:id` | UC12/13 | own jobs |
 | GET/PUT/DELETE | `/cart` | UC14 | own, current prices |
 | POST | `/checkout/quote` | UC15 | recompute server-side |
+| POST | `/checkout/voucher` | UC15 | check voucher on cart, no quote stored |
 | POST | `/orders` | UC15 | idempotency key, stock transaction |
 | GET | `/orders`, `/orders/:id` | UC16 | own/admin/assigned |
 | POST | `/orders/:id/cancel` | UC17 | state guarded, reason |
