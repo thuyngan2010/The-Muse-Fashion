@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { Injector, runInInjectionContext } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
 import { of } from 'rxjs';
@@ -59,5 +60,14 @@ describe('Payment event review form tells what is missing', () => {
   it('explains the API rejection in Vietnamese', () => {
     expect(reviewErrorText('Merchant funds cannot be closed without a recorded resolution')).toContain('tiền đã vào tài khoản cửa hàng');
     expect(reviewErrorText('Something else')).toBe('Something else');
+  });
+});
+
+describe('Refund proposal without any paid order', () => {
+  it('explains why there is no payment to choose', () => {
+    const source = readFileSync(new URL('./admin-refunds.page.ts', import.meta.url), 'utf8');
+    const notice = source.indexOf('@if (succeededPayments().length === 0)');
+    expect(notice).toBeGreaterThan(source.indexOf('<datalist id="succeeded-payments">'));
+    expect(source).toContain('Chưa có giao dịch thanh toán thành công nào để hoàn tiền.');
   });
 });

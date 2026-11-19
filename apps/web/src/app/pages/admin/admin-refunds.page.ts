@@ -322,6 +322,9 @@ const COUNT_STATES = ['PENDING_APPROVAL', 'APPROVED', 'SUCCEEDED', 'FAILED'];
             }
           </datalist>
         </label>
+        @if (succeededPayments().length === 0) {
+          <p class="hint review-missing" role="status">Chưa có giao dịch thanh toán thành công nào để hoàn tiền. Chỉ đơn đã thanh toán thành công mới tạo được đề xuất hoàn tiền.</p>
+        }
         <label>Số tiền hoàn (đ) *
           <input type="number" [(ngModel)]="propAmount" name="amount" required min="1000" />
         </label>
