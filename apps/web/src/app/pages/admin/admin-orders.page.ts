@@ -432,6 +432,8 @@ export class AdminOrdersPage implements OnInit, OnDestroy {
   private readonly subs = new Subscription();
   private urlOrderId = '';
   private firstParams = true;
+  /** Từ khóa đã dùng để tải danh sách; query() đổi ngay khi gõ nên không dùng để so sánh. */
+  private appliedQuery = '';
 
   // Drawer
   readonly drawerOpen = signal(false);
@@ -494,8 +496,9 @@ export class AdminOrdersPage implements OnInit, OnDestroy {
   private applyParams(params: ParamMap): void {
     const q = params.get('q')?.trim() ?? '';
     const customerId = params.get('customerId') ?? '';
-    const changed = this.firstParams || q !== this.query().trim() || customerId !== this.customerFilter();
+    const changed = this.firstParams || q !== this.appliedQuery || customerId !== this.customerFilter();
     if (q !== this.query().trim()) this.query.set(q);
+    this.appliedQuery = q;
     const customerChanged = customerId !== this.customerFilter();
     if (customerChanged) {
       this.customerFilter.set(customerId);
