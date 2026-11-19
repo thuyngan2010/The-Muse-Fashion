@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { CatalogModule } from '../catalog/catalog.module.js';
+import { StorageModule } from '../storage/storage.module.js';
 import { Product, ProductSchema } from '../catalog/product.schema.js';
 import { UsersModule } from '../users/users.module.js';
 import { OperationsModule } from '../operations/operations.module.js';
@@ -43,6 +44,7 @@ import { OrderExpiryWorker } from './order-expiry.worker.js';
 @Module({
   imports: [
     CatalogModule,
+    StorageModule,
     UsersModule,
     OperationsModule,
     MongooseModule.forFeature([

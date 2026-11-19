@@ -134,7 +134,7 @@ export class CartService {
     ).subscribe();
   }
 
-  addItem(item: { variantId: string; sku: string; productName: string; unitPrice: number; quantity: number; available: number }): void {
+  addItem(item: { variantId: string; sku: string; productName: string; unitPrice: number; quantity: number; available: number; imageUrl?: string | null }): void {
     if (this.loading()) return;
     if (this.auth.isAuthenticated() && !this.auth.isCustomer()) {
       this.toast.info('Vui lòng dùng tài khoản khách hàng để mua sắm.');
