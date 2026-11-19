@@ -3,7 +3,7 @@ import { AiFashionPlannerService } from './ai-fashion-planner.service.js';
 
 const input = { type: 'TRY_ON' as const, inputUrl: 'https://storage.test/private-person?signature=fixture',
   products: [{ id: 'p1', name: 'Shoes', description: '', material: 'leather', imageUrl: 'https://storage.test/shoes' }] };
-const analysis = { person: { count: 1, pose: 'standing', visibleRegions: ['feet'] },
+const analysis = { person: { count: 1, pose: 'standing', visibleRegions: ['face', 'feet'] },
   products: [{ productId: 'p1', category: 'shoes', targetRegion: 'feet', confidence: 0.96, details: 'Black leather shoes.' }] };
 const styling = { compatible: true, explanation: 'Phù hợp.', summary: 'Giày da đen.',
   items: [{ productId: 'p1', action: 'replace', notes: 'Fit both feet.' }] };

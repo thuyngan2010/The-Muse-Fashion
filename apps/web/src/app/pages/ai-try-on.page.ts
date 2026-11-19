@@ -11,6 +11,7 @@ import { Subscription } from 'rxjs';
 import { AiJobDetailsComponent } from '../components/ai-job-details.component';
 import { STORE_AI_TRY_ON_CONTENT } from '../shared/store-content';
 import { PageStateComponent } from '../components/page-state.component';
+import { detectLandscape } from '../shared/ai-photo';
 
 function generateUUID(): string {
   if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();
@@ -50,10 +51,12 @@ function generateUUID(): string {
           <button type="button" class="upload-canvas" (click)="fileInput.click()" [disabled]="generating() || uploading()">
             @if (previewUrl()) { <img [src]="previewUrl()" alt="Ảnh toàn thân bạn đã tải lên" /> }
             @else {
-              <span class="upload-mark" aria-hidden="true">＋</span><strong>TẢI ẢNH TOÀN THÂN</strong><small>PNG, JPG hoặc WEBP · tối đa 10MB</small>
+              <span class="upload-mark" aria-hidden="true">＋</span><strong>TẢI ẢNH CỦA BẠN</strong><small>PNG, JPG hoặc WEBP · tối đa 10MB</small>
             }
             @if (uploading()) { <span class="upload-overlay" role="status"><span class="spinner"></span>Đang tải và kiểm tra ảnh...</span> }
           </button>
+          <p class="photo-guide">Chỉ cần ảnh thấy rõ khuôn mặt. Nên dùng ảnh <strong>toàn thân, đứng thẳng, đủ sáng, một mình</strong> để kết quả giống bạn nhất. Ảnh chỉ có mặt hoặc nửa người thì AI sẽ tự dựng phần còn lại, nên kém chân thực hơn.</p>
+          @if (landscapeHint()) { <p class="photo-hint" role="status">Ảnh nằm ngang thường không thấy toàn thân. Bạn có thể đổi sang ảnh dọc để kết quả đẹp hơn.</p> }
           <button type="button" class="outline-button upload-other" (click)="fileInput.click()" [disabled]="generating() || uploading()">TẢI ẢNH KHÁC TỪ MÁY <span aria-hidden="true">↗</span></button>
           @if (uploadError()) {
             <div class="inline-message error" role="alert"><span>{{ uploadError() }}</span><button type="button" (click)="retryUpload()">THỬ TẢI LẠI</button></div>
@@ -91,6 +94,7 @@ function generateUUID(): string {
             <p class="measure-error" role="alert">{{ heightError() || weightError() }}</p>
           }
           <p class="measure-note">Không bắt buộc. Giúp AI thể hiện độ dài và độ vừa của trang phục sát hơn.</p>
+          @if (!height || !weight) { <p class="measure-hint">Nhập chiều cao và cân nặng giúp AI dựng dáng chính xác hơn, nhất là khi ảnh không toàn thân.</p> }
           <label class="consent-row"><input type="checkbox" [(ngModel)]="consentAccepted" name="consent" /><span>Tôi đồng ý xử lý ảnh để tạo bản thử đồ. {{ content.privacy }}</span></label>
           <div class="ready-panel">
             <div><span>SẴN SÀNG TẠO DIỆN MẠO</span><p>{{ content.processingTime }}</p></div>
@@ -181,6 +185,7 @@ function generateUUID(): string {
     .picker-grid .product-option span{padding:8px;font-size:12px}
     .measure-error{margin:8px 0 0;color:#7f2424;font-size:12px}
     .measure-note{margin:8px 0 0;color:#6b625d;font-size:11px;line-height:1.5}
+    .photo-guide{margin:12px 0 0;color:#4f4842;font-size:12px;line-height:1.6}.photo-guide strong{color:#171513}.photo-hint{margin:8px 0 0;padding:8px 12px;background:#fff7e6;color:#7a5200;font-size:12px;line-height:1.5}.measure-hint{margin:6px 0 0;color:#9b5663;font-size:11px;line-height:1.5}
     .compare-figure{margin:0}
     .compare-figure figcaption{min-height:18px;margin-bottom:6px;font-size:10px;font-weight:700;letter-spacing:.12em;color:#5f5953}
   `],
@@ -195,6 +200,8 @@ export class AiTryOnPage implements OnInit, OnDestroy {
   readonly uploadedMediaId = signal('');
   readonly uploading = signal(false);
   readonly uploadError = signal('');
+  /** Ảnh nằm ngang (rộng hơn cao): chỉ gợi ý đổi sang ảnh dọc, không chặn. */
+  readonly landscapeHint = signal(false);
   readonly generating = signal(false);
   readonly generationError = signal('');
   readonly job = signal<AiJob | null>(null);
@@ -234,9 +241,10 @@ export class AiTryOnPage implements OnInit, OnDestroy {
   onFileSelected(event: Event): void {
     const input = event.target as HTMLInputElement; if (!input.files?.length) return;
     const file = input.files[0]; input.value = ''; this.selectedFile = file;
-    const reader = new FileReader(); reader.onload = (loadEvent) => { if (this.selectedFile === file) this.previewUrl.set(loadEvent.target?.result as string); }; reader.readAsDataURL(file); this.uploadFile(file);
+    this.landscapeHint.set(false);
+    const reader = new FileReader(); reader.onload = (loadEvent) => { if (this.selectedFile === file) { const url = loadEvent.target?.result as string; this.previewUrl.set(url); detectLandscape(url, (landscape) => { if (this.previewUrl() === url) this.landscapeHint.set(landscape); }); } }; reader.readAsDataURL(file); this.uploadFile(file);
   }
-  clearUpload(): void { this.uploadSubscription?.unsubscribe(); this.selectedFile = undefined; this.previewUrl.set(''); this.uploadedMediaId.set(''); this.uploadError.set(''); this.uploading.set(false); }
+  clearUpload(): void { this.uploadSubscription?.unsubscribe(); this.selectedFile = undefined; this.previewUrl.set(''); this.landscapeHint.set(false); this.uploadedMediaId.set(''); this.uploadError.set(''); this.uploading.set(false); }
   retryUpload(): void { if (this.selectedFile && !this.uploading()) this.uploadFile(this.selectedFile); }
   private uploadFile(file: File): void {
     this.uploadSubscription?.unsubscribe(); this.uploadError.set(''); this.uploadedMediaId.set(''); this.uploading.set(true);

@@ -91,7 +91,7 @@ describe('AI worker lifecycle with QA mock and stubbed object storage', () => {
         req.on('end', () => {
           plannerRequests++;
           const result = plannerRequests === 1 ? {
-            person: { count: plannerMode === 'no-person' ? 0 : 1, pose: 'standing', visibleRegions: ['torso', 'feet'] },
+            person: { count: plannerMode === 'no-person' ? 0 : 1, pose: 'standing', visibleRegions: ['face', 'torso', 'feet'] },
             products: productIds.map((productId, i) => ({ productId, category: i === 0 ? 'shoes' : 'top',
               confidence: 0.99, targetRegion: i === 0 ? 'feet' : 'torso', details: 'Fixture reference product.' })),
           } : { compatible: true, explanation: 'Phù hợp.', summary: 'Phối giày và trang phục.',

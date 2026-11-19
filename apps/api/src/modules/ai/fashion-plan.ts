@@ -48,6 +48,8 @@ export function validateAnalysis(value: unknown, ids: string[]): FashionAnalysis
   if (!Array.isArray(person.visibleRegions) || person.visibleRegions.length > BODY_REGIONS.length
     || person.visibleRegions.some(v => !BODY_REGIONS.includes(v))) throw new Error('Invalid visible regions');
   const visibleRegions = person.visibleRegions as BodyRegion[];
+  // Chỉ bắt buộc thấy rõ mặt; phần thân không có trong ảnh sẽ được dựng theo prompt (BODY).
+  if (!visibleRegions.includes('face')) throw new FashionInputError('Vui lòng chọn ảnh thấy rõ khuôn mặt của bạn.');
   if (!Array.isArray(body.products) || body.products.length !== ids.length) throw new Error('Missing product detections');
   const products = body.products.map(value => {
     const p = obj(value);
@@ -59,10 +61,6 @@ export function validateAnalysis(value: unknown, ids: string[]): FashionAnalysis
     if (p.confidence < 0.65) throw new FashionInputError('Chưa nhận diện rõ sản phẩm. Vui lòng dùng ảnh sản phẩm rõ hơn.');
     const rule = FASHION_RULES[category];
     if (!(rule.regions as readonly unknown[]).includes(p.targetRegion)) throw new Error('Category/placement mismatch');
-    if (!visibleRegions.includes(p.targetRegion as BodyRegion)
-      || (category === 'dress' && !visibleRegions.includes('legs'))) {
-      throw new FashionInputError('Ảnh người chưa hiển thị vùng cần thử sản phẩm. Vui lòng chọn ảnh đầy đủ hơn, thấy rõ mặt hoặc chân nếu thử kính/giày.');
-    }
     return { productId: p.productId, category, confidence: p.confidence,
       targetRegion: p.targetRegion as BodyRegion, details: text(p.details) };
   });

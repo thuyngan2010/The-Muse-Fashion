@@ -24,9 +24,15 @@ describe('Fashion analysis and category-specific prompts', () => {
     const value = detection(); value.person.count = count;
     expect(() => validateAnalysis(value, ['p1'])).toThrow('đúng một người');
   });
-  it('does not invent feet in a cropped portrait to fit shoes', () => {
+  it('accepts a face-only or half-body photo; the missing body is built by the prompt', () => {
     const value = detection(); value.person.visibleRegions = ['face', 'torso'];
-    expect(() => validateAnalysis(value, ['p1'])).toThrow('chưa hiển thị vùng');
+    expect(validateAnalysis(value, ['p1']).products[0].category).toBe('shoes');
+    const dress = detection('dress', 'torso'); dress.person.visibleRegions = ['face'];
+    expect(() => validateAnalysis(dress, ['p1'])).not.toThrow();
+  });
+  it('requires a clearly visible face', () => {
+    const value = detection(); value.person.visibleRegions = ['torso', 'legs', 'feet'];
+    expect(() => validateAnalysis(value, ['p1'])).toThrow('Vui lòng chọn ảnh thấy rõ khuôn mặt của bạn.');
   });
   it('rejects uncertain detections and fabricated product ids', () => {
     const value = detection(); value.products[0].confidence = 0.3;

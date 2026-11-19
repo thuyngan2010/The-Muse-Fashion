@@ -9,6 +9,7 @@ import { CartService } from '../services/cart.service';
 import { ToastService } from '../services/toast.service';
 import { Subscription } from 'rxjs';
 import { STORE_AI_MIX_MATCH_CONTENT } from '../shared/store-content';
+import { detectLandscape } from '../shared/ai-photo';
 import { AiJobDetailsComponent } from '../components/ai-job-details.component';
 
 function generateUUID(): string {
@@ -47,6 +48,8 @@ function generateUUID(): string {
               @if (previewUrl()) { <img [src]="previewUrl()" alt="Ảnh để phối đồ" /> }
               @else { <span class="upload-mark" aria-hidden="true">＋</span><strong>TẢI ẢNH CỦA BẠN</strong><small>{{ content.uploadHint }}</small> }
             </button>
+            <p class="photo-guide">Chỉ cần ảnh thấy rõ khuôn mặt. Nên dùng ảnh <strong>toàn thân, đứng thẳng, đủ sáng, một mình</strong> để kết quả giống bạn nhất. Ảnh chỉ có mặt hoặc nửa người thì AI sẽ tự dựng phần còn lại, nên kém chân thực hơn.</p>
+            @if (landscapeHint()) { <p class="photo-hint" role="status">Ảnh nằm ngang thường không thấy toàn thân. Bạn có thể đổi sang ảnh dọc để kết quả đẹp hơn.</p> }
             @if (uploading()) { <p class="msg" role="status">Đang tải ảnh...</p> }
             @if (uploadError()) {
               <div class="msg error" role="alert">
@@ -111,6 +114,7 @@ function generateUUID(): string {
               <p class="measure-error" role="alert">{{ heightError() || weightError() }}</p>
             }
             <p class="measure-note">Không bắt buộc. Giúp AI thể hiện độ dài và độ vừa của trang phục sát hơn.</p>
+            @if (!height || !weight) { <p class="measure-hint">Nhập chiều cao và cân nặng giúp AI dựng dáng chính xác hơn, nhất là khi ảnh không toàn thân.</p> }
 
             <label class="consent-label">
               <input type="checkbox" [(ngModel)]="consentAccepted" name="consent" />
@@ -230,6 +234,7 @@ function generateUUID(): string {
     .measure-grid input { min-width: 0; width: 100%; padding: 0; border: 0; background: transparent; color: var(--ui-ink, #171717); font: 400 22px var(--font-serif, Georgia, serif); }
     .measure-error { margin: 0 0 8px; color: var(--ui-danger, #9b2c2c); font-size: 12px; }
     .measure-note { margin: 0 0 16px; color: var(--ui-ink-soft, #444748); font-size: 12px; line-height: 1.5; }
+    .photo-guide{margin:12px 0 0;color:#4f4842;font-size:12px;line-height:1.6}.photo-guide strong{color:#171513}.photo-hint{margin:8px 0 0;padding:8px 12px;background:#fff7e6;color:#7a5200;font-size:12px;line-height:1.5}.measure-hint{margin:6px 0 0;color:#9b5663;font-size:11px;line-height:1.5} .measure-hint { margin: -10px 0 16px; }
     @media (max-width: 640px) { .measure-grid { grid-template-columns: 1fr; } }
     .consent-label { display: flex; gap: 8px; margin-bottom: 20px; padding: 12px; background: var(--ui-bg-soft, #f5f3f3); color: var(--ui-ink-soft, #444748); font-size: 12px; line-height: 1.55; cursor: pointer; }
     .btn-submit { width: 100%; min-height: 50px; border: 1px solid var(--ui-ink, #171717); border-radius: 0; background: var(--ui-pink, #f4b8c1); color: var(--ui-ink, #171717); font-size: 12px; font-weight: 800; letter-spacing: 1.2px; cursor: pointer; }
@@ -286,6 +291,8 @@ export class AiMixMatchPage implements OnInit, OnDestroy {
   readonly selectedStyle = signal<string>('office');
   readonly uploading = signal(false);
   readonly uploadError = signal('');
+  /** Ảnh nằm ngang (rộng hơn cao): chỉ gợi ý đổi sang ảnh dọc, không chặn. */
+  readonly landscapeHint = signal(false);
   private selectedFile?: File;
   private uploadSubscription?: Subscription;
   readonly uploadedMediaId = signal('');
@@ -394,7 +401,13 @@ export class AiMixMatchPage implements OnInit, OnDestroy {
     input.value = '';
     this.selectedFile = file;
     const reader = new FileReader();
-    reader.onload = () => { if (this.selectedFile === file) this.previewUrl.set(String(reader.result)); };
+    this.landscapeHint.set(false);
+    reader.onload = () => {
+      if (this.selectedFile !== file) return;
+      const url = String(reader.result);
+      this.previewUrl.set(url);
+      detectLandscape(url, (landscape) => { if (this.previewUrl() === url) this.landscapeHint.set(landscape); });
+    };
     reader.readAsDataURL(file);
     this.uploadFile(file);
   }
