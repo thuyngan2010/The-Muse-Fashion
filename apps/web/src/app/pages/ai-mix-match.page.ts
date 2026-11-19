@@ -7,9 +7,10 @@ import type { AiJob, ProductSummary } from '@fashion/contracts';
 import { ApiService, bodyPayload, heightError, weightError } from '../services/api.service';
 import { CartService } from '../services/cart.service';
 import { ToastService } from '../services/toast.service';
-import { Subscription } from 'rxjs';
+import { Observable, Subscription, from, map, switchMap, tap } from 'rxjs';
 import { STORE_AI_MIX_MATCH_CONTENT } from '../shared/store-content';
-import { detectLandscape } from '../shared/ai-photo';
+import { PHOTO_ACCEPT, PHOTO_LIMITS_TEXT, compressPhoto, isLandscape, isLowResolution, photoUploadErrorMessage, uploadTryOnPhoto, validatePhotoFile, type PreparedPhoto } from '../shared/ai-photo';
+import { UPLOAD_MAX_BYTES } from '../shared/upload-limits';
 import { AiJobDetailsComponent } from '../components/ai-job-details.component';
 
 function generateUUID(): string {
@@ -43,18 +44,20 @@ function generateUUID(): string {
           <section class="card" aria-labelledby="step1-title">
             <span class="step-label">{{ content.step1.label }}</span>
             <h2 id="step1-title">{{ content.step1.title }}</h2>
-            <input #fileInput id="mix-photo" type="file" accept="image/jpeg,image/png,image/webp" hidden [disabled]="uploading() || generating()" (change)="onFileSelected($event)" />
+            <input #fileInput id="mix-photo" type="file" [accept]="photoAccept" hidden [disabled]="uploading() || generating()" (change)="onFileSelected($event)" />
             <button type="button" class="upload-canvas" [disabled]="uploading() || generating()" (click)="fileInput.click()">
               @if (previewUrl()) { <img [src]="previewUrl()" alt="Ảnh để phối đồ" /> }
-              @else { <span class="upload-mark" aria-hidden="true">＋</span><strong>TẢI ẢNH CỦA BẠN</strong><small>{{ content.uploadHint }}</small> }
+              @else { <span class="upload-mark" aria-hidden="true">＋</span><strong>TẢI ẢNH CỦA BẠN</strong> }
             </button>
+            <p class="photo-limits">{{ photoLimits }}</p>
             <p class="photo-guide">Chỉ cần ảnh thấy rõ khuôn mặt. Nên dùng ảnh <strong>toàn thân, đứng thẳng, đủ sáng, một mình</strong> để kết quả giống bạn nhất. Ảnh chỉ có mặt hoặc nửa người thì AI sẽ tự dựng phần còn lại, nên kém chân thực hơn.</p>
             @if (landscapeHint()) { <p class="photo-hint" role="status">Ảnh nằm ngang thường không thấy toàn thân. Bạn có thể đổi sang ảnh dọc để kết quả đẹp hơn.</p> }
-            @if (uploading()) { <p class="msg" role="status">Đang tải ảnh...</p> }
+            @if (lowResHint()) { <p class="photo-hint" role="status">Ảnh có độ phân giải thấp, kết quả có thể bị mờ.</p> }
+            @if (uploading()) { <p class="msg" role="status">{{ uploadStage() === 'compressing' ? 'Đang nén ảnh...' : 'Đang tải ảnh...' }}</p> }
             @if (uploadError()) {
               <div class="msg error" role="alert">
                 <span>{{ uploadError() }}</span>
-                <button type="button" class="btn-outline small" (click)="retryUpload()">THỬ TẢI LẠI</button>
+                @if (canRetryUpload()) { <button type="button" class="btn-outline small" (click)="retryUpload()">THỬ TẢI LẠI</button> }
               </div>
             } @else if (uploadedMediaId()) { <p class="msg success" role="status">Ảnh đã tải lên thành công.</p> }
           </section>
@@ -234,7 +237,7 @@ function generateUUID(): string {
     .measure-grid input { min-width: 0; width: 100%; padding: 0; border: 0; background: transparent; color: var(--ui-ink, #171717); font: 400 22px var(--font-serif, Georgia, serif); }
     .measure-error { margin: 0 0 8px; color: var(--ui-danger, #9b2c2c); font-size: 12px; }
     .measure-note { margin: 0 0 16px; color: var(--ui-ink-soft, #444748); font-size: 12px; line-height: 1.5; }
-    .photo-guide{margin:12px 0 0;color:#4f4842;font-size:12px;line-height:1.6}.photo-guide strong{color:#171513}.photo-hint{margin:8px 0 0;padding:8px 12px;background:#fff7e6;color:#7a5200;font-size:12px;line-height:1.5}.measure-hint{margin:6px 0 0;color:#9b5663;font-size:11px;line-height:1.5} .measure-hint { margin: -10px 0 16px; }
+    .photo-limits{margin:10px 0 0;color:#747878;font-size:11px;line-height:1.5;text-align:center}.photo-guide{margin:12px 0 0;color:#4f4842;font-size:12px;line-height:1.6}.photo-guide strong{color:#171513}.photo-hint{margin:8px 0 0;padding:8px 12px;background:#fff7e6;color:#7a5200;font-size:12px;line-height:1.5}.measure-hint{margin:6px 0 0;color:#9b5663;font-size:11px;line-height:1.5} .measure-hint { margin: -10px 0 16px; }
     @media (max-width: 640px) { .measure-grid { grid-template-columns: 1fr; } }
     .consent-label { display: flex; gap: 8px; margin-bottom: 20px; padding: 12px; background: var(--ui-bg-soft, #f5f3f3); color: var(--ui-ink-soft, #444748); font-size: 12px; line-height: 1.55; cursor: pointer; }
     .btn-submit { width: 100%; min-height: 50px; border: 1px solid var(--ui-ink, #171717); border-radius: 0; background: var(--ui-pink, #f4b8c1); color: var(--ui-ink, #171717); font-size: 12px; font-weight: 800; letter-spacing: 1.2px; cursor: pointer; }
@@ -293,6 +296,15 @@ export class AiMixMatchPage implements OnInit, OnDestroy {
   readonly uploadError = signal('');
   /** Ảnh nằm ngang (rộng hơn cao): chỉ gợi ý đổi sang ảnh dọc, không chặn. */
   readonly landscapeHint = signal(false);
+  readonly lowResHint = signal(false);
+  /** Bước đang chạy khi tải ảnh: nén trên trình duyệt rồi mới tải lên. */
+  readonly uploadStage = signal<'' | 'compressing' | 'uploading'>('');
+  readonly photoAccept = PHOTO_ACCEPT;
+  readonly photoLimits = PHOTO_LIMITS_TEXT;
+  /** Nén ảnh trước khi tải (tách riêng để test có thể thay thế). */
+  preparePhoto: (file: File) => Observable<PreparedPhoto> = (file) => from(compressPhoto(file, UPLOAD_MAX_BYTES));
+  /** Ảnh đã nén, dùng lại khi bấm THỬ TẢI LẠI. */
+  private preparedFile?: File;
   private selectedFile?: File;
   private uploadSubscription?: Subscription;
   readonly uploadedMediaId = signal('');
@@ -399,33 +411,57 @@ export class AiMixMatchPage implements OnInit, OnDestroy {
     const file = input.files?.[0];
     if (!file) return;
     input.value = '';
+    const invalid = validatePhotoFile(file);
+    if (invalid) {
+      this.uploadSubscription?.unsubscribe();
+      this.selectedFile = undefined;
+      this.preparedFile = undefined;
+      this.previewUrl.set('');
+      this.uploadedMediaId.set('');
+      this.uploading.set(false);
+      this.uploadError.set(invalid);
+      this.toast.error(invalid);
+      return;
+    }
     this.selectedFile = file;
-    const reader = new FileReader();
-    this.landscapeHint.set(false);
-    reader.onload = () => {
-      if (this.selectedFile !== file) return;
-      const url = String(reader.result);
-      this.previewUrl.set(url);
-      detectLandscape(url, (landscape) => { if (this.previewUrl() === url) this.landscapeHint.set(landscape); });
-    };
-    reader.readAsDataURL(file);
+    this.preparedFile = undefined;
     this.uploadFile(file);
   }
 
+  canRetryUpload(): boolean { return !!(this.preparedFile || this.selectedFile); }
+
+  /** Thử lại dùng ảnh đã nén (không bắt chọn lại); nếu chưa nén xong thì nén lại từ ảnh gốc. */
   retryUpload(): void {
-    if (this.selectedFile && !this.uploading()) this.uploadFile(this.selectedFile);
+    if (this.uploading()) return;
+    if (this.preparedFile) this.uploadFile(this.preparedFile, true);
+    else if (this.selectedFile) this.uploadFile(this.selectedFile);
   }
 
-  private uploadFile(file: File): void {
+  private uploadFile(file: File, alreadyPrepared = false): void {
     this.uploadSubscription?.unsubscribe();
     this.uploadError.set('');
     this.uploadedMediaId.set('');
     this.uploading.set(true);
-    this.uploadSubscription = this.api.uploadImage(file, 'tryon').subscribe({
-      next: media => { this.uploadedMediaId.set(media.id); this.uploading.set(false); },
+    if (!alreadyPrepared) { this.previewUrl.set(''); this.landscapeHint.set(false); this.lowResHint.set(false); }
+    this.uploadStage.set(alreadyPrepared ? 'uploading' : 'compressing');
+    const prepared$: Observable<File> = alreadyPrepared ? from([file]) : this.preparePhoto(file).pipe(
+      tap((photo) => {
+        this.preparedFile = photo.file;
+        this.landscapeHint.set(isLandscape(photo.width, photo.height));
+        this.lowResHint.set(isLowResolution(photo.width, photo.height));
+        this.uploadStage.set('uploading');
+        const reader = new FileReader();
+        reader.onload = () => { if (this.preparedFile === photo.file) this.previewUrl.set(String(reader.result)); };
+        reader.readAsDataURL(photo.file);
+      }),
+      map((photo) => photo.file),
+    );
+    this.uploadSubscription = prepared$.pipe(switchMap((ready) => uploadTryOnPhoto((f) => this.api.uploadImage(f, 'tryon'), ready))).subscribe({
+      next: media => { this.uploadedMediaId.set(media.id); this.uploading.set(false); this.uploadStage.set(''); },
       error: err => {
         this.uploading.set(false);
-        this.uploadError.set(err.error?.message || err.message || 'Không thể tải ảnh.');
+        this.uploadStage.set('');
+        this.uploadError.set(photoUploadErrorMessage(err));
         this.toast.error(this.uploadError());
       },
     });

@@ -1,4 +1,5 @@
 import { Injectable, inject } from '@angular/core';
+import { UPLOAD_MAX_BYTES, UPLOAD_MAX_LABEL } from '../shared/upload-limits';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable, catchError, defer, from, map, switchMap, throwError } from 'rxjs';
 import type {
@@ -489,8 +490,8 @@ export class ApiService {
   }
 
   uploadImage(file: File, purpose: 'avatar' | 'product' | 'lookbook' | 'community' | 'tryon' | 'refund_evidence') {
-    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type) || file.size <= 0 || file.size > 10 * 1024 * 1024) {
-      return throwError(() => new Error('Chọn ảnh JPEG, PNG hoặc WebP, tối đa 10 MB.'));
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type) || file.size <= 0 || file.size > UPLOAD_MAX_BYTES) {
+      return throwError(() => new Error(`Chọn ảnh JPEG, PNG hoặc WebP, tối đa ${UPLOAD_MAX_LABEL}.`));
     }
     return this.presignUpload({ contentType: file.type, sizeBytes: file.size, purpose }).pipe(
       switchMap((upload) => defer(() => from(fetch(upload.uploadUrl, {

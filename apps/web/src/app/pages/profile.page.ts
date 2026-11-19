@@ -45,7 +45,7 @@ import { STORE_PROFILE_CONTENT } from '../shared/store-content';
               </span>
               <div class="avatar-copy">
                 <strong>{{ auth.currentUser()?.fullName || 'Tài khoản MUSE' }}</strong>
-                <p>{{ auth.currentUser()?.avatarUrl ? 'Ảnh JPEG, PNG hoặc WebP, tối đa 10 MB.' : 'Chưa có ảnh đại diện, hệ thống dùng chữ cái đầu của tên tài khoản.' }}</p>
+                <p>{{ auth.currentUser()?.avatarUrl ? 'Ảnh JPEG, PNG hoặc WebP, tối đa 5 MB.' : 'Chưa có ảnh đại diện, hệ thống dùng chữ cái đầu của tên tài khoản.' }}</p>
                 <input #avatarInput type="file" accept="image/jpeg,image/png,image/webp" hidden (change)="onAvatarSelected($event)" />
                 <div class="avatar-actions">
                   <button type="button" class="button button-pink" [disabled]="avatarBusy()" (click)="avatarInput.click()">{{ avatarBusy() ? 'ĐANG XỬ LÝ...' : 'THAY ĐỔI ẢNH' }}</button>

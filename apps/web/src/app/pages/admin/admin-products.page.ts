@@ -275,7 +275,7 @@ const COLOR_HEX: Record<string, string> = {
               </label>
             }
           </div>
-          <span class="hint">JPEG, PNG hoặc WebP, tối đa 10 MB mỗi ảnh.</span>
+          <span class="hint">JPEG, PNG hoặc WebP, tối đa 5 MB mỗi ảnh.</span>
         </fieldset>
 
         <!-- Biến thể -->
