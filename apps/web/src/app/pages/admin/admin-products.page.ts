@@ -87,7 +87,6 @@ const COLOR_HEX: Record<string, string> = {
             <select [ngModel]="statusFilter()" (ngModelChange)="setStatusFilter($event)" name="status">
               <option value="">Tất cả</option>
               <option value="PUBLISHED">{{ productStatusLabel('PUBLISHED') }}</option>
-              <option value="DRAFT">{{ productStatusLabel('DRAFT') }}</option>
               <option value="ARCHIVED">{{ productStatusLabel('ARCHIVED') }}</option>
             </select>
           </label>
