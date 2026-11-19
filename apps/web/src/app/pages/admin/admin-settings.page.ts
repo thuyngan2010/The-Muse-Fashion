@@ -1,17 +1,18 @@
 import { PaginationComponent, PaginationState } from '../../components/pagination.component';
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { ActivatedRoute, RouterLink } from '@angular/router';
-import { DatePipe, JsonPipe } from '@angular/common';
+import { DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import type { SystemSettings, AuditLogEntry } from '@fashion/contracts';
 import { ApiService } from '../../services/api.service';
 import { ToastService } from '../../services/toast.service';
 import { AdminReportTabsComponent } from '../../components/admin-report-tabs.component';
 import { auditActionLabel, auditEntityLabel } from '../../shared/labels';
+import { auditMetaLines, type AuditMetaLine } from '../../shared/audit-meta';
 
 @Component({
   standalone: true,
-  imports: [PaginationComponent, FormsModule, DatePipe, JsonPipe, RouterLink, AdminReportTabsComponent],
+  imports: [PaginationComponent, FormsModule, DatePipe, RouterLink, AdminReportTabsComponent],
   template: `
     <div class="admin-settings-container">
       @if (activeTab() === 'audit') {
@@ -142,7 +143,7 @@ import { auditActionLabel, auditEntityLabel } from '../../shared/labels';
                     <td><code class="au-id">{{ log.entityId }}</code></td>
                     <td>
                       @if (hasMeta(log)) {
-                        <details><summary>Xem</summary><pre class="au-json">{{ log.metadata | json }}</pre></details>
+                        <details><summary>Xem</summary><dl class="au-meta">@for (line of metaLines(log); track $index) { <div><dt>{{ line.label }}:</dt> <dd>{{ line.value }}</dd></div> }</dl></details>
                       } @else { — }
                     </td>
                   </tr>
@@ -199,7 +200,10 @@ import { auditActionLabel, auditEntityLabel } from '../../shared/labels';
     .au-tag { display: inline-block; padding: 3px 10px; border-radius: 999px; background: var(--ui-pink-soft); color: var(--ui-accent); font: 600 11px/16px var(--font-sans); }
     .au-id { font: 400 12px/16px ui-monospace, monospace; overflow-wrap: anywhere; }
     .au-tbl summary { cursor: pointer; color: var(--ui-accent); font-weight: 600; }
-    .au-json { margin: 6px 0 0; padding: 8px; background: var(--ui-bg-soft); font-size: 11px; white-space: pre-wrap; word-break: break-all; max-width: 320px; }
+    .au-meta { margin: 6px 0 0; padding: 8px; background: var(--ui-bg-soft); font-size: 12px; line-height: 18px; max-width: 320px; display: grid; gap: 2px; }
+    .au-meta div { display: flex; gap: 6px; flex-wrap: wrap; }
+    .au-meta dt { margin: 0; color: var(--ui-ink-soft); font-weight: 600; }
+    .au-meta dd { margin: 0; overflow-wrap: anywhere; }
     .au-note { margin: 0; font-size: 12px; color: var(--ui-subtle); text-align: right; }
     .au-state { text-align: center; padding: 56px 16px; color: var(--ui-ink-soft); display: flex; flex-direction: column; align-items: center; gap: 12px; }
     .au-spinner { width: 30px; height: 30px; border: 3px solid var(--ui-line-soft); border-top-color: var(--ui-ink); border-radius: 50%; animation: spin 0.8s linear infinite; }
@@ -375,4 +379,7 @@ export class AdminSettingsPage implements OnInit {
   actionText(action: string): string { return auditActionLabel(action); }
   entityText(type: string): string { return auditEntityLabel(type); }
   hasMeta(log: AuditLogEntry): boolean { return !!log.metadata && Object.keys(log.metadata).length > 0; }
+  metaLines(log: AuditLogEntry): AuditMetaLine[] {
+    return auditMetaLines(log.entityType, log.action, log.metadata, (id) => this.actorName(id));
+  }
 }
