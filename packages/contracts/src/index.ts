@@ -137,6 +137,8 @@ export type CartItem = {
   quantity: number;
   unitPrice: number;
   available: number;
+  /** Ảnh bìa sản phẩm để hiển thị trong giỏ hàng; null nếu sản phẩm chưa có ảnh. */
+  imageUrl?: string | null;
 };
 
 export type Cart = {

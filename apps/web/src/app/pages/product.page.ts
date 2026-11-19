@@ -1303,6 +1303,7 @@ export class ProductPage implements OnInit, OnDestroy {
       unitPrice: v.price,
       quantity: this.quantity(),
       available: v.available,
+      imageUrl: p.images[0] ?? null,
     });
   }
 

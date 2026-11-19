@@ -3065,6 +3065,9 @@ components:
               quantity: {type: integer, minimum: 1, maximum: 99}
               unitPrice: {$ref: '#/components/schemas/Money'}
               available: {type: integer, minimum: 0}
+              imageUrl:
+                type: [string, 'null']
+                description: Product cover image (first manual URL, else first uploaded image); null when the product has no image.
         subtotal: {$ref: '#/components/schemas/Money'}
         updatedAt: {type: string, format: date-time}
     Shipment:

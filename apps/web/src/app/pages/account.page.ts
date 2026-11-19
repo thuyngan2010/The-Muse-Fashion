@@ -45,7 +45,7 @@ type Stat = { state: 'loading' | 'ok' | 'error'; value: number };
         <section class="block">
           <header class="block-head"><div><h2>{{ content.profile.title }}</h2><p>{{ content.profile.subtitle }}</p></div></header>
           <div class="profile-card">
-            <span class="avatar" aria-hidden="true">{{ initial() }}</span>
+            <span class="avatar" aria-hidden="true">@if (auth.currentUser()?.avatarUrl; as url) { <img [src]="url" alt="" /> } @else { {{ initial() }} }</span>
             <div class="profile-fields">
               <div class="field"><span class="field-label">HỌ VÀ TÊN</span><p class="field-value">{{ auth.currentUser()?.fullName }}</p></div>
               <div class="field"><span class="field-label">EMAIL ĐĂNG NHẬP</span><p class="field-value readonly">{{ auth.currentUser()?.email }}</p><small>{{ content.profile.emailNote }}</small></div>
@@ -117,6 +117,7 @@ type Stat = { state: 'loading' | 'ok' | 'error'; value: number };
     .view-all { color: #171414; font-size: 11px; font-weight: 700; letter-spacing: 1.1px; text-decoration: none; white-space: nowrap; }
     .profile-card { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 32px; padding: 32px; border: 1px solid #5f5353; }
     .avatar { display: grid; width: 92px; height: 92px; place-items: center; border: 1px solid #e3e2e2; border-radius: 50%; background: #ffd9e1; color: #000; font: 500 32px 'Playfair Display', serif; text-transform: uppercase; }
+    .avatar { overflow: hidden; } .avatar img { width: 100%; height: 100%; object-fit: cover; display: block; }
     .profile-fields { display: grid; gap: 20px; }
     .field-label { display: block; margin-bottom: 6px; color: #171414; font-size: 11px; font-weight: 600; letter-spacing: 1.1px; }
     .field-value { margin: 0; padding-bottom: 10px; border-bottom: 1px solid #e3e2e2; font-size: 15px; }
