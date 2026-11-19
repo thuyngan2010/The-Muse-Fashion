@@ -1575,6 +1575,7 @@ paths:
       - Catalog
       operationId: listAdminProducts
       x-implementation-status: partial
+      description: Each item also carries coverImage, the first product image (manual URL or uploaded media), or null.
       responses:
         '200':
           description: Request processed

@@ -241,7 +241,7 @@ export function orderSearchTerm(value: string): string {
       }
       <div drawer-footer>
         <button type="button" class="btn-outline" (click)="closeDrawer()">Đóng</button>
-        @if (detail()) { <button type="button" class="btn-outline" (click)="printSlip()">In phiếu đóng gói</button> }
+        @if (detail(); as d) { <button type="button" class="btn-outline" [disabled]="d.state === 'CANCELLED'" [attr.title]="d.state === 'CANCELLED' ? 'Đơn đã hủy, không cần in phiếu đóng gói' : null" (click)="printSlip()">In phiếu đóng gói</button> }
         @if (drawerOrder(); as o) {
           @if (canManage(o) && nextStatuses(o.state).includes('CANCELLED')) {
             <button type="button" class="btn-outline danger" (click)="openStatusModal(o, 'CANCELLED')">Hủy đơn</button>
@@ -825,7 +825,7 @@ export class AdminOrdersPage implements OnInit, OnDestroy {
   // --- In phiếu đóng gói của đơn đang mở ---
   printSlip(): void {
     const d = this.detail();
-    if (!d) return;
+    if (!d || d.state === 'CANCELLED') return;
     const items = d.items.map(l => `<tr><td>${escapeHtml(l.sku)}</td><td>${escapeHtml(l.productName)}</td><td class="n">${l.quantity}</td></tr>`).join('');
     const s = d.shippingSnapshot;
     const created = d.createdAt ? new Date(d.createdAt).toLocaleString('vi-VN') : '';

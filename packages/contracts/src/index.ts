@@ -109,6 +109,8 @@ export type ProductSummary = {
   images: string[];
   status: 'DRAFT' | 'PUBLISHED' | 'ARCHIVED';
   categoryId?: string | null;
+  /** Ảnh bìa (ảnh đầu tiên, kể cả ảnh tải lên); chỉ có ở danh sách sản phẩm admin. */
+  coverImage?: string | null;
 };
 
 export type ProductDetail = {
