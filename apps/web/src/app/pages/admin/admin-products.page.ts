@@ -144,7 +144,7 @@ const COLOR_HEX: Record<string, string> = {
                 @for (row of rows(); track row.product.id) {
                   <tr>
                     <td class="c-img">
-                      <div class="thumb">@if (row.product.images.length > 0) { <img [src]="row.product.images[0]" [alt]="row.product.name" /> }</div>
+                      <div class="thumb">@if (row.product.coverImage ?? row.product.images[0]; as cover) { <img [src]="cover" [alt]="row.product.name" /> }</div>
                     </td>
                     <td>
                       <strong class="p-name">{{ row.product.name }}</strong>

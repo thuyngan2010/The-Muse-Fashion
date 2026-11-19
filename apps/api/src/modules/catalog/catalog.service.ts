@@ -175,12 +175,30 @@ export class CatalogService {
       this.products.find(filter).sort({ createdAt: -1 }).skip((safePage - 1) * safeLimit).limit(safeLimit).lean().exec(),
       this.products.countDocuments(filter).exec(),
     ]);
-    return { page: safePage, limit: safeLimit, total, items: rows.map((row) => ({
+    // Ảnh tải lên lưu ở imageMediaIds (images chỉ chứa URL nhập tay) nên cần tra media để có ảnh bìa.
+    const coverMediaIds = rows.filter((row) => !row.images?.length).flatMap((row) => row.imageMediaIds ?? []);
+    const mediaRows = coverMediaIds.length
+      ? await this.media.find({ _id: { $in: coverMediaIds }, status: 'READY' }).lean().exec() : [];
+    const mediaById = new Map(mediaRows.map((item) => [String(item._id), item]));
+    return { page: safePage, limit: safeLimit, total, items: await Promise.all(rows.map(async (row) => ({
       id: String(row._id), name: row.name, slug: row.slug, status: row.status,
       description: row.description ?? '', material: row.material ?? '', images: row.images ?? [],
       price: row.price, categoryId: row.categoryId ? String(row.categoryId) : null,
       imageMediaIds: row.imageMediaIds ?? [],
-    })) };
+      coverImage: await this.coverImage(row as unknown as Record<string, unknown>, mediaById),
+    }))) };
+  }
+
+  /** Ảnh bìa = ảnh đầu tiên theo đúng thứ tự trang chi tiết: URL nhập tay trước, rồi ảnh tải lên. */
+  private async coverImage(product: Record<string, unknown>, mediaById: Map<string, { key: string; visibility: string }>) {
+    const images = Array.isArray(product.images) ? product.images as string[] : [];
+    if (images.length) return images[0];
+    for (const mediaId of (product.imageMediaIds as string[] | undefined) ?? []) {
+      const media = mediaById.get(String(mediaId));
+      if (!media) continue;
+      return (media.visibility === 'PUBLIC' ? this.storage.publicUrl(media.key) : null) ?? await this.storage.signedReadUrl(media.key);
+    }
+    return null;
   }
 
   async getAdminProduct(productId: string) {
