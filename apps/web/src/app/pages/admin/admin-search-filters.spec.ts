@@ -5,7 +5,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { ApiService } from '../../services/api.service';
 import { AuthService } from '../../services/auth.service';
 import { ToastService } from '../../services/toast.service';
-import { AdminOrdersPage } from './admin-orders.page';
+import { AdminOrdersPage, orderSearchTerm } from './admin-orders.page';
 import { AdminCustomersPage } from './admin-customers.page';
 import { AdminUsersPage } from './admin-users.page';
 
@@ -35,6 +35,25 @@ describe('Admin orders search', () => {
     params.next(convertToParamMap({ q: 'FCMWMCIJRIB3C82D2CD5C0' }));
     expect(listCalls()).toHaveLength(2);
     expect(listCalls()[1]).toEqual([undefined, 1, 20, { q: 'FCMWMCIJRIB3C82D2CD5C0', customerId: undefined }]);
+    page.ngOnDestroy();
+  });
+});
+
+describe('Admin orders search with a copied #code', () => {
+  it('drops the display-only # before filtering', () => {
+    expect(orderSearchTerm(' #FCMWMCIJRIB3C82D2CD5C0 ')).toBe('FCMWMCIJRIB3C82D2CD5C0');
+    expect(orderSearchTerm('# FCMW')).toBe('FCMW');
+    expect(orderSearchTerm('Nguyễn #2')).toBe('Nguyễn #2');
+  });
+
+  it('sends the code without # to the API and keeps the typed text in the box', () => {
+    const adminListOrders = vi.fn(() => of({ items: [], total: 0, page: 1, limit: 20 }));
+    const { page, params } = setup(AdminOrdersPage, { adminListOrders });
+    page.onSearch('#FCMWMCIJRIB3C82D2CD5C0');
+    params.next(convertToParamMap({ q: 'FCMWMCIJRIB3C82D2CD5C0' }));
+    const listCalls = adminListOrders.mock.calls.filter((c) => (c as unknown[])[2] !== 1);
+    expect(listCalls.at(-1)).toEqual([undefined, 1, 20, { q: 'FCMWMCIJRIB3C82D2CD5C0', customerId: undefined }]);
+    expect(page.query()).toBe('#FCMWMCIJRIB3C82D2CD5C0');
     page.ngOnDestroy();
   });
 });
