@@ -536,7 +536,9 @@ export class AdminRefundsPage implements OnInit {
     if (canRefunds) this.loadRefunds();
     if (canRefunds) this.loadCounts();
     if (canEvents) this.api.adminListPaymentEvents(1, 1, 'OPEN').subscribe({ next: res => this.openEvents.set(res.total), error: () => this.openEvents.set(null) });
-    if ((wantEvents && canEvents) || (!canRefunds && canEvents)) this.switchToEventsTab();
+    // Tải sẵn danh sách sự kiện để số đếm ở tab "Sự kiện thanh toán" đúng ngay khi mở trang.
+    if (canEvents) this.loadPaymentEvents();
+    if ((wantEvents && canEvents) || (!canRefunds && canEvents)) this.activeTab.set('events');
 
     if (this.auth.can('payment.read')) {
       this.api.listPayments(1, 50).subscribe({
