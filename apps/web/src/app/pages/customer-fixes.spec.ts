@@ -31,6 +31,12 @@ describe('AI Mix & Match hero links', () => {
     expect(page).toContain('<a routerLink="/ai/history" class="text-link">{{ content.historyLink }}</a>');
     expect(page).toContain('<a routerLink="/ai/try-on" class="text-link">{{ content.tryOnLink }}</a>');
   });
+
+  it('both hero links are written in the same all-caps style', () => {
+    const content = source('../shared/store-content.ts');
+    expect(content).toContain("historyLink: 'XEM LỊCH SỬ',");
+    expect(content).toContain("tryOnLink: 'VỀ TRANG THỬ ĐỒ',");
+  });
 });
 
 describe('AI Try-on hero links', () => {
