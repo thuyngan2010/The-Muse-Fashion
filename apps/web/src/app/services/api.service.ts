@@ -528,6 +528,7 @@ export class ApiService {
     categoryId: string;
     status: 'DRAFT' | 'PUBLISHED' | 'ARCHIVED';
     images?: string[];
+    imageMediaIds?: string[];
     sizeGuide?: Array<{ size: string; measurements: Record<string, number> }>;
   }): Observable<{ id: string; slug: string }> {
     return this.http.post<{ id: string; slug: string }>(`${this.api}/products`, dto);
