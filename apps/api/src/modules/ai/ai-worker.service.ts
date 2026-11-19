@@ -23,12 +23,13 @@ export class AiWorkerService implements OnModuleInit, OnModuleDestroy {
   constructor(
     @InjectModel(AiJob.name) private readonly jobs: Model<AiJob>,
     @InjectModel(Product.name) private readonly products: Model<Product>,
-    @InjectModel(Category.name) private readonly categories: Model<Category>,
     @InjectModel(MediaObject.name) private readonly media: Model<MediaObject>,
     private readonly provider: AiProviderService,
     private readonly ai: AiService,
     private readonly storage: StorageService,
     private readonly planner: AiFashionPlannerService,
+    // Để cuối và không bắt buộc: chỗ nào tạo worker theo thứ tự tham số cũ vẫn chạy, chỉ thiếu tên danh mục trong prompt.
+    @InjectModel(Category.name) private readonly categories?: Model<Category>,
   ) {}
 
   onModuleInit(): void {
@@ -103,7 +104,7 @@ export class AiWorkerService implements OnModuleInit, OnModuleDestroy {
         const mediaById = new Map(productMedia.map((item) => [String(item._id), item]));
         // Tên danh mục của cửa hàng (ví dụ "Áo", "Đầm") để mô tả sản phẩm trong prompt; chỉ đọc database.
         const categoryIds = [...new Set(products.map((product) => product.categoryId).filter(Boolean).map(String))];
-        const categoryRows = categoryIds.length ? await this.categories.find({ _id: { $in: categoryIds } }).select('name').lean().exec() : [];
+        const categoryRows = categoryIds.length && this.categories ? await this.categories.find({ _id: { $in: categoryIds } }).select('name').lean().exec() : [];
         const categoryById = new Map(categoryRows.map((row) => [String(row._id), row.name]));
         // Keep one reference per selected product in request order, rather than letting
         // multiple images of the first product consume all reference slots.

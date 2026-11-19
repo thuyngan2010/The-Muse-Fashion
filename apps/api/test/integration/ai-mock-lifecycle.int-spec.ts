@@ -123,7 +123,8 @@ describe('AI worker lifecycle with QA mock and stubbed object storage', () => {
       if (plannerMode !== 'off') {
         expect((await jobs.findById(request.jobId).lean())?.phase).toBe('GENERATING');
         expect(request.prompt).toContain('Replace footwear only');
-        expect(request.prompt).toContain(`Image 2, product ${productIds[0]}`);
+        expect(request.prompt).toContain('PLACEMENT RULES'+'\n'+'- Image 2 (shoes, replace): Replace footwear only');
+        expect(request.prompt).toContain(`"productId":"${productIds[0]}"`);
       }
       return originalRunJob(request);
     });
