@@ -1,3 +1,5 @@
+import type { GarmentSlot } from './garment-slot.js';
+
 export const BODY_REGIONS = ['face', 'head', 'torso', 'legs', 'feet', 'shoulders', 'waist', 'neck', 'hands', 'ears', 'wrists'] as const;
 export type BodyRegion = typeof BODY_REGIONS[number];
 
@@ -29,7 +31,9 @@ export type FashionStyling = { compatible: boolean; explanation: string; summary
   items: Array<{ productId: string; action: 'replace' | 'layer' | 'add'; notes: string }> };
 export type FashionRenderPlan = { version: 'fashion-plan-v1'; prompt: string; summary: string;
   detectedItems: Array<{ productId: string; category: FashionCategory; targetRegion: BodyRegion }> };
-export type FashionProduct = { id: string; name: string; description: string; material: string; imageUrl: string; category?: string };
+export type FashionProduct = { id: string; name: string; description: string; material: string; imageUrl: string; category?: string;
+  /** Ảnh tham chiếu là ảnh admin chọn riêng cho AI (chỉ có sản phẩm). */
+  referenceIsolated?: boolean };
 export type FashionPipelineInput = { type: 'TRY_ON' | 'MIX_MATCH'; inputUrl: string; products: FashionProduct[]; style?: 'office' | 'streetwear' | 'evening' | 'minimalist'; body?: BodyMeasurements };
 
 export class FashionInputError extends Error {}
@@ -109,7 +113,11 @@ export function buildFashionPrompt(type: FashionPipelineInput['type'], analysis:
 }
 
 /** Dữ liệu sản phẩm đưa vào prompt (đã có sẵn trong worker, không gọi thêm API). */
-export type TryOnPromptProduct = { name?: string | null; category?: string | null; material?: string | null };
+export type TryOnPromptProduct = { name?: string | null; category?: string | null; material?: string | null;
+  /** Vị trí mặc và danh từ tiếng Anh (worker tính sẵn); thiếu thì prompt tự đoán từ danh mục và tên. */
+  slot?: GarmentSlot | null; noun?: string | null;
+  /** true khi ảnh tham chiếu là ảnh admin chọn riêng cho AI (chỉ có sản phẩm). */
+  referenceIsolated?: boolean };
 export type TryOnPromptInput = {
   type: FashionPipelineInput['type'];
   products: TryOnPromptProduct[];

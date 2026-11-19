@@ -126,6 +126,8 @@ export type ProductDetail = {
   categoryId?: string | null;
   sizeGuide: SizeGuideRow[];
   variants: ProductVariant[];
+  /** Chỉ có ở API admin: ảnh dùng cho AI (URL trong images hoặc id trong imageMediaIds); null nếu chưa chọn. */
+  aiReferenceImage?: string | null;
 };
 
 export type CartItem = {

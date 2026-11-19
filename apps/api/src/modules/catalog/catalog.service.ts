@@ -211,7 +211,8 @@ export class CatalogService {
     ]);
     return { ...await this.detail(product as unknown as Record<string, unknown>,
       variants as unknown as Array<Record<string, unknown>>, new Map(mediaRows.map(item => [String(item._id), item]))),
-      categoryId: product.categoryId ? String(product.categoryId) : null };
+      categoryId: product.categoryId ? String(product.categoryId) : null,
+      aiReferenceImage: product.aiReferenceImage ?? null };
   }
 
   async getPublishedBySlug(slug: string) {
@@ -242,6 +243,7 @@ export class CatalogService {
   async createProduct(dto: CreateProductDto) {
     await this.ensureCategory(dto.categoryId);
     await this.ensureMediaIdsReady(dto.imageMediaIds);
+    const aiReference = aiReferencePatch(dto.aiReferenceImage, dto.images ?? [], dto.imageMediaIds ?? [], null);
     try {
       const created = await this.products.create({
         ...dto,
@@ -249,6 +251,7 @@ export class CatalogService {
         images: dto.images ?? [],
         imageMediaIds: dto.imageMediaIds ?? [],
         sizeGuide: dto.sizeGuide ?? [],
+        ...aiReference,
       });
       if (created.imageMediaIds?.length) await this.syncMediaPublication(created.imageMediaIds);
       return { id: String(created._id), slug: created.slug };
@@ -266,7 +269,9 @@ export class CatalogService {
       const result = await withCommerceTransaction(this.connection, async (session) => {
         const current = await this.products.findById(productId).session(session).lean().exec();
         if (!current) throw new NotFoundException('Product not found');
-        const updated = await this.products.findByIdAndUpdate(productId, { $set: dto },
+        const aiReference = aiReferencePatch(dto.aiReferenceImage, dto.images ?? current.images ?? [],
+          (dto.imageMediaIds ?? current.imageMediaIds ?? []).map(String), current.aiReferenceImage ?? null);
+        const updated = await this.products.findByIdAndUpdate(productId, { $set: { ...dto, ...aiReference } },
           { new: true, runValidators: true, session }).lean().exec();
         if (!updated) throw new NotFoundException('Product not found');
         if (dto.price !== undefined && dto.price !== current.price) {
@@ -476,4 +481,18 @@ export class CatalogService {
     try { await this.storage.reconcileMediaIds(ids); }
     catch (error) { this.logger.warn(`Product media sync deferred: ${error instanceof Error ? error.message : 'unknown'}`); }
   }
+}
+
+/**
+ * Ảnh dùng cho AI phải thuộc ảnh của chính sản phẩm (URL trong images hoặc id trong imageMediaIds).
+ * - requested: giá trị gửi lên (undefined = không đổi, null = bỏ chọn).
+ * - Không gửi mà ảnh đang chọn bị xóa khỏi sản phẩm thì tự bỏ chọn.
+ */
+export function aiReferencePatch(requested: string | null | undefined, images: string[], imageMediaIds: string[],
+  current: string | null): { aiReferenceImage?: string | null } {
+  const owned = new Set([...images, ...imageMediaIds.map(String)]);
+  if (requested === undefined) return current && !owned.has(current) ? { aiReferenceImage: null } : {};
+  if (requested === null) return { aiReferenceImage: null };
+  if (!owned.has(requested)) throw new BadRequestException('Ảnh dùng cho AI phải là một ảnh của chính sản phẩm này.');
+  return { aiReferenceImage: requested };
 }

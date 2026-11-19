@@ -13,6 +13,17 @@ import { AiProviderService } from './ai-provider.service.js';
 import { AiService } from './ai.service.js';
 import { AiFashionPlannerService } from './ai-fashion-planner.service.js';
 import { FashionInputError } from './fashion-plan.js';
+import { detectGarmentSlot } from './garment-slot.js';
+
+/** Ảnh admin đã chọn cho AI: URL nhập tay hoặc id ảnh tải lên, chỉ khi vẫn còn thuộc ảnh của sản phẩm. */
+export function aiReferenceChoice(product: { aiReferenceImage?: string | null; images?: string[]; imageMediaIds?: unknown[] }):
+  { url: string; mediaId?: undefined } | { url?: undefined; mediaId: string } | null {
+  const chosen = product.aiReferenceImage;
+  if (!chosen) return null;
+  if ((product.images ?? []).includes(chosen)) return { url: chosen };
+  if ((product.imageMediaIds ?? []).map(String).includes(chosen)) return { mediaId: chosen };
+  return null;
+}
 
 @Injectable()
 export class AiWorkerService implements OnModuleInit, OnModuleDestroy {
@@ -111,15 +122,21 @@ export class AiWorkerService implements OnModuleInit, OnModuleDestroy {
         const references = await Promise.all(claimed.productIds.map(async (id) => {
           const product = products.find(p => String(p._id) === String(id));
           if (!product) throw new FashionInputError('Một sản phẩm không còn khả dụng. Vui lòng chọn lại sản phẩm.');
-          let imageUrl = product.images?.find(Boolean);
-          if (!imageUrl) {
-            const item = (product.imageMediaIds ?? []).map(id => mediaById.get(String(id))).find(Boolean);
-            if (item) imageUrl = (item.visibility === 'PUBLIC' ? this.storage.publicUrl(item.key) : null)
-              ?? await this.storage.signedReadUrl(item.key, 600) ?? undefined;
-          }
+          const mediaUrl = async (item: { key: string; visibility: string } | undefined) => item
+            ? (item.visibility === 'PUBLIC' ? this.storage.publicUrl(item.key) : null) ?? await this.storage.signedReadUrl(item.key, 600) ?? undefined
+            : undefined;
+          // 1) Ảnh admin chọn "Dùng cho AI thử đồ" (chỉ có riêng sản phẩm), nếu còn thuộc sản phẩm.
+          const chosen = aiReferenceChoice(product);
+          let imageUrl = chosen?.url ?? (chosen?.mediaId ? await mediaUrl(mediaById.get(chosen.mediaId)) : undefined);
+          const referenceIsolated = !!imageUrl;
+          // 2) Không có thì như cũ: ảnh đầu tiên (URL nhập tay, rồi ảnh tải lên).
+          if (!imageUrl) imageUrl = product.images?.find(Boolean);
+          if (!imageUrl) imageUrl = await mediaUrl((product.imageMediaIds ?? []).map(id => mediaById.get(String(id))).find(Boolean));
           if (!imageUrl) throw new FashionInputError('Mỗi sản phẩm cần có ảnh tham chiếu để thử đồ.');
+          const category = product.categoryId ? categoryById.get(String(product.categoryId)) : undefined;
+          const garment = detectGarmentSlot(category, product.name);
           return { id: String(id), name: product.name, description: product.description ?? '', material: product.material ?? '', imageUrl,
-            category: product.categoryId ? categoryById.get(String(product.categoryId)) : undefined };
+            category, slot: garment.slot, noun: garment.noun, referenceIsolated };
         }));
         const productImageUrls = references.map(p => p.imageUrl);
         const setPhase = async (phase: 'ANALYZING' | 'PLANNING' | 'GENERATING') => {
@@ -147,7 +164,7 @@ export class AiWorkerService implements OnModuleInit, OnModuleDestroy {
           providerJobId: claimed.providerJobId,
           prompt: renderPlan?.prompt,
           body: { heightCm: claimed.heightCm, weightKg: claimed.weightKg },
-          products: references.map(({ name, category, material }) => ({ name, category, material })),
+          products: references.map(({ name, category, material, slot, noun, referenceIsolated }) => ({ name, category, material, slot, noun, referenceIsolated })),
           style: claimed.style,
         });
 

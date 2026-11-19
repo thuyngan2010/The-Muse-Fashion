@@ -261,8 +261,10 @@ const COLOR_HEX: Record<string, string> = {
               <div class="img-item">
                 <img [src]="url" [alt]="'Ảnh sản phẩm ' + (i + 1)" />
                 @if (i === 0) { <span class="cover-tag">Ảnh bìa</span> }
+                @if (isAiReference(url)) { <span class="ai-tag">Ảnh AI</span> }
                 <div class="img-tools">
                   @if (i > 0) { <button type="button" (click)="makeCover(i)" title="Đặt làm ảnh bìa">Đặt bìa</button> }
+                  <button type="button" (click)="toggleAiReference(url)" [attr.aria-pressed]="isAiReference(url)" [title]="isAiReference(url) ? 'Bỏ chọn ảnh dùng cho AI thử đồ' : 'Dùng cho AI thử đồ'" [attr.aria-label]="(isAiReference(url) ? 'Bỏ chọn ảnh dùng cho AI thử đồ: ảnh ' : 'Dùng cho AI thử đồ: ảnh ') + (i + 1)">{{ isAiReference(url) ? '★ AI' : '☆ AI' }}</button>
                   <button type="button" (click)="removeImage(i)" title="Xóa ảnh" [attr.aria-label]="'Xóa ảnh ' + (i + 1)">Xóa</button>
                 </div>
               </div>
@@ -275,6 +277,8 @@ const COLOR_HEX: Record<string, string> = {
             }
           </div>
           <span class="hint">JPEG, PNG hoặc WebP, tối đa 5 MB mỗi ảnh.</span>
+          <span class="hint">☆ AI = "Dùng cho AI thử đồ". Chọn ảnh CHỈ có riêng sản phẩm (chụp trải phẳng hoặc trên móc, nền trơn). Không chọn ảnh người mẫu mặc kèm món khác, AI sẽ dễ lấy nhầm.</span>
+          @if (prodImages().length > 0 && !aiReferencePayload()) { <span class="ai-missing">Chưa chọn ảnh AI</span> }
         </fieldset>
 
         <!-- Biến thể -->
@@ -446,6 +450,8 @@ const COLOR_HEX: Record<string, string> = {
     .img-item { position: relative; aspect-ratio: 4 / 5; background: var(--ui-bg-image); overflow: hidden; }
     .img-item img { width: 100%; height: 100%; object-fit: cover; display: block; }
     .cover-tag { position: absolute; left: 4px; top: 4px; padding: 2px 6px; background: var(--ui-ink); color: #fff; font: 700 10px/14px var(--font-sans); }
+    .ai-tag { position: absolute; right: 4px; top: 4px; padding: 2px 6px; background: var(--ui-accent, #8f485d); color: #fff; font: 700 10px/14px var(--font-sans); }
+    .ai-missing { align-self: flex-start; padding: 2px 8px; border: 1px solid var(--ui-line); color: var(--ui-ink-soft); font: 600 11px/16px var(--font-sans); }
     .img-tools { position: absolute; inset: auto 0 0 0; display: flex; gap: 2px; background: #171717b3; }
     .img-tools button { flex: 1; border: 0; background: none; color: #fff; padding: 5px 2px; font: 600 10px/12px var(--font-sans); cursor: pointer; }
     .img-tools button:hover { background: #ffffff26; }
@@ -734,6 +740,7 @@ export class AdminProductsPage implements OnInit, OnDestroy {
     this.prodPrice = 500000; this.prodStatus = 'DRAFT'; this.prodCategoryId = '';
     this.prodImages.set([]); this.variants.set([]); this.variantEdits = {}; this.variantOriginals = {};
     this.mediaIdByUrl.clear(); this.pendingMediaIds = []; this.rawImageCount = 0;
+    this.aiReference.set(null); this.aiReferenceLoadedFor = '';
     this.showAddVariant.set(false);
     this.productDrawerOpen.set(true);
   }
@@ -747,6 +754,7 @@ export class AdminProductsPage implements OnInit, OnDestroy {
     this.prodImages.set([...(product.images || [])]);
     this.mediaIdByUrl.clear();
     this.rawImageCount = (product.images || []).length;
+    this.aiReference.set(null); this.aiReferenceLoadedFor = '';
     this.pendingMediaIds = [...((product as ProductSummary & { imageMediaIds?: string[] }).imageMediaIds ?? [])];
     this.showAddVariant.set(false);
     this.variants.set([]); this.variantEdits = {}; this.variantOriginals = {};
@@ -763,6 +771,8 @@ export class AdminProductsPage implements OnInit, OnDestroy {
       next: detail => {
         this.applyVariants(detail.variants || []);
         this.attachMediaPreviews(detail.images || []);
+        // Chỉ lấy từ server ở lần tải đầu của sản phẩm: thêm biến thể xong tải lại không làm mất lựa chọn chưa lưu.
+        if (this.aiReferenceLoadedFor !== detail.id) { this.aiReferenceLoadedFor = detail.id; this.aiReference.set(detail.aiReferenceImage ?? null); }
         this.loadingVariants.set(false);
       },
       error: () => {
@@ -825,8 +835,22 @@ export class AdminProductsPage implements OnInit, OnDestroy {
     });
   }
 
+  /** Ảnh dùng cho AI thử đồ/phối đồ: lưu bằng URL (ảnh nhập tay) hoặc id ảnh tải lên. */
+  readonly aiReference = signal<string | null>(null);
+  private aiReferenceLoadedFor = '';
+  private aiKey(url: string): string { return this.mediaIdByUrl.get(url) ?? url; }
+  isAiReference(url: string): boolean { return this.aiReference() === this.aiKey(url); }
+  toggleAiReference(url: string): void { this.aiReference.set(this.isAiReference(url) ? null : this.aiKey(url)); }
+  /** Giá trị gửi lên server: chỉ khi ảnh đã chọn vẫn còn trong danh sách ảnh của sản phẩm. */
+  aiReferencePayload(): string | null {
+    const value = this.aiReference();
+    const { images, imageMediaIds } = this.imagePayload();
+    return value && (images.includes(value) || imageMediaIds.includes(value)) ? value : null;
+  }
+
   removeImage(index: number): void {
     const url = this.prodImages()[index];
+    if (url && this.isAiReference(url)) this.aiReference.set(null);
     if (url) this.mediaIdByUrl.delete(url);
     this.prodImages.update(list => list.filter((_, i) => i !== index));
   }
@@ -848,6 +872,7 @@ export class AdminProductsPage implements OnInit, OnDestroy {
       categoryId: this.prodCategoryId,
       status: this.prodStatus,
       ...this.imagePayload(),
+      aiReferenceImage: this.aiReferencePayload(),
     };
     this.saving.set(true);
 

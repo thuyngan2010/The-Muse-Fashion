@@ -2921,6 +2921,10 @@ components:
         slug: {type: string, pattern: '^[a-z0-9]+(?:-[a-z0-9]+)*$'}
         description: {type: string, maxLength: 10000}
         status: {type: string, enum: [DRAFT, PUBLISHED, ARCHIVED]}
+        aiReferenceImage:
+          type: [string, 'null']
+          maxLength: 2048
+          description: Optional. The product image used as the AI try-on/mix-match reference, either a URL from images or an id from imageMediaIds of this same product (400 otherwise). null clears it; removing that image clears it automatically. Returned by the admin product detail only.
     UserProfile:
       allOf:
       - {$ref: '#/components/schemas/UserSummary'}
