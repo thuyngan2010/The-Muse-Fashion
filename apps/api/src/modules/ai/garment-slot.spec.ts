@@ -37,6 +37,12 @@ describe('detectGarmentSlot: vị trí mặc từ tên danh mục và tên sản
     expect(matchGarmentText('Áo dài tay basic').slot).toBe('TOP');
   });
 
+  it('treats "jean" as a material when another keyword is present', () => {
+    expect(matchGarmentText('Đầm jean').slot).toBe('ONE_PIECE');
+    expect(matchGarmentText('Áo jean').slot).toBe('TOP');
+    expect(matchGarmentText('Jeans ống loe').slot).toBe('BOTTOM');
+  });
+
   it('does not confuse accented words that only look alike without accents', () => {
     expect(matchGarmentText('Set đồ đẹp').slot).toBe('UNKNOWN');
     expect(matchGarmentText('Áo thun đẹp').slot).toBe('TOP');

@@ -144,7 +144,8 @@ describe('OpenAI-compatible image edits', () => {
       products: [{ category: 'Áo', name: 'Áo sơ mi lụa', material: 'Lụa' }] });
     const withBody = JSON.parse(String(fetchMock.mock.calls[0][1].body)).prompt;
     expect(withBody).toContain('- Stated height: 165 cm\n- Stated weight: 52 kg');
-    expect(withBody).toContain('- Image 2: Áo – Áo sơ mi lụa, Lụa');
+    // Dòng ảnh sản phẩm nay ghi vị trí mặc + danh từ món đồ và lệnh chỉ lấy đúng món đó (phối đồ AI lấy đúng món).
+    expect(withBody).toContain('- Image 2: TOP – shirt – "Áo sơ mi lụa", Lụa\n  Use ONLY the shirt from Image 2.');
     await new AiProviderService().runJob({ ...input });
     expect(JSON.parse(String(fetchMock.mock.calls[1][1].body)).prompt).not.toContain('Stated height');
   });

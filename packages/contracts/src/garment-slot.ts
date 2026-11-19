@@ -97,11 +97,14 @@ function hasAccents(value: string): boolean {
 
 // Từ chung chung: danh mục chỉ ghi "Áo", "Váy", "Quần" thì chưa đủ biết vị trí (áo khoác? chân váy? quần yếm?).
 const GENERIC_PHRASES = new Set(['áo', 'váy', 'quần', 'top', 'tops']);
+// Từ chỉ chất liệu: "jean" đứng một mình là quần jean, nhưng "Váy jean", "Áo jean" là váy/áo bằng vải jean.
+// Chỉ dùng khi không có từ khóa nào khác khớp.
+const WEAK_PHRASES = new Set(['jean', 'jeans']);
 
-type PreparedRule = { accented: string; plain: string; slot: Rule[1]; noun: string; label: string; generic: boolean };
+type PreparedRule = { accented: string; plain: string; slot: Rule[1]; noun: string; label: string; generic: boolean; weak: boolean };
 // Cụm dài trước: tránh "áo" ăn mất "áo khoác", "váy" ăn mất "chân váy".
 const PREPARED: readonly PreparedRule[] = RULES
-  .map(([phrase, slot, noun, label]) => ({ accented: words(phrase, true), plain: words(phrase, false), slot, noun, label, generic: GENERIC_PHRASES.has(phrase) }))
+  .map(([phrase, slot, noun, label]) => ({ accented: words(phrase, true), plain: words(phrase, false), slot, noun, label, generic: GENERIC_PHRASES.has(phrase), weak: WEAK_PHRASES.has(phrase) }))
   .sort((a, b) => b.plain.length - a.plain.length);
 
 const UNKNOWN_MATCH: GarmentSlotMatch = { slot: 'UNKNOWN', noun: null, label: 'Khác' };
@@ -119,7 +122,8 @@ function findRule(value: string | null | undefined): PreparedRule | undefined {
   if (typeof value !== 'string' || !value.trim()) return undefined;
   const accents = hasAccents(value);
   const text = words(value, accents);
-  return PREPARED.find(rule => text.includes(accents ? rule.accented : rule.plain));
+  const matches = (rule: PreparedRule) => text.includes(accents ? rule.accented : rule.plain);
+  return PREPARED.find(rule => !rule.weak && matches(rule)) ?? PREPARED.find(rule => rule.weak && matches(rule));
 }
 
 /**
