@@ -7,6 +7,7 @@ import { AuthService } from '../../services/auth.service';
 import { ToastService } from '../../services/toast.service';
 import { AdminOrdersPage } from './admin-orders.page';
 import { AdminCustomersPage } from './admin-customers.page';
+import { AdminUsersPage } from './admin-users.page';
 
 const auth = { isAdmin: () => false, isStaff: () => true, currentUser: () => ({ id: 'staff' }), can: () => true, canGlobal: () => true };
 
@@ -50,6 +51,22 @@ describe('Admin customers filters', () => {
     params.next(convertToParamMap({ status: 'SUSPENDED', q: 'khach@example.com' }));
     expect(adminListUsers).toHaveBeenLastCalledWith(1, 20, 'CUSTOMER', { q: 'khach@example.com', status: 'SUSPENDED' });
     expect(adminListUsers).toHaveBeenCalledTimes(3);
+    page.ngOnDestroy();
+  });
+});
+
+describe('Admin staff filters (Báo cáo và phân quyền)', () => {
+  it('reloads staff and admins with the typed name/email and status', () => {
+    const adminListUsers = vi.fn(() => of({ items: [], total: 0, page: 1, limit: 20, statusCounts: {} }));
+    const { page, params } = setup(AdminUsersPage, { adminListUsers });
+    adminListUsers.mockClear();
+    page.onSearch('nhanvien@muse.vn');
+    params.next(convertToParamMap({ q: 'nhanvien@muse.vn' }));
+    expect(adminListUsers).toHaveBeenCalledWith(1, expect.any(Number), 'STAFF', { q: 'nhanvien@muse.vn', status: 'ALL' });
+    adminListUsers.mockClear();
+    page.setStatusFilter('SUSPENDED');
+    params.next(convertToParamMap({ q: 'nhanvien@muse.vn', status: 'SUSPENDED' }));
+    expect(adminListUsers).toHaveBeenCalledWith(1, expect.any(Number), 'STAFF', { q: 'nhanvien@muse.vn', status: 'SUSPENDED' });
     page.ngOnDestroy();
   });
 });
