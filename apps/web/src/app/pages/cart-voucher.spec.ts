@@ -1,5 +1,5 @@
 import { readFileSync } from 'node:fs';
-import { Injector, runInInjectionContext, signal } from '@angular/core';
+import { Injector, runInInjectionContext, signal, ɵChangeDetectionScheduler, ɵEffectScheduler } from '@angular/core';
 import { ActivatedRoute, Router, convertToParamMap } from '@angular/router';
 import { of, throwError } from 'rxjs';
 import { describe, expect, it, vi } from 'vitest';
@@ -22,6 +22,9 @@ function makeCart(api: Record<string, unknown>, authenticated = true) {
     { provide: CartService, useValue: { cart, loading: signal(false) } },
     { provide: AuthService, useValue: { isAuthenticated: () => authenticated } },
     { provide: Router, useValue: { navigate } },
+    // CartPage dùng effect(); test không có ứng dụng Angular nên cung cấp bộ lập lịch giả (giống audit-three.spec.ts).
+    { provide: ɵEffectScheduler, useValue: { add: () => {}, schedule: () => {}, remove: () => {}, flush: () => {} } },
+    { provide: ɵChangeDetectionScheduler, useValue: { notify: () => {}, runningTick: false } },
   ] });
   const page = runInInjectionContext(injector, () => new CartPage());
   return { page, navigate };
