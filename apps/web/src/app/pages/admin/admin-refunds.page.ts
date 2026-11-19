@@ -247,9 +247,9 @@ const COUNT_STATES = ['PENDING_APPROVAL', 'APPROVED', 'SUCCEEDED', 'FAILED'];
               <textarea [(ngModel)]="eventReviewNote" name="note" rows="3" placeholder="Nhập ghi chú giải thích quyết định kiểm toán…" required></textarea>
             </label>
             <label>Chứng từ kiểm toán *
-              <input type="file" accept="image/jpeg,image/png,image/webp" [disabled]="uploadingEvidence() || savingEventReview()" (change)="uploadEvidence($event)" />
+              @for (v of [evidenceInputVersion()]; track v) { <input type="file" accept="image/jpeg,image/png,image/webp" [disabled]="uploadingEvidence() || savingEventReview()" (change)="uploadEvidence($event)" /> }
               @if (uploadingEvidence()) { <span class="hint">Đang tải chứng từ…</span> }
-              @if (evidenceObjectKey()) { <span class="hint">Đã tải chứng từ.</span> }
+              @if (evidenceObjectKey()) { <span class="hint evidence-done">Đã tải chứng từ{{ evidenceFileName() ? ': ' + evidenceFileName() : '' }}. <button type="button" class="evidence-clear" (click)="clearEvidence()">Xóa ảnh</button></span> }
             </label>
           } @else {
             <p class="hint">Chỉ Admin được đánh giá sự kiện thanh toán.</p>
@@ -274,9 +274,9 @@ const COUNT_STATES = ['PENDING_APPROVAL', 'APPROVED', 'SUCCEEDED', 'FAILED'];
       <form (ngSubmit)="submitFailRefund()" class="modal-form">
         @if (selectedRefund()?.state === 'APPROVED') {
           <label>Chứng từ giao dịch thất bại *
-            <input type="file" accept="image/jpeg,image/png,image/webp" (change)="uploadEvidence($event)" [disabled]="uploadingEvidence()" />
+            @for (v of [evidenceInputVersion()]; track v) { <input type="file" accept="image/jpeg,image/png,image/webp" (change)="uploadEvidence($event)" [disabled]="uploadingEvidence()" /> }
           </label>
-          @if (evidenceObjectKey()) { <span class="hint">Đã tải chứng từ.</span> }
+          @if (evidenceObjectKey()) { <span class="hint evidence-done">Đã tải chứng từ{{ evidenceFileName() ? ': ' + evidenceFileName() : '' }}. <button type="button" class="evidence-clear" (click)="clearEvidence()">Xóa ảnh</button></span> }
         }
         <p class="hint">Bạn đang đánh dấu thất bại cho khoản hoàn tiền của đơn <strong>{{ selectedRefund()?.orderId?.slice(0, 8) }}</strong>.</p>
         <label>Lý do từ chối / thất bại *
@@ -340,9 +340,9 @@ const COUNT_STATES = ['PENDING_APPROVAL', 'APPROVED', 'SUCCEEDED', 'FAILED'];
           <input type="text" [(ngModel)]="compBankRef" name="bankRef" placeholder="Mã giao dịch ngân hàng chuyển khoản" required />
         </label>
         <label>Ảnh chứng từ chuyển khoản *
-          <input type="file" accept="image/jpeg,image/png,image/webp" [disabled]="uploadingEvidence()" (change)="uploadEvidence($event)" />
+          @for (v of [evidenceInputVersion()]; track v) { <input type="file" accept="image/jpeg,image/png,image/webp" [disabled]="uploadingEvidence()" (change)="uploadEvidence($event)" /> }
           @if (uploadingEvidence()) { <span class="hint">Đang tải chứng từ…</span> }
-          @if (evidenceObjectKey()) { <span class="hint">Đã tải chứng từ.</span> }
+          @if (evidenceObjectKey()) { <span class="hint evidence-done">Đã tải chứng từ{{ evidenceFileName() ? ': ' + evidenceFileName() : '' }}. <button type="button" class="evidence-clear" (click)="clearEvidence()">Xóa ảnh</button></span> }
         </label>
         <div class="modal-actions">
           <button type="button" class="btn-outline" (click)="completeModalOpen.set(false)">Hủy</button>
@@ -366,6 +366,7 @@ const COUNT_STATES = ['PENDING_APPROVAL', 'APPROVED', 'SUCCEEDED', 'FAILED'];
     .kpi-value { font: 500 26px/32px var(--font-serif); overflow-wrap: anywhere; }
     .kpi-note { font-size: 11px; line-height: 16px; color: var(--ui-subtle); }
     .note, .hint { margin: 0; font-size: 12px; color: var(--ui-subtle); }
+    .evidence-clear { margin-left: 6px; padding: 0; border: 0; background: none; color: #b3261e; font: inherit; font-weight: 600; text-decoration: underline; cursor: pointer; }
     .sub-tabs { display: flex; gap: 4px; flex-wrap: wrap; border-bottom: 1px solid var(--admin-line); }
     .sub-tab { display: inline-flex; align-items: center; gap: 8px; padding: 10px 14px; margin-bottom: -1px; border: 0; border-bottom: 2px solid transparent; background: none; font: 600 13px/20px var(--font-sans); color: var(--ui-ink-soft); cursor: pointer; }
     .sub-tab:hover { background: var(--ui-bg-soft); color: var(--ui-ink); }
@@ -495,6 +496,9 @@ export class AdminRefundsPage implements OnInit {
   // Form hoàn tất
   compBankRef = '';
   readonly evidenceObjectKey = signal('');
+  readonly evidenceFileName = signal('');
+  /** Tăng để tạo lại ô chọn file, xóa tên file cũ còn hiển thị. */
+  readonly evidenceInputVersion = signal(0);
   readonly uploadingEvidence = signal(false);
 
   ngOnInit(): void {
@@ -595,7 +599,7 @@ export class AdminRefundsPage implements OnInit {
   openFailModal(rf: Refund): void {
     this.selectedRefund.set(rf);
     this.failReason = '';
-    this.evidenceObjectKey.set('');
+    this.clearEvidence();
     this.failModalOpen.set(true);
   }
 
@@ -650,7 +654,7 @@ export class AdminRefundsPage implements OnInit {
     this.eventReviewDecision = ev.resolution === 'PENDING_APPROVAL' ? 'APPROVE' : 'ESCALATED';
     this.eventReviewBankReference = '';
     this.eventReviewNote = '';
-    this.evidenceObjectKey.set('');
+    this.clearEvidence();
     this.api.adminGetPaymentEvent(ev.id).subscribe({
       next: detail => { if (this.selectedEvent()?.id !== ev.id) return; this.selectedEvent.set(detail); this.reviewEventModalOpen.set(true); },
       error: () => this.toast.error('Không thể tải chứng từ và đề xuất đối soát.'),
@@ -795,7 +799,7 @@ export class AdminRefundsPage implements OnInit {
   openCompleteModal(rf: Refund): void {
     this.selectedRefund.set(rf);
     this.compBankRef = '';
-    this.evidenceObjectKey.set('');
+    this.clearEvidence();
     this.completeModalOpen.set(true);
   }
 
@@ -823,18 +827,28 @@ export class AdminRefundsPage implements OnInit {
     });
   }
 
+  /** Bỏ chứng từ đang chọn: chỉ lưu vào hồ sơ khi bấm Lưu/Xác nhận, nên bỏ ở đây là không gửi kèm. */
+  clearEvidence(): void {
+    this.evidenceObjectKey.set('');
+    this.evidenceFileName.set('');
+    this.evidenceInputVersion.update((v) => v + 1);
+  }
+
   uploadEvidence(event: Event): void {
     const file = (event.target as HTMLInputElement).files?.[0];
     if (!file) return;
     this.evidenceObjectKey.set('');
+    this.evidenceFileName.set('');
     this.uploadingEvidence.set(true);
     this.api.uploadImage(file, 'refund_evidence').subscribe({
       next: (media) => {
         this.evidenceObjectKey.set(media.objectKey);
+        this.evidenceFileName.set(file.name);
         this.uploadingEvidence.set(false);
       },
       error: (err) => {
         this.uploadingEvidence.set(false);
+        this.evidenceInputVersion.update((v) => v + 1);
         this.toast.error(err.error?.message || err.message || 'Không thể tải chứng từ.');
       },
     });
