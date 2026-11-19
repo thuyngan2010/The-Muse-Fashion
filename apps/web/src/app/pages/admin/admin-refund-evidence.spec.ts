@@ -5,7 +5,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { ApiService } from '../../services/api.service';
 import { AuthService } from '../../services/auth.service';
 import { ToastService } from '../../services/toast.service';
-import { AdminRefundsPage } from './admin-refunds.page';
+import { AdminRefundsPage, reviewErrorText } from './admin-refunds.page';
 
 function makePage(api: Record<string, unknown>) {
   const injector = Injector.create({ providers: [
@@ -38,5 +38,26 @@ describe('Refund evidence can be removed before saving', () => {
     page.openReviewEventModal(ev as never);
     expect(page.evidenceObjectKey()).toBe('');
     expect(page.evidenceFileName()).toBe('');
+  });
+});
+
+describe('Payment event review form tells what is missing', () => {
+  it('lists bank reference, 10-character note and evidence, and clears once filled', () => {
+    const page = makePage({ uploadImage: vi.fn(() => of({ id: 'm1', objectKey: 'k1' })) });
+    page.eventReviewDecision = 'OUTGOING_RECONCILED';
+    page.eventReviewBankReference = 'ab';
+    page.eventReviewNote = 'ngắn';
+    expect(page.reviewMissing()).toEqual([
+      'mã chứng từ ngân hàng (tối thiểu 3 ký tự)', 'ghi chú kiểm toán tối thiểu 10 ký tự (hiện có 4)', 'ảnh chứng từ kiểm toán',
+    ]);
+    page.eventReviewBankReference = 'FT2611180001';
+    page.eventReviewNote = 'Đã đối chiếu sao kê ngân hàng';
+    page.uploadEvidence({ target: { files: [new File(['x'], 'a.png', { type: 'image/png' })] } } as unknown as Event);
+    expect(page.reviewMissing()).toEqual([]);
+  });
+
+  it('explains the API rejection in Vietnamese', () => {
+    expect(reviewErrorText('Merchant funds cannot be closed without a recorded resolution')).toContain('tiền đã vào tài khoản cửa hàng');
+    expect(reviewErrorText('Something else')).toBe('Something else');
   });
 });
