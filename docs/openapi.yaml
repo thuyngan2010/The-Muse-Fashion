@@ -299,7 +299,8 @@ paths:
         schema: {type: string, maxLength: 100}
       - name: sort
         in: query
-        schema: {type: string, enum: [newest, price_asc, price_desc, name_asc]}
+        description: rating returns only products with at least one public review, highest average stars first.
+        schema: {type: string, enum: [newest, price_asc, price_desc, name_asc, rating]}
       responses:
         '200':
           description: Published products

@@ -8,6 +8,21 @@ import { STORE_HOME_CONTENT } from '../shared/store-content';
 
 type CategoryTile = { category: Category; image: string; count: number | null };
 
+/**
+ * Sản phẩm nổi bật: ưu tiên sản phẩm có điểm đánh giá cao (rated, đã sắp xếp từ API sort=rating).
+ * Chưa có sản phẩm nào được đánh giá thì giữ cách cũ: sản phẩm thứ 5–8 trong danh sách mới nhất.
+ * Thiếu chỗ thì lấp bằng các sản phẩm mới nhất (có thể trùng khối Hàng mới về), không lặp trong chính khối nổi bật.
+ */
+export function pickFeaturedProducts(rated: ProductSummary[], newest: ProductSummary[], size = 4): ProductSummary[] {
+  const picked = (rated.length > 0 ? rated : newest.slice(4, 4 + size)).slice(0, size);
+  const ids = new Set(picked.map(p => p.id));
+  for (const p of newest) {
+    if (picked.length >= size) break;
+    if (!ids.has(p.id)) { picked.push(p); ids.add(p.id); }
+  }
+  return picked;
+}
+
 @Component({
   selector: 'fc-home-page',
   standalone: true,
@@ -202,8 +217,9 @@ export class HomePage implements OnInit, OnDestroy {
   readonly tiles = signal<CategoryTile[]>([]);
   private readonly allCategories = signal<Category[]>([]);
   private readonly allProducts = signal<ProductSummary[]>([]);
+  private readonly ratedProducts = signal<ProductSummary[]>([]);
   readonly newest = computed(() => this.allProducts().slice(0, 4));
-  readonly featured = computed(() => this.allProducts().slice(4, 8));
+  readonly featured = computed(() => pickFeaturedProducts(this.ratedProducts(), this.allProducts()));
   private readonly categoryMap = computed(() => new Map(this.allCategories().map(c => [c.id, c.name])));
 
   private timer?: ReturnType<typeof setInterval>;
@@ -215,6 +231,11 @@ export class HomePage implements OnInit, OnDestroy {
     this.subs.push(this.api.products({ sort: 'newest', limit: 8 }).subscribe({
       next: res => this.allProducts.set(res.items),
       error: () => this.productError.set(true),
+    }));
+
+    this.subs.push(this.api.products({ sort: 'rating', limit: 4 }).subscribe({
+      next: res => this.ratedProducts.set(res.items),
+      error: () => this.ratedProducts.set([]),
     }));
 
     this.subs.push(this.api.categories().subscribe({
