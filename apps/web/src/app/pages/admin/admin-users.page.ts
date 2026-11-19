@@ -316,6 +316,9 @@ export class AdminUsersPage implements OnInit, OnDestroy {
   private readonly search$ = new Subject<string>();
   private readonly subs = new Subscription();
   private firstParams = true;
+  /** Bộ lọc đã dùng để tải danh sách; search()/statusFilter() đổi ngay khi thao tác nên không dùng để so sánh. */
+  private appliedQuery = '';
+  private appliedStatus = 'ALL';
 
   readonly limit = 20;
   readonly page = signal(1);
@@ -367,9 +370,11 @@ export class AdminUsersPage implements OnInit, OnDestroy {
     const q = params.get('q')?.trim() ?? '';
     const raw = params.get('status');
     const status = raw === 'ACTIVE' || raw === 'PENDING_VERIFICATION' || raw === 'SUSPENDED' ? raw : 'ALL';
-    const changed = this.firstParams || q !== this.search().trim() || status !== this.statusFilter();
+    const changed = this.firstParams || q !== this.appliedQuery || status !== this.appliedStatus;
     this.search.set(q);
     this.statusFilter.set(status);
+    this.appliedQuery = q;
+    this.appliedStatus = status;
     this.firstParams = false;
     if (changed) { this.page.set(1); this.load(); }
   }

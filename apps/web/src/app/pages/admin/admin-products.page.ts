@@ -573,6 +573,14 @@ export class AdminProductsPage implements OnInit, OnDestroy {
   readonly saving = signal(false);
   readonly uploading = signal(false);
   readonly prodImages = signal<string[]>([]);
+  /**
+   * Ảnh tải lên được lưu dạng media riêng tư (API trả url = null) nên gửi bằng imageMediaIds;
+   * map này nối URL xem trước đang hiển thị với mediaId tương ứng.
+   */
+  private readonly mediaIdByUrl = new Map<string, string>();
+  /** mediaId của sản phẩm đang sửa chưa có URL xem trước (giữ nguyên khi lưu). */
+  private pendingMediaIds: string[] = [];
+  private rawImageCount = 0;
   readonly variants = signal<ProductVariant[]>([]);
   readonly loadingVariants = signal(false);
   readonly showAddVariant = signal(false);
@@ -726,6 +734,7 @@ export class AdminProductsPage implements OnInit, OnDestroy {
     this.prodName = ''; this.prodSlug = ''; this.prodDescription = ''; this.prodMaterial = '';
     this.prodPrice = 500000; this.prodStatus = 'DRAFT'; this.prodCategoryId = '';
     this.prodImages.set([]); this.variants.set([]); this.variantEdits = {}; this.variantOriginals = {};
+    this.mediaIdByUrl.clear(); this.pendingMediaIds = []; this.rawImageCount = 0;
     this.showAddVariant.set(false);
     this.productDrawerOpen.set(true);
   }
@@ -737,6 +746,9 @@ export class AdminProductsPage implements OnInit, OnDestroy {
     this.prodPrice = product.price; this.prodCategoryId = product.categoryId || '';
     this.prodStatus = product.status;
     this.prodImages.set([...(product.images || [])]);
+    this.mediaIdByUrl.clear();
+    this.rawImageCount = (product.images || []).length;
+    this.pendingMediaIds = [...((product as ProductSummary & { imageMediaIds?: string[] }).imageMediaIds ?? [])];
     this.showAddVariant.set(false);
     this.variants.set([]); this.variantEdits = {}; this.variantOriginals = {};
     this.productDrawerOpen.set(true);
@@ -751,6 +763,7 @@ export class AdminProductsPage implements OnInit, OnDestroy {
     this.api.adminGetProduct(this.editingProductId).subscribe({
       next: detail => {
         this.applyVariants(detail.variants || []);
+        this.attachMediaPreviews(detail.images || []);
         this.loadingVariants.set(false);
       },
       error: () => {
@@ -782,17 +795,29 @@ export class AdminProductsPage implements OnInit, OnDestroy {
     this.prodStatus = (event.target as HTMLInputElement).checked ? 'PUBLISHED' : 'DRAFT';
   }
 
+  /** Chi tiết sản phẩm trả ảnh theo thứ tự: URL thường trước, rồi ảnh media theo imageMediaIds. */
+  private attachMediaPreviews(images: string[]): void {
+    const ids = this.pendingMediaIds;
+    if (!ids.length || images.length !== this.rawImageCount + ids.length) return;
+    const previews = images.slice(this.rawImageCount);
+    previews.forEach((url, i) => this.mediaIdByUrl.set(url, ids[i]));
+    this.pendingMediaIds = [];
+    this.prodImages.update(list => [...list.slice(0, this.rawImageCount), ...previews, ...list.slice(this.rawImageCount)]);
+  }
+
   uploadImage(event: Event): void {
     const input = event.target as HTMLInputElement;
     const file = input.files?.[0];
     input.value = '';
     if (!file) return;
-    if (this.prodImages().length >= MAX_IMAGES) { this.toast.warning(`Tối đa 10 ảnh cho mỗi sản phẩm.`); return; }
+    if (this.prodImages().length + this.pendingMediaIds.length >= MAX_IMAGES) { this.toast.warning(`Tối đa 10 ảnh cho mỗi sản phẩm.`); return; }
     this.uploading.set(true);
     this.api.uploadImage(file, 'product').subscribe({
       next: media => {
         this.uploading.set(false);
-        const url = media.url; if (url) this.prodImages.update(list => [...list, url]);
+        const preview = media.url || URL.createObjectURL(file);
+        this.mediaIdByUrl.set(preview, media.id);
+        this.prodImages.update(list => [...list, preview]);
       },
       error: err => {
         this.uploading.set(false);
@@ -801,7 +826,11 @@ export class AdminProductsPage implements OnInit, OnDestroy {
     });
   }
 
-  removeImage(index: number): void { this.prodImages.update(list => list.filter((_, i) => i !== index)); }
+  removeImage(index: number): void {
+    const url = this.prodImages()[index];
+    if (url) this.mediaIdByUrl.delete(url);
+    this.prodImages.update(list => list.filter((_, i) => i !== index));
+  }
   makeCover(index: number): void {
     this.prodImages.update(list => { const next = [...list]; const [item] = next.splice(index, 1); return [item, ...next]; });
   }
@@ -819,7 +848,7 @@ export class AdminProductsPage implements OnInit, OnDestroy {
       price: this.prodPrice,
       categoryId: this.prodCategoryId,
       status: this.prodStatus,
-      images: this.prodImages(),
+      ...this.imagePayload(),
     };
     this.saving.set(true);
 
@@ -854,6 +883,15 @@ export class AdminProductsPage implements OnInit, OnDestroy {
       },
       error: err => { this.saving.set(false); this.toast.error(err.error?.message || 'Không thể lưu sản phẩm.'); },
     });
+  }
+
+  /** Tách ảnh: URL thường gửi qua images, ảnh tải lên gửi qua imageMediaIds (giữ thứ tự hiển thị). */
+  imagePayload(): { images: string[]; imageMediaIds: string[] } {
+    const list = this.prodImages();
+    return {
+      images: list.filter(url => !this.mediaIdByUrl.has(url)),
+      imageMediaIds: [...list.filter(url => this.mediaIdByUrl.has(url)).map(url => this.mediaIdByUrl.get(url)!), ...this.pendingMediaIds],
+    };
   }
 
   private isVariantChanged(id: string): boolean {

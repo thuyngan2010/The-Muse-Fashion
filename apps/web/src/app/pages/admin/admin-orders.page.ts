@@ -37,6 +37,11 @@ function escapeHtml(value: string | number | null | undefined): string {
   return String(value ?? '').replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch] as string));
 }
 
+/** Từ khóa tìm đơn: bỏ khoảng trắng và dấu # ở đầu (giao diện hiển thị mã đơn dạng #FC…, dấu # không thuộc mã). */
+export function orderSearchTerm(value: string): string {
+  return value.trim().replace(/^#+\s*/, '');
+}
+
 @Component({
   standalone: true,
   imports: [PaginationComponent, DatePipe, RouterLink, FormsModule, ModalComponent, AdminDrawerComponent, AdminOrderTabsComponent],
@@ -432,6 +437,8 @@ export class AdminOrdersPage implements OnInit, OnDestroy {
   private readonly subs = new Subscription();
   private urlOrderId = '';
   private firstParams = true;
+  /** Từ khóa đã dùng để tải danh sách; query() đổi ngay khi gõ nên không dùng để so sánh. */
+  private appliedQuery = '';
 
   // Drawer
   readonly drawerOpen = signal(false);
@@ -472,7 +479,7 @@ export class AdminOrdersPage implements OnInit, OnDestroy {
 
   ngOnInit(): void {
     // Ô tìm: chờ 300ms sau khi ngừng gõ, ghi ?q= lên URL; thay đổi URL là nguồn kích hoạt tải lại (về trang 1).
-    this.subs.add(this.search$.pipe(map(v => v.trim()), debounceTime(300), distinctUntilChanged()).subscribe(value => {
+    this.subs.add(this.search$.pipe(map(v => orderSearchTerm(v)), debounceTime(300), distinctUntilChanged()).subscribe(value => {
       void this.router.navigate([], { relativeTo: this.route, queryParams: { q: value || null }, queryParamsHandling: 'merge', replaceUrl: true });
     }));
     this.subs.add(this.route.queryParamMap.subscribe(params => this.applyParams(params)));
@@ -492,10 +499,11 @@ export class AdminOrdersPage implements OnInit, OnDestroy {
 
   /** Đọc ?q=, ?customerId=, ?orderId=. q và customerId đổi thì tải lại từ trang 1; orderId mở drawer đơn đó. */
   private applyParams(params: ParamMap): void {
-    const q = params.get('q')?.trim() ?? '';
+    const q = orderSearchTerm(params.get('q') ?? '');
     const customerId = params.get('customerId') ?? '';
-    const changed = this.firstParams || q !== this.query().trim() || customerId !== this.customerFilter();
-    if (q !== this.query().trim()) this.query.set(q);
+    const changed = this.firstParams || q !== this.appliedQuery || customerId !== this.customerFilter();
+    if (q !== orderSearchTerm(this.query())) this.query.set(q);
+    this.appliedQuery = q;
     const customerChanged = customerId !== this.customerFilter();
     if (customerChanged) {
       this.customerFilter.set(customerId);
@@ -546,7 +554,7 @@ export class AdminOrdersPage implements OnInit, OnDestroy {
     this.loading.set(true);
     this.loadError.set('');
     this.pagination.load(() => this.api.adminListOrders(this.selectedState() || undefined, this.pagination.page(), this.pagination.limit, {
-      q: this.query().trim() || undefined, customerId: this.customerFilter() || undefined,
+      q: orderSearchTerm(this.query()) || undefined, customerId: this.customerFilter() || undefined,
     }), {
       next: (res) => {
         this.orders.set(res.items);

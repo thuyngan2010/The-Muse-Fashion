@@ -281,6 +281,9 @@ export class AdminCustomersPage implements OnInit, OnDestroy {
   private readonly subs = new Subscription();
   private detailSub?: Subscription;
   private firstParams = true;
+  /** Bộ lọc đã dùng để tải danh sách; search()/statusFilter() đổi ngay khi thao tác nên không dùng để so sánh. */
+  private appliedQuery = '';
+  private appliedStatus: 'ALL' | 'ACTIVE' | 'SUSPENDED' = 'ALL';
   private urlCustomerId = '';
 
   ngOnInit(): void {
@@ -304,9 +307,11 @@ export class AdminCustomersPage implements OnInit, OnDestroy {
     const q = params.get('q')?.trim() ?? '';
     const rawStatus = params.get('status');
     const status = rawStatus === 'ACTIVE' || rawStatus === 'SUSPENDED' ? rawStatus : 'ALL';
-    const changed = this.firstParams || q !== this.search().trim() || status !== this.statusFilter();
+    const changed = this.firstParams || q !== this.appliedQuery || status !== this.appliedStatus;
     this.search.set(q);
     this.statusFilter.set(status);
+    this.appliedQuery = q;
+    this.appliedStatus = status;
     this.firstParams = false;
     if (changed) { this.pagination.reset(); this.load(); }
     const customerId = params.get('customerId') ?? '';
