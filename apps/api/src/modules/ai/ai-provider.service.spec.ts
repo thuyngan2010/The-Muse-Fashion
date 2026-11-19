@@ -122,15 +122,18 @@ describe('OpenAI-compatible image edits', () => {
     expect(JSON.parse(String(fetchMock.mock.calls[0][1].body)).prompt).toBe('Fit the referenced glasses to the face; preserve the person.');
   });
 
-  it('appends the body measurement line to the default prompt only when measurements exist', async () => {
+  it('builds the shared try-on prompt (products, measurements) when the planner is off', async () => {
     const fetchMock = vi.fn().mockImplementation(async () => new Response(JSON.stringify({ data: [{ b64_json: png.toString('base64') }] }), {
       headers: { 'content-type': 'application/json' },
     }));
     vi.stubGlobal('fetch', fetchMock);
-    await new AiProviderService().runJob({ ...input, body: { heightCm: 165, weightKg: 52 } });
-    expect(JSON.parse(String(fetchMock.mock.calls[0][1].body)).prompt).toContain('height is 165 cm and weight is 52 kg');
+    await new AiProviderService().runJob({ ...input, body: { heightCm: 165, weightKg: 52 },
+      products: [{ category: 'Áo', name: 'Áo sơ mi lụa', material: 'Lụa' }] });
+    const withBody = JSON.parse(String(fetchMock.mock.calls[0][1].body)).prompt;
+    expect(withBody).toContain('- Stated height: 165 cm\n- Stated weight: 52 kg');
+    expect(withBody).toContain('- Image 2: Áo – Áo sơ mi lụa, Lụa');
     await new AiProviderService().runJob({ ...input });
-    expect(JSON.parse(String(fetchMock.mock.calls[1][1].body)).prompt).not.toContain('stated');
+    expect(JSON.parse(String(fetchMock.mock.calls[1][1].body)).prompt).not.toContain('Stated height');
   });
 
   it('does not retry a failed POST inside the SDK', async () => {
