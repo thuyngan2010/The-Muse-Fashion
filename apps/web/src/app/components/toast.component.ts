@@ -1,11 +1,11 @@
-import { Component, inject } from '@angular/core';
+import { Component, ElementRef, effect, inject, viewChild } from '@angular/core';
 import { ToastService } from '../services/toast.service';
 
 @Component({
   selector: 'fc-toast',
   standalone: true,
   template: `
-    <div class="toast-container" aria-live="polite" aria-atomic="true">
+    <div #stack class="toast-container" popover="manual" aria-live="polite" aria-atomic="true">
       @for (toast of toastService.toasts(); track toast.id) {
         <div class="toast" [class]="'toast-' + toast.type" role="alert">
           <div class="toast-content">
@@ -31,6 +31,15 @@ import { ToastService } from '../services/toast.service';
       max-width: 380px;
       width: calc(100% - 40px);
       pointer-events: none;
+      /* Bỏ style mặc định của popover để giữ nguyên vị trí góc phải phía trên. */
+      bottom: auto;
+      left: auto;
+      height: auto;
+      margin: 0;
+      padding: 0;
+      border: 0;
+      background: transparent;
+      overflow: visible;
     }
     .toast {
       pointer-events: auto;
@@ -91,4 +100,29 @@ import { ToastService } from '../services/toast.service';
 })
 export class ToastComponent {
   readonly toastService = inject(ToastService);
+  private readonly stack = viewChild<ElementRef<HTMLElement>>('stack');
+
+  constructor() {
+    effect(() => {
+      const hasToasts = this.toastService.toasts().length > 0;
+      const el = this.stack()?.nativeElement;
+      if (el) raiseToastLayer(el, hasToasts);
+    });
+  }
+}
+
+/**
+ * Drawer/modal mở bằng showModal() nằm ở "top layer", che mọi phần tử thường kể cả z-index 9999.
+ * Vùng thông báo là popover nên cũng vào top layer; khi đang có drawer/modal mở thì mở lại popover
+ * để nó nằm trên cùng, thông báo lỗi hiện phía trước popup.
+ */
+export function raiseToastLayer(el: HTMLElement, visible: boolean): void {
+  if (typeof el.showPopover !== 'function') return;
+  const open = el.matches(':popover-open');
+  if (!visible) { if (open) el.hidePopover(); return; }
+  let modalOpen = false;
+  try { modalOpen = !!el.ownerDocument.querySelector('dialog:modal'); } catch { modalOpen = false; }
+  if (open && !modalOpen) return;
+  if (open) el.hidePopover();
+  el.showPopover();
 }
